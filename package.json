@@ -1,0 +1,49 @@
+{
+    "name": "@openclaw/gigabrain",
+    "version": "0.3.0-rc1",
+    "type": "module",
+    "description": "Standalone OpenClaw memory plugin — capture, recall, dedupe, audit, native sync",
+    "scripts": {
+        "test": "node tests/run-all.js",
+        "test:unit": "node tests/run-all.js --filter unit",
+        "test:integration": "node tests/run-all.js --filter integration",
+        "test:regression": "node tests/run-all.js --filter regression",
+        "test:performance": "node tests/run-all.js --filter performance",
+        "gigabrainctl": "node scripts/gigabrainctl.js",
+        "nightly": "node scripts/gigabrainctl.js nightly",
+        "maintain": "node scripts/gigabrainctl.js maintain",
+        "audit": "node scripts/gigabrainctl.js audit --mode shadow",
+        "inventory": "node scripts/gigabrainctl.js inventory",
+        "doctor": "node scripts/gigabrainctl.js doctor",
+        "migrate:v3": "node scripts/migrate-v3.js",
+        "harmonize": "node scripts/harmonize-memory.js"
+    },
+    "keywords": [
+        "openclaw",
+        "memory",
+        "plugin",
+        "gigabrain"
+    ],
+    "openclaw": {
+        "extensions": [
+            "./index.ts"
+        ]
+    },
+    "peerDependencies": {
+        "openclaw": ">=2026.2.15"
+    },
+    "peerDependenciesMeta": {
+        "openclaw": {
+            "optional": false
+        }
+    },
+    "files": [
+        "index.ts",
+        "lib/",
+        "scripts/",
+        "eval/",
+        "package.json",
+        "openclaw.plugin.json",
+        "README.md"
+    ]
+}

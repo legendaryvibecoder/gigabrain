@@ -1,0 +1,450 @@
+{
+  "id": "gigabrain",
+  "kind": "utility",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true
+      },
+      "runtime": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "default": "local"
+          },
+          "cleanupVersion": {
+            "type": "string",
+            "default": "v3.0.0"
+          },
+          "paths": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "workspaceRoot": {
+                "type": "string"
+              },
+              "memoryRoot": {
+                "type": "string",
+                "default": "memory"
+              },
+              "registryPath": {
+                "type": "string"
+              },
+              "outputDir": {
+                "type": "string",
+                "default": "output"
+              },
+              "reviewQueuePath": {
+                "type": "string",
+                "default": "output/memory-review-queue.jsonl"
+              }
+            }
+          }
+        }
+      },
+      "capture": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "requireMemoryNote": {
+            "type": "boolean",
+            "default": true
+          },
+          "minConfidence": {
+            "type": "number",
+            "default": 0.65
+          },
+          "minContentChars": {
+            "type": "number",
+            "default": 25
+          },
+          "queueOnModelUnavailable": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "dedupe": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "exactEnabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "semanticEnabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "autoThreshold": {
+            "type": "number",
+            "default": 0.92
+          },
+          "reviewThreshold": {
+            "type": "number",
+            "default": 0.85
+          },
+          "crossScopeGlobal": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "recall": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "topK": {
+            "type": "number",
+            "default": 8
+          },
+          "minScore": {
+            "type": "number",
+            "default": 0.45
+          },
+          "maxTokens": {
+            "type": "number",
+            "default": 1200
+          },
+          "archiveFallbackEnabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "personal_core",
+              "project_context",
+              "hybrid"
+            ],
+            "default": "hybrid"
+          },
+          "classBudgets": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "core": {
+                "type": "number",
+                "default": 0.45
+              },
+              "situational": {
+                "type": "number",
+                "default": 0.3
+              },
+              "decisions": {
+                "type": "number",
+                "default": 0.25
+              }
+            }
+          }
+        }
+      },
+      "quality": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "knowledge_rich"
+            ],
+            "default": "knowledge_rich"
+          },
+          "junkFilterEnabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "minContentChars": {
+            "type": "number",
+            "default": 25
+          },
+          "junkPatternsBase": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "<memory_clusters>",
+              "<working_memory>",
+              "<recalled_memories>",
+              "<agent_profile>",
+              "<user_profile>",
+              "<gigabrain-context>",
+              "<context>",
+              "<system>",
+              "<tool_output>",
+              "Read HEARTBEAT",
+              "A new session was started",
+              "System:",
+              "API_KEY=",
+              "_API_KEY=",
+              "SECRET=",
+              "PASSWORD=",
+              "Template placeholder",
+              "benchmark",
+              "mb:",
+              "smoke test",
+              "^\\(none\\)$"
+            ]
+          },
+          "junkPatternsAppend": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "junkPatternsReplace": {
+            "type": "boolean",
+            "default": false
+          },
+          "highValueShortEnabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "highValueShortPatternsBase": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "\\b(?:user|owner)\\s+(?:likes?|loves?|prefers?|dislikes?|hates?)\\b",
+              "\\b(?:i|ich)\\s+(?:like|love|prefer|mag|liebe|bevorzuge)\\b",
+              "\\b(?:pronouns?|pronomen)\\b",
+              "\\b(?:partner(?:in)?|wife|husband|girlfriend|boyfriend|friend|mentor|sibling)\\b",
+              "\\b(?:proud of|stolz auf|grateful|dankbar|appreciates?|sch[aä]tzt|supports?|unterst[uü]tzt|trusts?|vertraut)\\b"
+            ]
+          },
+          "highValueShortPatternsAppend": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "durableEnabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "durablePatternsBase": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "\\b(?:user|owner)\\s+(?:likes?|loves?|prefers?|dislikes?|hates?)\\b",
+              "\\b(?:proud of|stolz auf|grateful|dankbar|appreciates?|sch[aä]tzt|supports?|unterst[uü]tzt|trusts?|vertraut)\\b",
+              "\\b(?:partner(?:in)?|wife|husband|girlfriend|boyfriend|best friend|mentor|sibling)\\b",
+              "\\b(?:pronouns?|pronomen)\\b",
+              "\\b(?:identity|personality|continuity|evolution)\\b"
+            ]
+          },
+          "durablePatternsAppend": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": []
+          },
+          "valueThresholds": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "keep": {
+                "type": "number",
+                "default": 0.75
+              },
+              "archive": {
+                "type": "number",
+                "default": 0.45
+              },
+              "reject": {
+                "type": "number",
+                "default": 0.45
+              }
+            }
+          }
+        }
+      },
+      "llm": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "openclaw",
+              "openai_compatible",
+              "ollama",
+              "none"
+            ],
+            "default": "none"
+          },
+          "baseUrl": {
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "apiKey": {
+            "type": "string"
+          },
+          "timeoutMs": {
+            "type": "number",
+            "default": 12000
+          },
+          "review": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": false
+              },
+              "limit": {
+                "type": "number",
+                "default": 200
+              },
+              "minScore": {
+                "type": "number",
+                "default": 0.24
+              },
+              "maxScore": {
+                "type": "number",
+                "default": 0.52
+              },
+              "minConfidence": {
+                "type": "number",
+                "default": 0.7
+              }
+            }
+          }
+        }
+      },
+      "maintenance": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "snapshotDir": {
+            "type": "string",
+            "default": "memory/backups"
+          },
+          "eventsPath": {
+            "type": "string",
+            "default": "output/memory-events.jsonl"
+          },
+          "usageLogPath": {
+            "type": "string",
+            "default": "memory/usage-log.md"
+          },
+          "compactDays": {
+            "type": "number",
+            "default": 30
+          },
+          "emergencyUnvacuumedDays": {
+            "type": "number",
+            "default": 7
+          },
+          "maxEmergencyFiles": {
+            "type": "number",
+            "default": 1
+          },
+          "vacuum": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "native": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "memoryMdPath": {
+            "type": "string",
+            "default": "MEMORY.md"
+          },
+          "dailyNotesGlob": {
+            "type": "string",
+            "default": "memory/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.md"
+          },
+          "includeFiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "memory/latest.md",
+              "memory/recent-changes.md",
+              "memory/whois.md",
+              "memory/pinned-core-people.md",
+              "memory/pinned/core-people.md"
+            ]
+          },
+          "excludeGlobs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "memory/archive/**",
+              "memory/debug/**",
+              "memory/private/**",
+              "memory/working.md",
+              "memory/*-captured.md"
+            ]
+          },
+          "syncMode": {
+            "type": "string",
+            "enum": [
+              "hybrid"
+            ],
+            "default": "hybrid"
+          },
+          "maxChunkChars": {
+            "type": "number",
+            "default": 900
+          },
+          "onDemandTemporalDays": {
+            "type": "number",
+            "default": 3650
+          }
+        }
+      },
+      "person": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "keepPublicFacts": {
+            "type": "boolean",
+            "default": true
+          },
+          "relationshipPriorityBoost": {
+            "type": "number",
+            "default": 0.35
+          },
+          "publicProfileBoost": {
+            "type": "number",
+            "default": 0.1
+          },
+          "requireWordBoundaryMatch": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    }
+  }
+}

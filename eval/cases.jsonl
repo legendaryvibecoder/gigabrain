@@ -1,0 +1,16 @@
+# Core entity and profile recall cases
+{"query": "wer ist riley", "queries": ["wer ist riley", "riley partner sozialberater", "riley person"], "expected": ["riley", "partner", "lebens- und sozialberater"], "agent": "shared"}
+{"query": "wer ist sam", "queries": ["wer ist sam", "sam person"], "expected": ["sam"], "agent": "shared"}
+{"query": "wer ist alex", "queries": ["wer ist alex", "alex person"], "expected": ["alex"], "agent": "shared"}
+
+# Identity and preference style prompts
+{"query": "what do you know about yourself atlas", "queries": ["what do you know about yourself", "agent identity"], "expected": ["agent", "identity"], "agent": "main"}
+{"query": "welche jahreszeit magst du", "queries": ["welche jahreszeit magst du", "favorite season"], "expected": ["season", "preference"], "agent": "main"}
+
+# Temporal / context retrieval checks
+{"query": "was war letzte woche wichtig", "queries": ["was war letzte woche wichtig", "letzte woche"], "expected": ["woche"], "agent": "shared"}
+{"query": "what changed recently", "queries": ["what changed recently", "recent update"], "expected": ["updated", "context"], "agent": "shared"}
+
+# Negation / correction behavior checks
+{"query": "was stimmt nicht mehr über riley", "queries": ["was stimmt nicht mehr über riley", "riley corrected"], "expected": ["riley"], "agent": "shared"}
+{"query": "what was corrected", "queries": ["what was corrected", "corrected memory"], "expected": ["correct", "updated"], "agent": "shared"}

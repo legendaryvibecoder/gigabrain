@@ -1,0 +1,386 @@
+# Gigabrain
+
+Gigabrain is the long-term memory layer for [OpenClaw](https://github.com/anthropics/openclaw) agents. It converts conversations and native notes into durable, queryable memory, then injects the right context before each prompt so agents stay consistent across sessions.
+
+It is built for local-first production use: SQLite-backed recall, deterministic dedupe/audit flows, native markdown sync, and an optional FastAPI console for memory operations.
+
+## What it does
+
+- **Capture**: Extracts structured facts (preferences, decisions, entities, episodes) from conversations and stores them in a SQLite registry
+- **Recall**: Before each prompt, searches the registry and native markdown files to inject relevant context the agent "remembers"
+- **Dedupe**: Exact and semantic deduplication prevents the same fact from being stored twice (configurable thresholds)
+- **Native sync**: Indexes your workspace `MEMORY.md` and daily notes alongside the registry for unified recall
+- **Person service**: Tracks entity mentions across memories for person-aware retrieval ordering
+- **Quality gate**: Junk filter, confidence thresholds, and optional LLM-based review keep memory clean
+- **Audit**: Nightly maintenance with snapshot backups, compaction, and quality scoring
+- **Web console**: Optional FastAPI dashboard for browsing, editing, and managing memories
+
+## Prerequisites
+
+- **Node.js** >= 22.x (uses `node:sqlite` experimental API)
+- **OpenClaw** >= 2026.2.15 (gateway + plugin loader)
+- **Python** >= 3.10 (only for the optional web console)
+- **Ollama** (optional, for local LLM-based extraction review and semantic search)
+
+## Installation
+
+1. Clone into your OpenClaw plugins directory:
+
+```bash
+cd ~/.openclaw/plugins   # or wherever your gateway loads plugins from
+git clone https://github.com/your-org/gigabrain.git
+```
+
+2. Register the plugin in your `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "gigabrain": {
+        "path": "~/.openclaw/plugins/gigabrain",
+        "config": {
+          "enabled": true
+        }
+      }
+    }
+  }
+}
+```
+
+3. Restart the gateway:
+
+```bash
+openclaw gateway restart
+```
+
+## Configuration
+
+All config lives under `plugins.entries.gigabrain.config` in `openclaw.json`. The full schema is defined in [`openclaw.plugin.json`](openclaw.plugin.json). Key sections:
+
+### Runtime
+
+```json
+{
+  "runtime": {
+    "timezone": "Europe/Vienna",
+    "paths": {
+      "workspaceRoot": "/path/to/agent/workspace",
+      "memoryRoot": "memory",
+      "registryPath": "/path/to/memory.db"
+    }
+  }
+}
+```
+
+- `workspaceRoot` — agent workspace root (where `MEMORY.md` lives)
+- `memoryRoot` — subdirectory for daily notes (default: `memory`)
+- `registryPath` — path to the SQLite database (auto-created if missing)
+
+### Capture
+
+```json
+{
+  "capture": {
+    "enabled": true,
+    "requireMemoryNote": true,
+    "minConfidence": 0.65,
+    "minContentChars": 25
+  }
+}
+```
+
+- `requireMemoryNote` — when `true`, only explicit `<memory_note>` tags trigger capture (recommended)
+- `minConfidence` — minimum confidence score to store a memory (0.0–1.0)
+
+### Recall
+
+```json
+{
+  "recall": {
+    "topK": 8,
+    "minScore": 0.45,
+    "maxTokens": 1200,
+    "mode": "hybrid"
+  }
+}
+```
+
+- `topK` — maximum memories injected per prompt
+- `mode` — `personal_core` (identity-heavy), `project_context` (task-heavy), or `hybrid`
+- `classBudgets` — budget split between core/situational/decisions (must sum to 1.0)
+
+### Dedupe
+
+```json
+{
+  "dedupe": {
+    "exactEnabled": true,
+    "semanticEnabled": true,
+    "autoThreshold": 0.92,
+    "reviewThreshold": 0.85
+  }
+}
+```
+
+- Above `autoThreshold` — auto-merged silently
+- Between `reviewThreshold` and `autoThreshold` — queued for review
+
+### LLM (optional)
+
+```json
+{
+  "llm": {
+    "provider": "ollama",
+    "baseUrl": "http://127.0.0.1:11434",
+    "model": "qwen2.5:14b",
+    "review": {
+      "enabled": true
+    }
+  }
+}
+```
+
+Providers: `ollama`, `openai_compatible`, `openclaw`, or `none` (deterministic-only mode).
+
+### Native sync
+
+```json
+{
+  "native": {
+    "enabled": true,
+    "memoryMdPath": "MEMORY.md",
+    "dailyNotesGlob": "memory/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.md"
+  }
+}
+```
+
+Indexes workspace markdown files into `memory_native_chunks` for unified recall alongside the registry.
+
+### Quality
+
+```json
+{
+  "quality": {
+    "junkFilterEnabled": true,
+    "durableEnabled": true
+  }
+}
+```
+
+Built-in junk patterns block system prompts, API keys, and benchmark artifacts from being stored. Durable patterns boost important relationship/identity facts.
+
+See [`openclaw.plugin.json`](openclaw.plugin.json) for the complete schema with all defaults.
+
+## First-time setup
+
+After installing, run the migration script once:
+
+```bash
+node scripts/migrate-v3.js --apply --config ~/.openclaw/openclaw.json
+```
+
+This creates the database schema (`memory_events`, `memory_current`, `memory_native_chunks`, `memory_entity_mentions`) and backfills events from any existing data.
+
+A rollback metadata file is written to `output/rollback-meta.json` in case you need to revert.
+
+## Memory notes (how capture works)
+
+Gigabrain captures memories when the agent emits `<memory_note>` XML tags in its responses. By default, `requireMemoryNote` is `true`, so **only explicit tags trigger capture** — Gigabrain won't silently extract facts from normal conversation.
+
+### Tag format
+
+```xml
+<memory_note type="USER_FACT" confidence="0.9">User prefers dark mode in all editors.</memory_note>
+```
+
+**Attributes:**
+
+| Attribute | Required | Values |
+|-----------|----------|--------|
+| `type` | Yes | `USER_FACT`, `PREFERENCE`, `DECISION`, `ENTITY`, `EPISODE`, `AGENT_IDENTITY`, `CONTEXT` |
+| `confidence` | No | `0.0`–`1.0`, or `high` / `medium` / `low` (default: `0.65`) |
+| `scope` | No | Memory scope, e.g. `shared`, `profile:main` (default: from config) |
+
+**Rules:**
+- One fact per tag — keep it short and concrete
+- No secrets, credentials, API keys, or tokens
+- No system prompt wrappers or tool output envelopes
+- Content must be at least 25 characters (configurable via `capture.minContentChars`)
+- Content must not exceed 1200 characters
+- Nested `<memory_note>` tags are rejected
+
+### Agent instructions (AGENTS.md)
+
+For the agent to emit memory notes correctly, you need to add instructions to your workspace's `AGENTS.md` (or equivalent instruction file). Here's a minimal example:
+
+```markdown
+## Memory
+
+Gigabrain handles memory capture and recall automatically.
+
+### Memory Note Protocol
+
+When the user explicitly asks you to remember or save something
+(e.g. "remember that", "save this", "note that I prefer X"):
+
+1. Emit a `<memory_note>` tag with the fact:
+   ```xml
+   <memory_note type="USER_FACT" confidence="0.9">Concrete fact here.</memory_note>
+   ```
+2. Use one tag per fact.
+3. Keep facts short, concrete, and self-contained.
+4. Choose the appropriate type (USER_FACT, PREFERENCE, DECISION, ENTITY, EPISODE, AGENT_IDENTITY).
+
+When the user does NOT explicitly ask to save memory:
+- Do NOT emit `<memory_note>` tags.
+- Normal conversation does not trigger memory capture.
+
+Never include secrets, credentials, tokens, or API keys in memory notes.
+```
+
+### How recall works
+
+Before each prompt, Gigabrain:
+
+1. Searches the SQLite registry for memories relevant to the current query
+2. Searches native markdown files (`MEMORY.md`, daily notes) for matching chunks
+3. Applies class budgets (core / situational / decisions) and token limits
+4. Injects the top results as context the agent can "remember"
+
+The agent doesn't need to do anything special for recall — it happens automatically via the gateway plugin hooks.
+
+### Scope rules
+
+- **Private/main sessions** (direct chat): recall from all sources including `MEMORY.md` and private scopes
+- **Shared contexts** (group chats, other users): only curated shared memories, never private data
+
+Configure scope behavior in `openclaw.json` under the agent's memory settings.
+
+## CLI
+
+The control plane is `scripts/gigabrainctl.js`:
+
+```bash
+# Full nightly pipeline (maintain + audit + vault-export + graph-build)
+node scripts/gigabrainctl.js nightly
+
+# Maintenance only (snapshot, compact, vacuum)
+node scripts/gigabrainctl.js maintain
+
+# Quality audit (shadow = dry-run, apply = commit changes, restore = rollback)
+node scripts/gigabrainctl.js audit --mode shadow|apply|restore
+
+# Print memory inventory stats
+node scripts/gigabrainctl.js inventory
+
+# Health check
+node scripts/gigabrainctl.js doctor
+```
+
+All commands are also available as npm scripts: `npm run nightly`, `npm run maintain`, etc.
+
+## HTTP endpoints
+
+The plugin registers these routes on the OpenClaw gateway:
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/gb/health` | No | Health check |
+| `POST` | `/gb/bench/recall` | Token | Recall benchmark endpoint |
+| `GET` | `/gb/memory/:id/timeline` | Token | Event timeline for a memory |
+
+Auth uses the `X-GB-Token` header. The token is configured in the gateway.
+
+## Web console (memory_api)
+
+An optional FastAPI dashboard for browsing and managing memories. See [`memory_api/README.md`](memory_api/README.md) for setup.
+
+Features: memory browser with search/filter, concept deduplication view, audit queue, document store, profile viewer, knowledge graph visualization.
+
+## Testing
+
+```bash
+# Run all tests (requires Node.js with --experimental-sqlite)
+npm test
+
+# Filter by category
+npm run test:unit
+npm run test:integration
+npm run test:regression
+npm run test:performance
+```
+
+The suite includes 10 tests covering config validation, policy rules, capture service, person service, LLM routing, audit maintenance, migration, native recall, regression behavior, and nightly performance.
+
+## Benchmarking
+
+```bash
+# Single benchmark run
+node bench/memorybench/run.js \
+  --base-url http://127.0.0.1:18789 \
+  --token "$GB_UI_TOKEN" \
+  --cases eval/cases.jsonl \
+  --topk 8 --runs 3
+
+# Compare two environments
+node bench/memorybench/compare.js \
+  --base-a http://host-a:18789 --token-a "$TOKEN_A" --label-a baseline \
+  --base-b http://host-b:18789 --token-b "$TOKEN_B" --label-b candidate \
+  --runs 3
+```
+
+Results are written to `bench/memorybench/data/runs/`.
+
+## Project structure
+
+```
+gigabrain/
+├── index.ts                    # Plugin entry point (OpenClaw extension)
+├── openclaw.plugin.json        # Config schema definition
+├── package.json
+│
+├── lib/core/                   # Core services
+│   ├── config.js               # Config validation and normalization
+│   ├── capture-service.js      # Extraction, dedup, registry upsert
+│   ├── recall-service.js       # Search, filter, inject pipeline
+│   ├── event-store.js          # Append-only event log
+│   ├── projection-store.js     # Materialized current-state view
+│   ├── native-sync.js          # MEMORY.md + daily notes indexer
+│   ├── person-service.js       # Entity mention graph
+│   ├── policy.js               # Junk filter, quality rules
+│   ├── audit-service.js        # Quality scoring and review
+│   ├── maintenance-service.js  # Snapshots, compaction, vacuum
+│   ├── llm-router.js           # LLM provider abstraction
+│   ├── http-routes.js          # Gateway HTTP endpoints
+│   ├── review-queue.js         # Extraction review queue
+│   └── metrics.js              # Telemetry counters
+│
+├── scripts/                    # CLI tools
+│   ├── gigabrainctl.js         # Main control plane
+│   ├── migrate-v3.js           # Schema migration
+│   ├── harmonize-memory.js     # Memory harmonization
+│   └── harness-lab-*.js        # Evaluation harness
+│
+├── memory_api/                 # Optional web console (FastAPI)
+│   ├── app.py
+│   ├── requirements.txt
+│   └── static/index.html
+│
+├── tests/                      # Test suite
+├── bench/memorybench/          # Benchmark harness
+├── eval/                       # Evaluation cases
+└── docs/                       # Additional documentation
+```
+
+## Security
+
+- All HTTP endpoints require token authentication (`X-GB-Token` header)
+- Auth is **fail-closed**: if no token is configured, all requests are rejected
+- The web console escapes all user content to prevent XSS
+- The memory_api binds to `127.0.0.1` only — use Tailscale or SSH tunneling for remote access
+- Dependencies are audited with `pip-audit` (0 known vulnerabilities as of v0.3.0-rc1)
+
+## License
+
+MIT License. See LICENSE file for details.

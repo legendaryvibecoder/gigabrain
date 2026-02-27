@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Databases
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.db
+
+# Python
+__pycache__/
+*.pyc
+.venv*/
+memory_api/__pycache__/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated / build
+config/
+docs/
+eval/harness-cases.jsonl
+lib/obsidian-cli-adapter.js
+lib/obsidian-fs-adapter.js
+lib/obsidian-ingest-adapter.js
+scripts/harness-lab-*.js
+scripts/obsidian-ingest-*.js
+
+# Data directories
+data/
+
+# Run artifacts
+bench/memorybench/data/runs/
+output/
+
+# Backups
+*.bak.*
+*.bak-*
+.backup-*/
+
+# Credentials / certificates
+*.pem
+*.key
+*.p12
+*.cert
+
+# Lockfiles (optional — include if you want reproducible builds)
+# package-lock.json
