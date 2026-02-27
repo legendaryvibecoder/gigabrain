@@ -1,0 +1,1331 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-store" />
+  <title>Gigabrain Memory Console</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+    :root {
+      --bg: #f7f3ea;
+      --bg-2: #edf5f2;
+      --card: #ffffff;
+      --text: #1f2a2e;
+      --muted: #5b6b72;
+      --accent: #0f766e;
+      --accent-2: #f4b23c;
+      --danger: #d9480f;
+      --success: #16a34a;
+      --warning: #b45309;
+      --border: #e1e6e2;
+      --shadow: 0 16px 40px rgba(17, 24, 39, 0.08);
+      --radius: 16px;
+    }
+    :root[data-theme="dark"] {
+      --bg: #0b0f14;
+      --bg-2: #0b0f14;
+      --card: #141a21;
+      --text: #e6edf3;
+      --muted: #9aa7b2;
+      --accent: #22c55e;
+      --accent-2: #f59e0b;
+      --danger: #f97316;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --border: #1f2a33;
+      --shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "IBM Plex Sans", "Space Grotesk", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #fdf4d7 0%, transparent 60%),
+        radial-gradient(900px 500px at 90% 0%, #d9f5ef 0%, transparent 60%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      min-height: 100vh;
+    }
+    :root[data-theme="dark"] body {
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(34, 197, 94, 0.08) 0%, transparent 60%),
+        radial-gradient(900px 500px at 90% 0%, rgba(245, 158, 11, 0.1) 0%, transparent 60%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    }
+    header {
+      padding: 18px 28px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      background: rgba(247, 243, 234, 0.92);
+      backdrop-filter: blur(10px);
+      z-index: 10;
+    }
+    :root[data-theme="dark"] header {
+      background: rgba(11, 15, 20, 0.92);
+    }
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -0.02em;
+      font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
+    }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tab {
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+    .tab.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 8px 20px rgba(15, 118, 110, 0.25);
+    }
+    :root[data-theme="dark"] .tab { background: #0f141b; color: var(--text); }
+    .container { padding: 24px 28px 40px; max-width: 1200px; margin: 0 auto; }
+    .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 18px; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+      align-items: center;
+    }
+    input, select, button, textarea {
+      background: #fff;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 9px 12px;
+      font-size: 13px;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+    :root[data-theme="dark"] input,
+    :root[data-theme="dark"] select,
+    :root[data-theme="dark"] button,
+    :root[data-theme="dark"] textarea { background: #0f141b; }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+    }
+    button { cursor: pointer; font-weight: 600; }
+    button:hover { transform: translateY(-1px); }
+    .btn-primary { background: var(--accent); color: #fff; border-color: transparent; }
+    .btn-ghost { background: #f7f7f4; }
+    .btn-danger { background: #fff1e9; color: var(--danger); border-color: #ffd7c2; }
+    .btn-success { background: #eafaf0; color: var(--success); border-color: #c6f1d4; }
+    :root[data-theme="dark"] .btn-ghost { background: #0f141b; }
+    textarea { min-height: 120px; width: 100%; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+    tr:hover { background: #fafaf7; }
+    tr.selected { background: rgba(15, 118, 110, 0.08); }
+    :root[data-theme="dark"] tr.selected { background: rgba(34, 197, 94, 0.15); }
+    .muted { color: var(--muted); }
+    .tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      background: #f6f4ed;
+      border: 1px solid var(--border);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    :root[data-theme="dark"] .tag { background: #0f141b; }
+    .status { padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+    .status.active { background: #eafaf0; color: var(--success); }
+    .status.pending { background: #fff7ed; color: var(--warning); }
+    .status.rejected { background: #fff1e9; color: var(--danger); }
+    .status.superseded { background: #eef2f4; color: #6b7280; }
+    .detail pre { white-space: pre-wrap; font-size: 12px; background: #faf9f6; padding: 12px; border-radius: 12px; border: 1px dashed var(--border); }
+    :root[data-theme="dark"] .detail pre { background: #0f141b; }
+    .panel { display: none; }
+    .panel.active { display: block; animation: fadeUp 0.35s ease; }
+    .stack { display: flex; flex-direction: column; gap: 12px; }
+    #graph-canvas { height: 600px; background: #fff; border: 1px solid var(--border); border-radius: 12px; }
+    :root[data-theme="dark"] #graph-canvas { background: #0f141b; }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 960px) {
+      .grid { grid-template-columns: 1fr; }
+      header { gap: 12px; flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🧠 Gigabrain Memory Console</h1>
+    <div class="tabs">
+      <button class="tab active" data-tab="memories">Memories</button>
+      <button class="tab" data-tab="agent-profile">Agent Profile</button>
+      <button class="tab" data-tab="docs">Docs</button>
+      <button class="tab" data-tab="concepts">Concepts</button>
+      <button class="tab" data-tab="audit">Audit</button>
+      <button class="tab" data-tab="profile">User Profile</button>
+      <button class="tab" data-tab="graph">Graph</button>
+      <button class="tab" data-tab="recall">Recall Debug</button>
+    </div>
+    <button id="theme-toggle" class="btn-ghost">Dark</button>
+  </header>
+
+  <div class="container">
+    <section id="panel-memories" class="panel active">
+      <div class="grid">
+        <div class="card">
+          <div class="controls">
+            <input id="mem-query" placeholder="Search memories" />
+            <select id="mem-status">
+              <option value="">status: any</option>
+              <option value="active" selected>active</option>
+              <option value="pending">pending</option>
+              <option value="rejected">rejected</option>
+              <option value="superseded">superseded</option>
+            </select>
+            <select id="mem-type">
+              <option value="">type: any</option>
+              <option value="USER_FACT">USER_FACT</option>
+              <option value="ENTITY">ENTITY</option>
+              <option value="PREFERENCE">PREFERENCE</option>
+              <option value="AGENT_IDENTITY">AGENT_IDENTITY</option>
+              <option value="DECISION">DECISION</option>
+              <option value="CONTEXT">CONTEXT</option>
+              <option value="EPISODE">EPISODE</option>
+            </select>
+            <select id="mem-sort">
+              <option value="recent">recent</option>
+              <option value="oldest">oldest</option>
+              <option value="confidence">confidence</option>
+              <option value="confidence_asc">confidence (asc)</option>
+            </select>
+            <select id="mem-limit">
+              <option value="20">20</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+            </select>
+            <button id="mem-refresh" class="btn-ghost">Refresh</button>
+            <button id="mem-prev" class="btn-ghost">Prev</button>
+            <span id="mem-page" class="muted"></span>
+            <button id="mem-next" class="btn-ghost">Next</button>
+          </div>
+          <table id="mem-table">
+            <thead>
+              <tr><th>Type</th><th>Content</th><th>Status</th><th>Conf</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card detail" id="mem-detail">
+          <h3>Detail</h3>
+          <div class="muted">Select a memory.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-agent-profile" class="panel">
+      <div class="grid">
+        <div class="card">
+          <div class="controls">
+            <input id="prof-query" placeholder="Search agent profile" />
+            <select id="prof-status">
+              <option value="active" selected>active</option>
+              <option value="rejected">rejected</option>
+              <option value="superseded">superseded</option>
+            </select>
+            <select id="prof-type">
+              <option value="">type: any</option>
+              <option value="AGENT_IDENTITY">AGENT_IDENTITY</option>
+              <option value="PREFERENCE">PREFERENCE</option>
+            </select>
+            <select id="prof-sort">
+              <option value="recent">recent</option>
+              <option value="oldest">oldest</option>
+              <option value="confidence">confidence</option>
+              <option value="confidence_asc">confidence (asc)</option>
+            </select>
+            <select id="prof-limit">
+              <option value="20">20</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+            </select>
+            <button id="prof-refresh" class="btn-ghost">Refresh</button>
+            <button id="prof-prev" class="btn-ghost">Prev</button>
+            <span id="prof-page" class="muted"></span>
+            <button id="prof-next" class="btn-ghost">Next</button>
+          </div>
+          <table id="prof-table">
+            <thead>
+              <tr><th>Type</th><th>Content</th><th>Status</th><th>Conf</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card detail" id="prof-detail">
+          <h3>Detail</h3>
+          <div class="muted">Select a profile memory.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-docs" class="panel">
+      <div class="grid">
+        <div class="card stack">
+          <div class="controls">
+            <input id="doc-query" placeholder="Search docs" />
+            <select id="doc-status">
+              <option value="">status: any</option>
+              <option value="active" selected>active</option>
+              <option value="archived">archived</option>
+              <option value="deleted">deleted</option>
+            </select>
+            <select id="doc-source">
+              <option value="">source: any</option>
+              <option value="url">url</option>
+              <option value="pdf">pdf</option>
+              <option value="text">text</option>
+              <option value="file">file</option>
+            </select>
+            <select id="doc-sort">
+              <option value="recent">recent</option>
+              <option value="oldest">oldest</option>
+            </select>
+            <select id="doc-limit">
+              <option value="20">20</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+            </select>
+            <button id="doc-refresh" class="btn-ghost">Refresh</button>
+            <button id="doc-prev" class="btn-ghost">Prev</button>
+            <span id="doc-page" class="muted"></span>
+            <button id="doc-next" class="btn-ghost">Next</button>
+          </div>
+
+          <div class="card">
+            <h3>Ingest Text</h3>
+            <div class="stack">
+              <input id="doc-title" placeholder="Title" />
+              <textarea id="doc-content" placeholder="Paste content"></textarea>
+              <button id="doc-create" class="btn-primary">Create Doc</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Ingest URL</h3>
+            <div class="stack">
+              <input id="doc-url" placeholder="https://..." />
+              <button id="doc-create-url" class="btn-primary">Fetch URL</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Upload File</h3>
+            <input type="file" id="doc-file" />
+            <button id="doc-create-file" class="btn-primary">Upload</button>
+          </div>
+
+          <table id="doc-table">
+            <thead>
+              <tr><th>Title</th><th>Source</th><th>Status</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card detail" id="doc-detail">
+          <h3>Doc Detail</h3>
+          <div class="muted">Select a document.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-concepts" class="panel">
+      <div class="grid">
+        <div class="card">
+          <div class="controls">
+            <input id="concept-query" placeholder="Search concepts" />
+            <select id="concept-scope">
+              <option value="shared" selected>scope: shared</option>
+              <option value="">scope: any</option>
+              <option value="profile:*">scope: profile:*</option>
+            </select>
+            <select id="concept-status">
+              <option value="">status: any</option>
+              <option value="active">active</option>
+              <option value="rejected">rejected</option>
+              <option value="superseded">superseded</option>
+            </select>
+            <select id="concept-limit">
+              <option value="20">20</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+            </select>
+            <button id="concept-refresh" class="btn-ghost">Refresh</button>
+            <button id="concept-prev" class="btn-ghost">Prev</button>
+            <span id="concept-page" class="muted"></span>
+            <button id="concept-next" class="btn-ghost">Next</button>
+          </div>
+          <table id="concept-table">
+            <thead>
+              <tr><th>Count</th><th>Canonical</th><th>Status</th><th>Scope</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card detail" id="concept-detail">
+          <h3>Concept</h3>
+          <div class="muted">Select a concept.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-audit" class="panel">
+      <div class="grid">
+        <div class="card">
+          <div class="controls">
+            <select id="audit-scope">
+              <option value="shared" selected>scope: shared</option>
+              <option value="">scope: any</option>
+              <option value="profile:*">scope: profile:*</option>
+            </select>
+            <select id="audit-limit">
+              <option value="20">20</option>
+              <option value="50" selected>50</option>
+              <option value="100">100</option>
+            </select>
+            <button id="audit-refresh" class="btn-ghost">Refresh</button>
+            <button id="audit-prev" class="btn-ghost">Prev</button>
+            <span id="audit-page" class="muted"></span>
+            <button id="audit-next" class="btn-ghost">Next</button>
+          </div>
+          <table id="audit-table">
+            <thead>
+              <tr><th>Reasons</th><th>Type</th><th>Content</th><th>Conf</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="card detail" id="audit-detail">
+          <h3>Detail</h3>
+          <div class="muted">Select an audit item.</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-profile" class="panel">
+      <div class="grid">
+        <div class="card">
+          <h3>Static Profile</h3>
+          <div id="profile-static" class="stack"></div>
+        </div>
+        <div class="card">
+          <h3>Dynamic Context (last 30d)</h3>
+          <div id="profile-dynamic" class="stack"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-graph" class="panel">
+      <div class="card stack">
+        <div class="controls">
+          <button id="graph-refresh">Refresh</button>
+          <span id="graph-meta" class="muted"></span>
+        </div>
+        <div id="graph-canvas"></div>
+        <pre id="graph-fallback" class="muted"></pre>
+      </div>
+    </section>
+
+    <section id="panel-recall" class="panel">
+      <div class="card stack">
+        <h3>Recall Debug</h3>
+        <input id="recall-query" placeholder="Ask a recall query" />
+        <button id="recall-run">Explain Recall</button>
+        <pre id="recall-result" class="muted"></pre>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/force-graph@1.47.2/dist/force-graph.min.js"></script>
+<script>
+const api = (path) => `/gb${path}`;
+const tokenKey = 'gb_token';
+let token = localStorage.getItem(tokenKey) || '';
+if (!token) {
+  token = prompt('Enter GB_UI_TOKEN');
+  if (token) localStorage.setItem(tokenKey, token);
+}
+const authHeaders = () => token ? { 'X-GB-Token': token } : {};
+let memOffset = 0;
+let memLimit = 50;
+let docOffset = 0;
+let docLimit = 50;
+let memRows = [];
+let selectedMemIndex = -1;
+let profOffset = 0;
+let profLimit = 50;
+let profRows = [];
+let selectedProfIndex = -1;
+let conceptOffset = 0;
+let conceptLimit = 50;
+let conceptRows = [];
+let selectedConceptIndex = -1;
+let auditOffset = 0;
+let auditLimit = 50;
+let auditRows = [];
+let selectedAuditIndex = -1;
+let auditReasonsById = new Map();
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+const themeKey = 'gb_theme';
+const setTheme = (theme) => {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem(themeKey, theme);
+  const toggle = document.getElementById('theme-toggle');
+  if (toggle) toggle.textContent = theme === 'dark' ? 'Light' : 'Dark';
+};
+const initTheme = () => {
+  const saved = localStorage.getItem(themeKey);
+  setTheme(saved || 'dark');
+};
+
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${name}`).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${name}"]`).classList.add('active');
+}
+
+// Memories
+async function fetchMemories() {
+  const q = document.getElementById('mem-query').value;
+  const status = document.getElementById('mem-status').value;
+  const type = document.getElementById('mem-type').value;
+  const sort = document.getElementById('mem-sort').value;
+  const params = new URLSearchParams();
+  if (q) params.set('query', q);
+  if (status) params.set('status', status);
+  if (type) params.set('type', type);
+  if (sort) params.set('sort', sort);
+  // Default: show only shared user-memory (agent profile lives in its own scope/tab).
+  params.set('scope', 'shared');
+  params.set('limit', String(memLimit));
+  params.set('offset', String(memOffset));
+
+  const res = await fetch(api(`/memories?${params.toString()}`), { headers: authHeaders() });
+  const data = await res.json();
+  const total = Number(res.headers.get('x-total-count') || '0');
+  memRows = Array.isArray(data) ? data : [];
+  renderMemTable(memRows);
+  updateMemPagination(memRows.length || 0, total);
+}
+
+function renderMemTable(rows) {
+  const tbody = document.querySelector('#mem-table tbody');
+  tbody.innerHTML = '';
+  rows.forEach((row, idx) => {
+    const status = row.status || 'active';
+    const tr = document.createElement('tr');
+    if (idx === selectedMemIndex) tr.classList.add('selected');
+    tr.innerHTML = `<td><span class="tag">${escapeHtml(row.type)}</span></td><td>${escapeHtml(row.content)}</td><td><span class="status ${escapeHtml(status)}">${escapeHtml(status)}</span></td><td>${(row.confidence ?? 0).toFixed(2)}</td>`;
+    tr.onclick = () => loadMemDetailByIndex(idx);
+    tbody.appendChild(tr);
+  });
+}
+
+function updateMemPagination(count, total) {
+  const page = document.getElementById('mem-page');
+  const prev = document.getElementById('mem-prev');
+  const next = document.getElementById('mem-next');
+  const pageNum = Math.floor(memOffset / memLimit) + 1;
+  const totalPages = total ? Math.max(1, Math.ceil(total / memLimit)) : 1;
+  page.textContent = `page ${pageNum} / ${totalPages} (${total || count} total)`;
+  prev.disabled = memOffset === 0;
+  next.disabled = total ? (memOffset + count >= total) : (count < memLimit);
+}
+
+function resetMemDetail() {
+  selectedMemIndex = -1;
+  const detail = document.getElementById('mem-detail');
+  detail.innerHTML = '<h3>Detail</h3><div class="muted">Select a memory.</div>';
+}
+
+async function refreshMemoriesAndAdvance(currentId, opts = {}) {
+  const prevIdx = selectedMemIndex;
+  await fetchMemories();
+  if (!memRows.length) {
+    resetMemDetail();
+    return;
+  }
+  const foundIdx = currentId ? memRows.findIndex(r => r.id === currentId) : -1;
+  let idx = 0;
+  if (opts.advance === 'next') {
+    if (foundIdx >= 0) idx = Math.min(foundIdx + 1, memRows.length - 1);
+    else idx = Math.min(Math.max(0, prevIdx), memRows.length - 1);
+  } else {
+    if (foundIdx >= 0) idx = foundIdx;
+    else idx = Math.min(Math.max(0, prevIdx), memRows.length - 1);
+  }
+  loadMemDetailByIndex(idx);
+}
+
+function updateDocPagination(count, total) {
+  const page = document.getElementById('doc-page');
+  const prev = document.getElementById('doc-prev');
+  const next = document.getElementById('doc-next');
+  const pageNum = Math.floor(docOffset / docLimit) + 1;
+  const totalPages = total ? Math.max(1, Math.ceil(total / docLimit)) : 1;
+  page.textContent = `page ${pageNum} / ${totalPages} (${total || count} total)`;
+  prev.disabled = docOffset === 0;
+  next.disabled = total ? (docOffset + count >= total) : (count < docLimit);
+}
+
+function resetDetail(detailId, label) {
+  const detail = document.getElementById(detailId);
+  detail.innerHTML = `<h3>Detail</h3><div class="muted">${escapeHtml(label)}</div>`;
+}
+
+async function fetchMemoryById(id) {
+  const res = await fetch(api(`/memories/${id}`), { headers: authHeaders() });
+  return await res.json();
+}
+
+function renderMemoryDetail(row, opts) {
+  const detailId = opts.detailId;
+  const prefix = opts.prefix;
+  const afterChange = opts.afterChange;
+  const extraMetaHtml = opts.extraMetaHtml || '';
+  const status = row.status || 'active';
+  const detail = document.getElementById(detailId);
+  detail.innerHTML = `
+    <h3>${escapeHtml(row.type)} <span class="status ${escapeHtml(status)}">${escapeHtml(status)}</span></h3>
+    ${extraMetaHtml}
+    <textarea id="${prefix}-content">${escapeHtml(row.content)}</textarea>
+    <p class="muted">confidence: ${(row.confidence ?? 0).toFixed(2)} | id: ${escapeHtml(row.id)}</p>
+    <p class="muted">scope: ${escapeHtml(row.scope)}</p>
+    <p class="muted">normalized: ${escapeHtml(row.normalized)}</p>
+    <p class="muted">concept: ${escapeHtml(row.concept)}</p>
+    <div class="controls">
+      <select id="${prefix}-type-edit">
+        <option value="USER_FACT">USER_FACT</option>
+        <option value="ENTITY">ENTITY</option>
+        <option value="PREFERENCE">PREFERENCE</option>
+        <option value="AGENT_IDENTITY">AGENT_IDENTITY</option>
+        <option value="DECISION">DECISION</option>
+        <option value="CONTEXT">CONTEXT</option>
+        <option value="EPISODE">EPISODE</option>
+      </select>
+      <select id="${prefix}-status-edit">
+        <option value="active">active</option>
+        <option value="pending">pending</option>
+        <option value="rejected">rejected</option>
+        <option value="superseded">superseded</option>
+      </select>
+      <label class="muted"><input type="checkbox" id="${prefix}-pinned" /> pinned</label>
+      <button id="${prefix}-save" class="btn-primary">Save</button>
+    </div>
+    <div class="controls">
+      <button id="${prefix}-confirm" class="btn-success">Confirm</button>
+      <button id="${prefix}-reject" class="btn-danger">Reject</button>
+    </div>
+    <h4>Evidence</h4>
+    <pre>${escapeHtml((row.evidence || []).map(e => e.text_snippet).join('\n---\n')) || 'none'}</pre>
+  `;
+
+  document.getElementById(`${prefix}-type-edit`).value = row.type || 'CONTEXT';
+  document.getElementById(`${prefix}-status-edit`).value = row.status || 'active';
+  document.getElementById(`${prefix}-pinned`).checked = Boolean(row.pinned);
+
+  document.getElementById(`${prefix}-save`).onclick = async () => {
+    const content = document.getElementById(`${prefix}-content`).value;
+    const type = document.getElementById(`${prefix}-type-edit`).value;
+    const status = document.getElementById(`${prefix}-status-edit`).value;
+    const pinned = document.getElementById(`${prefix}-pinned`).checked;
+    await fetch(api(`/memories/${row.id}`), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ content, type, status, pinned })
+    });
+    await afterChange(row.id, { advance: 'stay' });
+  };
+  document.getElementById(`${prefix}-confirm`).onclick = async () => {
+    await fetch(api(`/memories/${row.id}/confirm`), { method: 'POST', headers: authHeaders() });
+    await afterChange(row.id, { advance: 'next' });
+  };
+  document.getElementById(`${prefix}-reject`).onclick = async () => {
+    await fetch(api(`/memories/${row.id}/reject`), { method: 'POST', headers: authHeaders() });
+    await afterChange(row.id, { advance: 'next' });
+  };
+}
+
+async function loadMemoryDetail(id, opts) {
+  const row = await fetchMemoryById(id);
+  renderMemoryDetail(row, opts);
+}
+
+function loadMemDetailByIndex(idx) {
+  if (idx < 0 || idx >= memRows.length) return;
+  selectedMemIndex = idx;
+  renderMemTable(memRows);
+  const row = memRows[idx];
+  if (row && row.id) {
+    loadMemoryDetail(row.id, {
+      detailId: 'mem-detail',
+      prefix: 'mem',
+      afterChange: refreshMemoriesAndAdvance
+    });
+  }
+}
+
+// Agent Profile
+async function fetchProfileMemories() {
+  const q = document.getElementById('prof-query').value;
+  const status = document.getElementById('prof-status').value;
+  const type = document.getElementById('prof-type').value;
+  const sort = document.getElementById('prof-sort').value;
+  const params = new URLSearchParams();
+  if (q) params.set('query', q);
+  if (status) params.set('status', status);
+  if (type) params.set('type', type);
+  if (sort) params.set('sort', sort);
+  params.set('scope', 'profile:*');
+  params.set('limit', String(profLimit));
+  params.set('offset', String(profOffset));
+
+  const res = await fetch(api(`/memories?${params.toString()}`), { headers: authHeaders() });
+  const data = await res.json();
+  const total = Number(res.headers.get('x-total-count') || '0');
+  profRows = Array.isArray(data) ? data : [];
+  renderProfileTable(profRows);
+  updateProfilePagination(profRows.length || 0, total);
+}
+
+function renderProfileTable(rows) {
+  const tbody = document.querySelector('#prof-table tbody');
+  tbody.innerHTML = '';
+  rows.forEach((row, idx) => {
+    const status = row.status || 'active';
+    const tr = document.createElement('tr');
+    if (idx === selectedProfIndex) tr.classList.add('selected');
+    tr.innerHTML = `<td><span class="tag">${escapeHtml(row.type)}</span></td><td>${escapeHtml(row.content)}</td><td><span class="status ${escapeHtml(status)}">${escapeHtml(status)}</span></td><td>${(row.confidence ?? 0).toFixed(2)}</td>`;
+    tr.onclick = () => loadProfileDetailByIndex(idx);
+    tbody.appendChild(tr);
+  });
+}
+
+function updateProfilePagination(count, total) {
+  const page = document.getElementById('prof-page');
+  const prev = document.getElementById('prof-prev');
+  const next = document.getElementById('prof-next');
+  const pageNum = Math.floor(profOffset / profLimit) + 1;
+  const totalPages = total ? Math.max(1, Math.ceil(total / profLimit)) : 1;
+  page.textContent = `page ${pageNum} / ${totalPages} (${total || count} total)`;
+  prev.disabled = profOffset === 0;
+  next.disabled = total ? (profOffset + count >= total) : (count < profLimit);
+}
+
+function resetProfileDetail() {
+  selectedProfIndex = -1;
+  resetDetail('prof-detail', 'Select a profile memory.');
+}
+
+async function refreshProfileAndAdvance(currentId, opts = {}) {
+  const prevIdx = selectedProfIndex;
+  await fetchProfileMemories();
+  if (!profRows.length) {
+    resetProfileDetail();
+    return;
+  }
+  const foundIdx = currentId ? profRows.findIndex(r => r.id === currentId) : -1;
+  let idx = 0;
+  if (opts.advance === 'next') {
+    if (foundIdx >= 0) idx = Math.min(foundIdx + 1, profRows.length - 1);
+    else idx = Math.min(Math.max(0, prevIdx), profRows.length - 1);
+  } else {
+    if (foundIdx >= 0) idx = foundIdx;
+    else idx = Math.min(Math.max(0, prevIdx), profRows.length - 1);
+  }
+  loadProfileDetailByIndex(idx);
+}
+
+function loadProfileDetailByIndex(idx) {
+  if (idx < 0 || idx >= profRows.length) return;
+  selectedProfIndex = idx;
+  renderProfileTable(profRows);
+  const row = profRows[idx];
+  if (row && row.id) {
+    loadMemoryDetail(row.id, {
+      detailId: 'prof-detail',
+      prefix: 'prof',
+      afterChange: refreshProfileAndAdvance
+    });
+  }
+}
+
+// Concepts
+async function fetchConcepts() {
+  const q = document.getElementById('concept-query').value;
+  const scope = document.getElementById('concept-scope').value;
+  const status = document.getElementById('concept-status').value;
+  const params = new URLSearchParams();
+  if (q) params.set('query', q);
+  if (scope) params.set('scope', scope);
+  if (status) params.set('status', status);
+  params.set('limit', String(conceptLimit));
+  params.set('offset', String(conceptOffset));
+
+  const res = await fetch(api(`/concepts?${params.toString()}`), { headers: authHeaders() });
+  const data = await res.json();
+  const total = Number(res.headers.get('x-total-count') || '0');
+  conceptRows = Array.isArray(data) ? data : [];
+  renderConceptTable(conceptRows);
+  updateConceptPagination(conceptRows.length || 0, total);
+}
+
+function renderConceptTable(rows) {
+  const tbody = document.querySelector('#concept-table tbody');
+  tbody.innerHTML = '';
+  rows.forEach((row, idx) => {
+    const status = row.canonical_status || 'active';
+    const tr = document.createElement('tr');
+    if (idx === selectedConceptIndex) tr.classList.add('selected');
+    const content = (row.canonical_content || '').slice(0, 140);
+    tr.innerHTML = `<td>${row.count}</td><td>${escapeHtml(content)}</td><td><span class="status ${escapeHtml(status)}">${escapeHtml(status)}</span></td><td>${escapeHtml(row.canonical_scope)}</td>`;
+    tr.onclick = () => loadConceptDetailByIndex(idx);
+    tbody.appendChild(tr);
+  });
+}
+
+function updateConceptPagination(count, total) {
+  const page = document.getElementById('concept-page');
+  const prev = document.getElementById('concept-prev');
+  const next = document.getElementById('concept-next');
+  const pageNum = Math.floor(conceptOffset / conceptLimit) + 1;
+  const totalPages = total ? Math.max(1, Math.ceil(total / conceptLimit)) : 1;
+  page.textContent = `page ${pageNum} / ${totalPages} (${total || count} total)`;
+  prev.disabled = conceptOffset === 0;
+  next.disabled = total ? (conceptOffset + count >= total) : (count < conceptLimit);
+}
+
+async function loadConceptDetailByIndex(idx) {
+  if (idx < 0 || idx >= conceptRows.length) return;
+  selectedConceptIndex = idx;
+  renderConceptTable(conceptRows);
+  const row = conceptRows[idx];
+  if (!row) return;
+  await renderConceptDetail(row);
+}
+
+async function renderConceptDetail(concept) {
+  const scope = document.getElementById('concept-scope').value;
+  const detail = document.getElementById('concept-detail');
+  detail.innerHTML = `
+    <h3>Concept</h3>
+    <p class="muted">concept: ${escapeHtml(concept.concept_key)}</p>
+    <p class="muted">count: ${concept.count} (active: ${concept.active_count}, rejected: ${concept.rejected_count}, superseded: ${concept.superseded_count})</p>
+    <div class="controls">
+      <button id="concept-reload" class="btn-ghost">Reload</button>
+      <button id="concept-reject-selected" class="btn-danger">Reject Selected</button>
+      <button id="concept-merge-selected" class="btn-primary">Merge Selected</button>
+    </div>
+    <div id="concept-dups"></div>
+    <div id="concept-mem-detail"></div>
+  `;
+
+  const params = new URLSearchParams();
+  params.set('concept', concept.concept_key);
+  params.set('limit', '200');
+  params.set('offset', '0');
+  params.set('sort', 'recent');
+  if (scope) params.set('scope', scope);
+  const res = await fetch(api(`/memories?${params.toString()}`), { headers: authHeaders() });
+  const dups = await res.json();
+
+  const dupsEl = document.getElementById('concept-dups');
+  const rows = Array.isArray(dups) ? dups : [];
+  const dupsRows = rows.map(r => {
+    const status = r.status || 'active';
+    const checkedId = `concept-chk-${escapeHtml(r.id)}`;
+    return `
+      <tr>
+        <td><input type="checkbox" id="${checkedId}" /></td>
+        <td><span class="tag">${escapeHtml(r.type)}</span></td>
+        <td>${escapeHtml(r.content)}</td>
+        <td><span class="status ${escapeHtml(status)}">${escapeHtml(status)}</span></td>
+        <td>${(r.confidence ?? 0).toFixed(2)}</td>
+        <td><button class="btn-ghost" data-edit-id="${escapeHtml(r.id)}">Edit</button></td>
+      </tr>
+    `;
+  }).join('');
+  dupsEl.innerHTML = `
+    <h4>Duplicates (${rows.length})</h4>
+    <table>
+      <thead><tr><th></th><th>Type</th><th>Content</th><th>Status</th><th>Conf</th><th></th></tr></thead>
+      <tbody>${dupsRows || ''}</tbody>
+    </table>
+  `;
+
+  Array.from(dupsEl.querySelectorAll('button[data-edit-id]')).forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.getAttribute('data-edit-id');
+      if (!id) return;
+      loadMemoryDetail(id, {
+        detailId: 'concept-mem-detail',
+        prefix: 'concept',
+        afterChange: async () => await renderConceptDetail(concept)
+      });
+    };
+  });
+
+  const selectedIds = () => {
+    const ids = [];
+    for (const r of rows) {
+      const chk = document.getElementById(`concept-chk-${r.id}`);
+      if (chk && chk.checked) ids.push(r.id);
+    }
+    return ids;
+  };
+
+  document.getElementById('concept-reload').onclick = async () => {
+    await renderConceptDetail(concept);
+  };
+  document.getElementById('concept-reject-selected').onclick = async () => {
+    const ids = selectedIds();
+    if (!ids.length) return;
+    for (const id of ids) {
+      await fetch(api(`/memories/${id}/reject`), { method: 'POST', headers: authHeaders() });
+    }
+    await fetchConcepts();
+    await renderConceptDetail(concept);
+  };
+  document.getElementById('concept-merge-selected').onclick = async () => {
+    const ids = selectedIds();
+    if (ids.length < 2) return;
+    const primary = ids.includes(concept.canonical_id) ? concept.canonical_id : ids[0];
+    const ordered = [primary, ...ids.filter(x => x !== primary)];
+    await fetch(api(`/memories/merge`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ ids: ordered })
+    });
+    await fetchConcepts();
+    await renderConceptDetail(concept);
+  };
+}
+
+// Audit
+async function fetchAudit() {
+  const scope = document.getElementById('audit-scope').value;
+  const params = new URLSearchParams();
+  if (scope) params.set('scope', scope);
+  params.set('limit', String(auditLimit));
+  params.set('offset', String(auditOffset));
+  const res = await fetch(api(`/audit?${params.toString()}`), { headers: authHeaders() });
+  const data = await res.json();
+  const total = Number(res.headers.get('x-total-count') || '0');
+  auditRows = Array.isArray(data) ? data : [];
+  auditReasonsById = new Map();
+  for (const r of auditRows) {
+    if (r && r.id && Array.isArray(r.reasons)) {
+      auditReasonsById.set(r.id, r.reasons);
+    }
+  }
+  renderAuditTable(auditRows);
+  updateAuditPagination(auditRows.length || 0, total);
+}
+
+function renderAuditTable(rows) {
+  const tbody = document.querySelector('#audit-table tbody');
+  tbody.innerHTML = '';
+  rows.forEach((row, idx) => {
+    const reasons = Array.isArray(row.reasons) ? row.reasons.join(', ') : '';
+    const tr = document.createElement('tr');
+    if (idx === selectedAuditIndex) tr.classList.add('selected');
+    tr.innerHTML = `<td>${escapeHtml(reasons)}</td><td><span class="tag">${escapeHtml(row.type)}</span></td><td>${escapeHtml(row.content)}</td><td>${(row.confidence ?? 0).toFixed(2)}</td>`;
+    tr.onclick = () => loadAuditDetailByIndex(idx);
+    tbody.appendChild(tr);
+  });
+}
+
+function updateAuditPagination(count, total) {
+  const page = document.getElementById('audit-page');
+  const prev = document.getElementById('audit-prev');
+  const next = document.getElementById('audit-next');
+  const pageNum = Math.floor(auditOffset / auditLimit) + 1;
+  const totalPages = total ? Math.max(1, Math.ceil(total / auditLimit)) : 1;
+  page.textContent = `page ${pageNum} / ${totalPages} (${total || count} total)`;
+  prev.disabled = auditOffset === 0;
+  next.disabled = total ? (auditOffset + count >= total) : (count < auditLimit);
+}
+
+function resetAuditDetail() {
+  selectedAuditIndex = -1;
+  resetDetail('audit-detail', 'Select an audit item.');
+}
+
+async function refreshAuditAndAdvance(currentId, opts = {}) {
+  const prevIdx = selectedAuditIndex;
+  await fetchAudit();
+  if (!auditRows.length) {
+    resetAuditDetail();
+    return;
+  }
+  const foundIdx = currentId ? auditRows.findIndex(r => r.id === currentId) : -1;
+  let idx = 0;
+  if (opts.advance === 'next') {
+    if (foundIdx >= 0) idx = Math.min(foundIdx + 1, auditRows.length - 1);
+    else idx = Math.min(Math.max(0, prevIdx), auditRows.length - 1);
+  } else {
+    if (foundIdx >= 0) idx = foundIdx;
+    else idx = Math.min(Math.max(0, prevIdx), auditRows.length - 1);
+  }
+  loadAuditDetailByIndex(idx);
+}
+
+function loadAuditDetailByIndex(idx) {
+  if (idx < 0 || idx >= auditRows.length) return;
+  selectedAuditIndex = idx;
+  renderAuditTable(auditRows);
+  const row = auditRows[idx];
+  if (row && row.id) {
+    const reasons = auditReasonsById.get(row.id) || [];
+    const extra = reasons.length ? `<p class="muted">reasons: ${reasons.map(r => escapeHtml(r)).join(', ')}</p>` : '';
+    loadMemoryDetail(row.id, {
+      detailId: 'audit-detail',
+      prefix: 'audit',
+      extraMetaHtml: extra,
+      afterChange: refreshAuditAndAdvance
+    });
+  }
+}
+
+// Docs
+async function fetchDocs() {
+  const q = document.getElementById('doc-query').value;
+  const status = document.getElementById('doc-status').value;
+  const source = document.getElementById('doc-source').value;
+  const sort = document.getElementById('doc-sort').value;
+  const params = new URLSearchParams();
+  if (q) params.set('query', q);
+  if (status) params.set('status', status);
+  if (source) params.set('source', source);
+  if (sort) params.set('sort', sort);
+  params.set('limit', String(docLimit));
+  params.set('offset', String(docOffset));
+  const res = await fetch(api(`/docs?${params.toString()}`), { headers: authHeaders() });
+  const data = await res.json();
+  const total = Number(res.headers.get('x-total-count') || '0');
+  renderDocTable(data);
+  updateDocPagination(data?.length || 0, total);
+}
+
+function renderDocTable(rows) {
+  const tbody = document.querySelector('#doc-table tbody');
+  tbody.innerHTML = '';
+  rows.forEach((row) => {
+    const tr = document.createElement('tr');
+    const status = row.status || 'active';
+    tr.innerHTML = `<td>${escapeHtml(row.title || 'Untitled')}</td><td>${escapeHtml(row.source)}</td><td><span class="status ${escapeHtml(status)}">${escapeHtml(status)}</span></td>`;
+    tr.onclick = () => loadDocDetail(row.id);
+    tbody.appendChild(tr);
+  });
+}
+
+async function loadDocDetail(id) {
+  const res = await fetch(api(`/docs/${id}`), { headers: authHeaders() });
+  const row = await res.json();
+  const detail = document.getElementById('doc-detail');
+  detail.innerHTML = `
+    <h3>${escapeHtml(row.title || 'Untitled')} <span class="status ${escapeHtml(row.status || 'active')}">${escapeHtml(row.status || 'active')}</span></h3>
+    <p class="muted">${escapeHtml(row.source)} ${row.url ? '&middot; ' + escapeHtml(row.url) : ''}</p>
+    <p class="muted">id: ${escapeHtml(row.id)}</p>
+    <button id="doc-delete" class="btn-danger">Delete</button>
+    <h4>Content</h4>
+    <pre>${escapeHtml(row.content)}</pre>
+  `;
+  document.getElementById('doc-delete').onclick = async () => {
+    await fetch(api(`/docs/${id}`), { method: 'DELETE', headers: authHeaders() });
+    fetchDocs();
+  };
+}
+
+async function createDocText() {
+  const title = document.getElementById('doc-title').value;
+  const content = document.getElementById('doc-content').value;
+  if (!content) return;
+  await fetch(api('/docs'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ title, content, source: 'text' })
+  });
+  document.getElementById('doc-content').value = '';
+  fetchDocs();
+}
+
+async function createDocUrl() {
+  const url = document.getElementById('doc-url').value;
+  if (!url) return;
+  await fetch(api('/docs/url'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ url })
+  });
+  fetchDocs();
+}
+
+async function createDocFile() {
+  const fileInput = document.getElementById('doc-file');
+  if (!fileInput.files.length) return;
+  const form = new FormData();
+  form.append('file', fileInput.files[0]);
+  await fetch(api('/docs/file'), { method: 'POST', headers: authHeaders(), body: form });
+  fileInput.value = '';
+  fetchDocs();
+}
+
+// Profile
+	async function fetchProfile() {
+	  const res = await fetch(api('/profile'), { headers: authHeaders() });
+	  const data = await res.json();
+	  const profile = data.profile || data;
+	  const staticEl = document.getElementById('profile-static');
+	  const dynamicEl = document.getElementById('profile-dynamic');
+	  staticEl.innerHTML = (profile.static || []).map(r => `<div>${escapeHtml(r.content)} <span class="tag">${escapeHtml(r.type)}</span></div>`).join('') || '<div class="muted">none</div>';
+	  dynamicEl.innerHTML = (profile.dynamic || []).map(r => `<div>${escapeHtml(r.content)} <span class="tag">${escapeHtml(r.type)}</span></div>`).join('') || '<div class="muted">none</div>';
+	}
+
+// Graph
+let graphInstance = null;
+async function fetchGraph() {
+  const res = await fetch(api('/graph'), { headers: authHeaders() });
+  const data = await res.json();
+  renderGraph(data);
+}
+
+function renderGraph(data) {
+  const meta = document.getElementById('graph-meta');
+  meta.textContent = data.generated_at ? `updated ${data.generated_at}` : 'no graph yet';
+  const fallback = document.getElementById('graph-fallback');
+  const container = document.getElementById('graph-canvas');
+  if (!window.ForceGraph || !data || !Array.isArray(data.nodes)) {
+    fallback.textContent = JSON.stringify(data || {}, null, 2);
+    return;
+  }
+  fallback.textContent = '';
+  if (!graphInstance) {
+    graphInstance = ForceGraph()(container)
+      .nodeId('id')
+      .nodeLabel(node => node.label || node.id)
+      .nodeAutoColorBy('kind')
+      .linkWidth(link => Math.max(1, (link.value || 0) * 3))
+      .linkDirectionalParticles(1)
+      .linkDirectionalParticleWidth(2);
+  }
+  const links = (data.edges || []).map(e => ({
+    source: e.source,
+    target: e.target,
+    value: e.weight || 0
+  }));
+  graphInstance.graphData({ nodes: data.nodes || [], links });
+  const width = container.clientWidth || 800;
+  graphInstance.width(width).height(600);
+}
+
+// Recall debug
+async function explainRecall() {
+  const q = document.getElementById('recall-query').value;
+  if (!q) return;
+  const res = await fetch(api('/recall/explain'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ query: q })
+  });
+  const data = await res.json();
+  document.getElementById('recall-result').textContent = JSON.stringify(data, null, 2);
+}
+
+// Events
+Array.from(document.querySelectorAll('.tab')).forEach(btn => {
+  btn.onclick = () => {
+    const tab = btn.dataset.tab;
+    showPanel(tab);
+    if (tab === 'memories') fetchMemories();
+    if (tab === 'agent-profile') fetchProfileMemories();
+    if (tab === 'docs') fetchDocs();
+    if (tab === 'concepts') fetchConcepts();
+    if (tab === 'audit') fetchAudit();
+    if (tab === 'profile') fetchProfile();
+    if (tab === 'graph') fetchGraph();
+  };
+});
+
+document.getElementById('mem-refresh').onclick = fetchMemories;
+document.getElementById('mem-prev').onclick = () => {
+  memOffset = Math.max(0, memOffset - memLimit);
+  fetchMemories();
+};
+document.getElementById('mem-next').onclick = () => {
+  memOffset = memOffset + memLimit;
+  fetchMemories();
+};
+document.getElementById('mem-status').onchange = () => {
+  memOffset = 0;
+  fetchMemories();
+};
+document.getElementById('mem-type').onchange = () => {
+  memOffset = 0;
+  fetchMemories();
+};
+document.getElementById('mem-sort').onchange = () => {
+  memOffset = 0;
+  fetchMemories();
+};
+document.getElementById('mem-limit').onchange = (e) => {
+  memLimit = Number(e.target.value || 50);
+  memOffset = 0;
+  fetchMemories();
+};
+
+document.getElementById('prof-refresh').onclick = fetchProfileMemories;
+document.getElementById('prof-prev').onclick = () => {
+  profOffset = Math.max(0, profOffset - profLimit);
+  fetchProfileMemories();
+};
+document.getElementById('prof-next').onclick = () => {
+  profOffset = profOffset + profLimit;
+  fetchProfileMemories();
+};
+document.getElementById('prof-status').onchange = () => {
+  profOffset = 0;
+  fetchProfileMemories();
+};
+document.getElementById('prof-type').onchange = () => {
+  profOffset = 0;
+  fetchProfileMemories();
+};
+document.getElementById('prof-sort').onchange = () => {
+  profOffset = 0;
+  fetchProfileMemories();
+};
+document.getElementById('prof-limit').onchange = (e) => {
+  profLimit = Number(e.target.value || 50);
+  profOffset = 0;
+  fetchProfileMemories();
+};
+
+document.getElementById('doc-refresh').onclick = fetchDocs;
+document.getElementById('doc-prev').onclick = () => {
+  docOffset = Math.max(0, docOffset - docLimit);
+  fetchDocs();
+};
+document.getElementById('doc-next').onclick = () => {
+  docOffset = docOffset + docLimit;
+  fetchDocs();
+};
+document.getElementById('doc-status').onchange = () => {
+  docOffset = 0;
+  fetchDocs();
+};
+document.getElementById('doc-source').onchange = () => {
+  docOffset = 0;
+  fetchDocs();
+};
+document.getElementById('doc-sort').onchange = () => {
+  docOffset = 0;
+  fetchDocs();
+};
+document.getElementById('doc-limit').onchange = (e) => {
+  docLimit = Number(e.target.value || 50);
+  docOffset = 0;
+  fetchDocs();
+};
+document.getElementById('doc-create').onclick = createDocText;
+document.getElementById('doc-create-url').onclick = createDocUrl;
+document.getElementById('doc-create-file').onclick = createDocFile;
+document.getElementById('recall-run').onclick = explainRecall;
+document.getElementById('graph-refresh').onclick = fetchGraph;
+
+document.getElementById('concept-refresh').onclick = fetchConcepts;
+document.getElementById('concept-prev').onclick = () => {
+  conceptOffset = Math.max(0, conceptOffset - conceptLimit);
+  fetchConcepts();
+};
+document.getElementById('concept-next').onclick = () => {
+  conceptOffset = conceptOffset + conceptLimit;
+  fetchConcepts();
+};
+document.getElementById('concept-scope').onchange = () => {
+  conceptOffset = 0;
+  fetchConcepts();
+};
+document.getElementById('concept-status').onchange = () => {
+  conceptOffset = 0;
+  fetchConcepts();
+};
+document.getElementById('concept-limit').onchange = (e) => {
+  conceptLimit = Number(e.target.value || 50);
+  conceptOffset = 0;
+  fetchConcepts();
+};
+
+document.getElementById('audit-refresh').onclick = fetchAudit;
+document.getElementById('audit-prev').onclick = () => {
+  auditOffset = Math.max(0, auditOffset - auditLimit);
+  fetchAudit();
+};
+document.getElementById('audit-next').onclick = () => {
+  auditOffset = auditOffset + auditLimit;
+  fetchAudit();
+};
+document.getElementById('audit-scope').onchange = () => {
+  auditOffset = 0;
+  fetchAudit();
+};
+document.getElementById('audit-limit').onchange = (e) => {
+  auditLimit = Number(e.target.value || 50);
+  auditOffset = 0;
+  fetchAudit();
+};
+
+document.getElementById('theme-toggle').onclick = () => {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  setTheme(current === 'dark' ? 'light' : 'dark');
+};
+
+window.addEventListener('resize', () => {
+  if (graphInstance) {
+    const container = document.getElementById('graph-canvas');
+    const width = container.clientWidth || 800;
+    graphInstance.width(width).height(600);
+  }
+});
+
+initTheme();
+fetchMemories();
+</script>
+</body>
+</html>
