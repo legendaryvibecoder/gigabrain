@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import { normalizeConfig } from '../lib/core/config.js';
 import { runMaintenance } from '../lib/core/maintenance-service.js';
+import { rebuildEntityMentions } from '../lib/core/person-service.js';
 import { recallForQuery } from '../lib/core/recall-service.js';
 import { makeTempWorkspace, makeConfigObject, openDb } from './helpers.js';
 
@@ -44,6 +45,34 @@ const run = async () => {
 
   const db = openDb(ws.dbPath);
   try {
+    // Seed a noisy instruction-like memory plus a factual memory for a synthetic entity.
+    // Entity questions should prefer direct facts over "add to profile" instruction text.
+    db.prepare(`
+      INSERT INTO memory_current (
+        memory_id, type, content, normalized, normalized_hash, source, confidence, scope, status, value_score, value_label, created_at, updated_at
+      ) VALUES (
+        ?, 'CONTEXT', ?, ?, ?, 'capture', 0.9, 'shared', 'active', 0.99, 'core', datetime('now'), datetime('now')
+      )
+    `).run(
+      'm-novara-instruction',
+      'Add to profile: Novara is Jordan partner and birthday Nov 6.',
+      'add to profile novara is jordan partner and birthday nov 6',
+      'h-novara-instruction',
+    );
+    db.prepare(`
+      INSERT INTO memory_current (
+        memory_id, type, content, normalized, normalized_hash, source, confidence, scope, status, value_score, value_label, created_at, updated_at
+      ) VALUES (
+        ?, 'USER_FACT', ?, ?, ?, 'capture', 0.95, 'shared', 'active', 0.72, 'core', datetime('now'), datetime('now')
+      )
+    `).run(
+      'm-novara-fact',
+      'Novara is Jordan partner and birthday Nov 6.',
+      'novara is jordan partner and birthday nov 6',
+      'h-novara-fact',
+    );
+    rebuildEntityMentions(db);
+
     const jan = recallForQuery({
       db,
       config,
@@ -65,6 +94,22 @@ const run = async () => {
     });
     const leaksMemoryMd = shared.results.some((row) => String(row.source_kind || '') === 'memory_md');
     assert.equal(leaksMemoryMd, false, 'shared recall must not pull private MEMORY.md chunks');
+
+    const novara = recallForQuery({
+      db,
+      config,
+      query: 'wer ist novara?',
+      scope: 'shared',
+    });
+    assert.equal(novara.results.length >= 1, true, 'entity query should return synthetic Novara memories');
+    const topNovara = String(novara.results[0]?.content || '').toLowerCase();
+    assert.equal(topNovara.startsWith('add to profile'), false, 'entity query should prefer direct facts over instruction-like text');
+    assert.equal(topNovara.includes('novara is jordan partner'), true, 'top entity memory should still carry direct relationship fact');
+    const inj = String(novara.injection || '').toLowerCase();
+    assert.equal(inj.includes('entity_answer_hints:'), true, 'entity injection should expose high-priority answer hints');
+    const hintsSection = inj.split('entity_answer_hints:')[1]?.split('\nmemories:')[0] || '';
+    assert.equal(hintsSection.includes('novara is jordan partner and birthday nov 6.'), true, 'entity hints should include direct fact');
+    assert.equal(hintsSection.includes('add to profile: novara is jordan partner and birthday nov 6.'), false, 'entity hints should exclude instruction-like text');
   } finally {
     db.close();
   }

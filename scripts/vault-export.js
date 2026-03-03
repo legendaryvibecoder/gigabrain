@@ -7,7 +7,7 @@
  *
  * Flags:
  *   --db     Path to registry.sqlite  (default: ~/.openclaw/gigabrain/memory/registry.sqlite)
- *   --vault  Path to vault directory   (default: ~/runtime/clawd-live/vault/)
+ *   --vault  Path to vault directory   (default: ~/.openclaw/gigabrain/vault/)
  *   --dry-run  Print stats without writing files
  *   --clean    Remove stale vault files whose memory_id is no longer active
  */
@@ -32,7 +32,7 @@ const readFlag = (name, fallback) => {
 const hasFlag = (name) => args.includes(name);
 
 const DB_PATH = readFlag('--db', `${process.env.HOME}/.openclaw/gigabrain/memory/registry.sqlite`);
-const VAULT_DIR = readFlag('--vault', `${process.env.HOME}/runtime/clawd-live/vault/`);
+const VAULT_DIR = readFlag('--vault', `${process.env.HOME}/.openclaw/gigabrain/vault/`);
 const DRY_RUN = hasFlag('--dry-run');
 const CLEAN = hasFlag('--clean');
 
