@@ -105,6 +105,11 @@ const run = async () => {
     const topNovara = String(novara.results[0]?.content || '').toLowerCase();
     assert.equal(topNovara.startsWith('add to profile'), false, 'entity query should prefer direct facts over instruction-like text');
     assert.equal(topNovara.includes('novara is jordan partner'), true, 'top entity memory should still carry direct relationship fact');
+    const inj = String(novara.injection || '').toLowerCase();
+    assert.equal(inj.includes('entity_answer_hints:'), true, 'entity injection should expose high-priority answer hints');
+    const hintsSection = inj.split('entity_answer_hints:')[1]?.split('\nmemories:')[0] || '';
+    assert.equal(hintsSection.includes('novara is jordan partner and birthday nov 6.'), true, 'entity hints should include direct fact');
+    assert.equal(hintsSection.includes('add to profile: novara is jordan partner and birthday nov 6.'), false, 'entity hints should exclude instruction-like text');
   } finally {
     db.close();
   }

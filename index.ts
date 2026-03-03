@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 
 import { V3_CONFIG_SCHEMA, normalizeConfig } from './lib/core/config.js';
-import { DatabaseSync, openDatabase } from './lib/core/sqlite.js';
 import { createMemoryHttpHandler } from './lib/core/http-routes.js';
 import { ensureProjectionStore, materializeProjectionFromMemories } from './lib/core/projection-store.js';
 import { ensureEventStore } from './lib/core/event-store.js';
@@ -24,15 +24,6 @@ type PluginApi = {
 
 type PluginConfig = ReturnType<typeof normalizeConfig>;
 
-/** Shape of the context object passed as the second argument to hook handlers. */
-type HookContext = {
-  agentId?: string;
-  sessionKey?: string;
-  sessionId?: string;
-  workspaceDir?: string;
-  messageProvider?: unknown;
-};
-
 const isObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value && typeof value === 'object' && !Array.isArray(value));
 
@@ -48,17 +39,83 @@ const parseAgentIdFromSessionKey = (sessionKey: string): string => {
   return String(parts[1] || 'shared').trim() || 'shared';
 };
 
-/**
- * Resolve scope from the hook context (second argument) and fall back to event fields.
- * The gateway passes agentId and sessionKey in ctx, not in event.
- */
-const resolveScopeFromCtx = (event: any, ctx?: HookContext): string => {
-  // Prefer ctx fields (where the gateway actually puts them)
-  const ctxAgent = String(ctx?.agentId || '').trim();
-  if (ctxAgent) return ctxAgent;
-  const ctxSessionKey = String(ctx?.sessionKey || '').trim();
-  if (ctxSessionKey) return parseAgentIdFromSessionKey(ctxSessionKey);
-  // Legacy fallback: check event fields (for older gateway versions)
+const GIGABRAIN_CONTEXT_RE = /<gigabrain-context>([\s\S]*?)<\/gigabrain-context>/gi;
+const QUERY_META_LINE_RE = /^(?:fallback|memories|instruction|entity_mode|conversation info|to send an image back)\s*:/i;
+const BOOTSTRAP_INJECTION_RE = /\b(?:you are running a boot check|boot\.md|reply with only:\s*no_reply|a new session was started via \/new or \/reset|session startup sequence|follow boot\.md instructions exactly)\b/i;
+const NO_REPLY_ONLY_RE = /^no_reply[.!]?$/i;
+const FOLLOWUP_PRONOUN_RE = /\b(?:sie|er|ihn|ihr|her|him|them|diese(?:r|n|m)?|jene(?:r|n|m)?|that person|diese person|jene person)\b/i;
+const FOLLOWUP_INTENT_RE = /\b(?:was|what|sag|tell|erz[aä]hl|noch|mehr|else|weiter|weiteres)\b/i;
+const ENTITY_FROM_QUERY_RE = /\b(?:wer\s+ist|who\s+is|who\s+was|what\s+do\s+you\s+know\s+about|tell\s+me\s+about|was\s+wei(?:ss|ß)t\s+du\s+über|was\s+weisst\s+du\s+ueber|über|ueber|about)\s+([a-zA-ZÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ0-9'’._-]*(?:\s+[a-zA-ZÀ-ÖØ-öø-ÿ][a-zA-ZÀ-ÖØ-öø-ÿ0-9'’._-]*){0,2})/i;
+const ENTITY_STOPWORDS = new Set([
+  'sie', 'er', 'ihr', 'ihn', 'her', 'him', 'them', 'diese', 'dieser', 'diesem',
+  'jener', 'jene', 'jenem', 'person', 'about', 'ueber', 'über', 'who', 'what',
+]);
+
+const messageToText = (msg: any): string => {
+  if (typeof msg?.content === 'string') return msg.content;
+  if (Array.isArray(msg?.content)) {
+    return msg.content
+      .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+      .join('\n');
+  }
+  return '';
+};
+
+const extractContextQuery = (input: string): string => {
+  const text = String(input || '');
+  const candidates: string[] = [];
+  let match: RegExpExecArray | null;
+  while ((match = GIGABRAIN_CONTEXT_RE.exec(text)) !== null) {
+    const block = String(match[1] || '');
+    const lines = block.split(/\r?\n/);
+    for (const rawLine of lines) {
+      const line = String(rawLine || '').trim();
+      if (!line) continue;
+      if (!line.toLowerCase().startsWith('query:')) continue;
+      const value = line.slice('query:'.length).trim();
+      if (value) candidates.push(value);
+    }
+  }
+  return candidates.length > 0 ? candidates[candidates.length - 1] : '';
+};
+
+const sanitizeCandidateQuery = (input: string): string => {
+  let text = String(input || '').trim();
+  if (!text) return '';
+
+  for (let i = 0; i < 3; i += 1) {
+    const contextQuery = extractContextQuery(text);
+    if (!contextQuery) break;
+    if (contextQuery === text) break;
+    text = contextQuery;
+  }
+
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => String(line || '').trim())
+    .filter(Boolean);
+  const cleaned: string[] = [];
+  for (const line of lines) {
+    if (line.startsWith('```')) continue;
+    if (/^[-*]\s*\[.+\]\s*\(.+\)\s*/.test(line)) continue;
+    if (QUERY_META_LINE_RE.test(line)) continue;
+    if (/^\{.*\}$/.test(line)) continue;
+    if (/^\[[^\]]+\]\s*$/.test(line)) continue;
+    cleaned.push(line);
+  }
+
+  text = cleaned.length > 0 ? cleaned.join(' ') : text;
+  text = text.replace(/^\[[^\]]+\]\s*/, '').trim();
+  text = text.replace(/\s+/g, ' ').trim();
+  if (text.length > 600) text = text.slice(0, 600).trim();
+
+  if (!text) return '';
+  if (NO_REPLY_ONLY_RE.test(text)) return '';
+  if (BOOTSTRAP_INJECTION_RE.test(text)) return '';
+  return text;
+};
+
+const resolveScopeForEvent = (event: any): string => {
   const explicit = String(event?.agentId || event?.scope || '').trim();
   if (explicit) return explicit;
   const sessionKey = String(event?.sessionKey || event?.meta?.sessionKey || '');
@@ -72,76 +129,87 @@ const extractUserQuery = (event: any): string => {
     const msg = messages[i];
     const role = String(msg?.role || '').toLowerCase();
     if (role !== 'user') continue;
-    const content = typeof msg?.content === 'string'
-      ? msg.content
-      : Array.isArray(msg?.content)
-        ? msg.content.map((part: any) => (typeof part?.text === 'string' ? part.text : '')).join('\n')
-        : '';
-    const trimmed = String(content || '').trim();
-    if (trimmed) return trimmed;
+    const content = messageToText(msg);
+    const sanitized = sanitizeCandidateQuery(content);
+    if (sanitized) return sanitized;
   }
-  const prompt = String(event?.prompt || '').trim();
-  return prompt;
+  return sanitizeCandidateQuery(String(event?.prompt || ''));
 };
 
-const stringifyCaptureValue = (value: any, depth = 0): string => {
-  if (depth > 5 || value == null) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value);
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => stringifyCaptureValue(item, depth + 1))
-      .filter(Boolean)
-      .join('\n');
-  }
-  if (typeof value === 'object') {
-    const record = value as Record<string, any>;
-    const preferredKeys = ['text', 'content', 'output_text', 'message', 'response', 'output', 'result', 'final'];
-    const parts: string[] = [];
-    for (const key of preferredKeys) {
-      if (!(key in record)) continue;
-      const piece = stringifyCaptureValue(record[key], depth + 1).trim();
-      if (piece) parts.push(piece);
+const extractEntityHintFromQuery = (query: string): string => {
+  const text = String(query || '').trim();
+  if (!text) return '';
+  const match = text.match(ENTITY_FROM_QUERY_RE);
+  if (!match?.[1]) return '';
+  const candidate = String(match[1] || '')
+    .trim()
+    .replace(/[?!.,;:]+$/g, '')
+    .replace(/\s+/g, ' ');
+  if (!candidate) return '';
+  const normalized = candidate.toLowerCase();
+  if (ENTITY_STOPWORDS.has(normalized)) return '';
+  return candidate;
+};
+
+const isLikelyEntityFollowup = (query: string): boolean => {
+  const text = String(query || '').trim();
+  if (!text) return false;
+  return FOLLOWUP_PRONOUN_RE.test(text) && FOLLOWUP_INTENT_RE.test(text);
+};
+
+const normalizedQueryKey = (value: string): string =>
+  String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+const findPreviousEntityHint = (messages: any[], currentQuery: string): string => {
+  const list = Array.isArray(messages) ? messages : [];
+  let skippedCurrent = false;
+  for (let i = list.length - 1; i >= 0; i -= 1) {
+    const msg = list[i];
+    if (String(msg?.role || '').toLowerCase() !== 'user') continue;
+    const candidate = sanitizeCandidateQuery(messageToText(msg));
+    if (!candidate) continue;
+    if (!skippedCurrent && normalizedQueryKey(candidate) === normalizedQueryKey(currentQuery)) {
+      skippedCurrent = true;
+      continue;
     }
-    if (parts.length > 0) return parts.join('\n');
-    try {
-      return JSON.stringify(record);
-    } catch {
-      return String(record);
-    }
+    const hint = extractEntityHintFromQuery(candidate);
+    if (hint) return hint;
   }
   return '';
 };
 
-const extractCapturePayload = (event: any, ctx?: HookContext) => {
-  const outputRaw = event?.output ?? event?.result ?? event?.response ?? event?.final ?? '';
-  const promptRaw = event?.prompt ?? '';
-  const sessionKey = String(ctx?.sessionKey || event?.sessionKey || '');
-  const agentId = String(ctx?.agentId || event?.agentId || parseAgentIdFromSessionKey(sessionKey));
+const enrichQueryWithEntityContext = (query: string, messages: any[]): string => {
+  const base = String(query || '').trim();
+  if (!base) return '';
+  if (extractEntityHintFromQuery(base)) return base;
+  if (!isLikelyEntityFollowup(base)) return base;
+  const hint = findPreviousEntityHint(messages, base);
+  if (!hint) return base;
+  const lowered = base.toLowerCase();
+  if (lowered.includes(hint.toLowerCase())) return base;
+  return `${base} ${hint}`.trim();
+};
+
+const extractCapturePayload = (event: any) => {
+  const output = String(
+    event?.output
+      || event?.result
+      || event?.response
+      || event?.final
+      || '',
+  );
   return {
-    scope: resolveScopeFromCtx(event, ctx),
-    agentId,
-    sessionKey,
-    text: stringifyCaptureValue(outputRaw),
-    output: outputRaw,
-    response: event?.response,
-    result: event?.result,
-    final: event?.final,
-    prompt: stringifyCaptureValue(promptRaw),
+    scope: resolveScopeForEvent(event),
+    agentId: String(event?.agentId || parseAgentIdFromSessionKey(String(event?.sessionKey || ''))),
+    sessionKey: String(event?.sessionKey || ''),
+    text: output,
+    prompt: String(event?.prompt || ''),
     messages: Array.isArray(event?.messages) ? event.messages : [],
-    meta: event?.meta ?? event?.metadata ?? {},
-    metadata: event?.metadata ?? event?.meta ?? {},
-    llmUnavailable: Boolean(
-      event?.llmUnavailable === true
-      || event?.modelUnavailable === true
-      || event?.meta?.llmUnavailable === true
-      || event?.metadata?.llmUnavailable === true,
-    ),
   };
 };
 
 const withDb = <T,>(dbPath: string, fn: (db: DatabaseSync) => T): T => {
-  const db = openDatabase(dbPath);
+  const db = new DatabaseSync(dbPath);
   try {
     ensureProjectionStore(db);
     ensureEventStore(db);
@@ -162,114 +230,10 @@ const shouldSkipRecall = (query: string): boolean => {
   if (!text) return true;
   if (text.startsWith('automation:')) return true;
   if (text.includes('<memory_note')) return true;
+  if (NO_REPLY_ONLY_RE.test(text)) return true;
+  if (BOOTSTRAP_INJECTION_RE.test(text)) return true;
   return false;
 };
-
-/* ── Session tracking helpers ─────────────────────────────────────────── */
-
-/** Ensure the sessions table exists (idempotent). */
-const ensureSessionsTable = (db: DatabaseSync): void => {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS sessions (
-      id TEXT PRIMARY KEY,
-      agent_id TEXT,
-      channel TEXT,
-      started_at TEXT DEFAULT (datetime('now')),
-      ended_at TEXT,
-      message_count INTEGER DEFAULT 0,
-      summary TEXT,
-      next_steps TEXT,
-      status TEXT DEFAULT 'active'
-    )
-  `);
-};
-
-/**
- * Derive a stable session id from the gateway session key.
- * Format: "agent:<agentId>:<channel>" -> "agent:<agentId>:<channel>"
- * If sessionId is provided by gateway, prefer that (it is a UUID per run).
- */
-const deriveSessionId = (ctx?: HookContext): string => {
-  // Use the gateway-assigned sessionId if available (UUID, unique per conversation)
-  const gwSessionId = String(ctx?.sessionId || '').trim();
-  if (gwSessionId && gwSessionId !== 'undefined') return gwSessionId;
-  // Fall back to sessionKey
-  const key = String(ctx?.sessionKey || '').trim();
-  if (key) return key;
-  return `session-${Date.now()}`;
-};
-
-/** Derive channel from sessionKey (e.g. "agent:default:telegram:..." -> "telegram") */
-const deriveChannel = (ctx?: HookContext): string => {
-  const key = String(ctx?.sessionKey || '').trim();
-  if (!key) return 'unknown';
-  const parts = key.split(':');
-  // Format: agent:<agentId>:<channel>:... or agent:<agentId>:main
-  if (parts.length >= 3) return parts[2] || 'main';
-  return 'main';
-};
-
-/**
- * Start or resume a session. If a session with the same sessionKey already exists
- * and is active, increment message_count. Otherwise create a new one.
- */
-const startOrResumeSession = (db: DatabaseSync, ctx?: HookContext, logger?: any): void => {
-  ensureSessionsTable(db);
-  const sessionId = deriveSessionId(ctx);
-  const agentId = String(ctx?.agentId || '').trim() || 'shared';
-  const channel = deriveChannel(ctx);
-
-  // Check if session already exists
-  const existing = db.prepare('SELECT id, status FROM sessions WHERE id = ?').get(sessionId) as any;
-  if (existing) {
-    // Resume: increment message count
-    db.prepare(`
-      UPDATE sessions
-      SET message_count = message_count + 1,
-          status = 'active'
-      WHERE id = ?
-    `).run(sessionId);
-    logger?.info?.(`[gigabrain] session resumed id=${sessionId} agent=${agentId}`);
-  } else {
-    // Create new session
-    db.prepare(`
-      INSERT INTO sessions (id, agent_id, channel, started_at, message_count, status)
-      VALUES (?, ?, ?, datetime('now'), 1, 'active')
-    `).run(sessionId, agentId, channel);
-    logger?.info?.(`[gigabrain] session started id=${sessionId} agent=${agentId} channel=${channel}`);
-  }
-};
-
-/**
- * Close a session (set ended_at and status).
- */
-const endSession = (db: DatabaseSync, ctx?: HookContext, logger?: any): void => {
-  ensureSessionsTable(db);
-  const sessionId = deriveSessionId(ctx);
-
-  const existing = db.prepare('SELECT id FROM sessions WHERE id = ?').get(sessionId) as any;
-  if (!existing) {
-    // Session was never started (e.g. hook ordering issue) -- create a minimal record
-    const agentId = String(ctx?.agentId || '').trim() || 'shared';
-    const channel = deriveChannel(ctx);
-    db.prepare(`
-      INSERT INTO sessions (id, agent_id, channel, started_at, ended_at, message_count, status)
-      VALUES (?, ?, ?, datetime('now'), datetime('now'), 1, 'ended')
-    `).run(sessionId, agentId, channel);
-    logger?.info?.(`[gigabrain] session retroactively created+ended id=${sessionId}`);
-    return;
-  }
-
-  db.prepare(`
-    UPDATE sessions
-    SET ended_at = datetime('now'),
-        status = 'ended'
-    WHERE id = ?
-  `).run(sessionId);
-  logger?.info?.(`[gigabrain] session ended id=${sessionId}`);
-};
-
-/* ── Plugin ───────────────────────────────────────────────────────────── */
 
 const gigabrainPlugin = {
   id: 'gigabrain',
@@ -304,8 +268,6 @@ const gigabrainPlugin = {
 
     withDb(dbPath, () => undefined);
     withDb(dbPath, (db) => {
-      // Ensure sessions table exists on startup
-      ensureSessionsTable(db);
       if (config.native.enabled === false) return;
       const nativeSync = syncNativeMemory({
         db,
@@ -328,19 +290,13 @@ const gigabrainPlugin = {
       logger.info?.('[gigabrain] /gb routes registered (including timeline endpoint)');
     }
 
-    api.on('before_agent_start', async (event: any, ctx?: HookContext) => {
-      // ── Session tracking ──
+    api.on('before_agent_start', async (event: any) => {
       try {
-        withDb(dbPath, (db) => startOrResumeSession(db, ctx, logger));
-      } catch (sessErr) {
-        logger.warn?.(`[gigabrain] session start error: ${sessErr instanceof Error ? sessErr.message : String(sessErr)}`);
-      }
-
-      // ── Memory recall ──
-      try {
-        const query = extractUserQuery(event);
+        const baseQuery = extractUserQuery(event);
+        const messages = Array.isArray(event?.messages) ? event.messages : [];
+        const query = enrichQueryWithEntityContext(baseQuery, messages);
         if (shouldSkipRecall(query)) return;
-        const scope = resolveScopeFromCtx(event, ctx);
+        const scope = resolveScopeForEvent(event);
         const recall = withDb(dbPath, (db) => recallForQuery({
           db,
           config,
@@ -349,9 +305,28 @@ const gigabrainPlugin = {
         }));
         if (!recall?.injection) return;
 
-        logger.info?.(`[gigabrain] recall injected ${recall.injection.length} chars for scope=${scope}`);
+        const existing = Array.isArray(event?.messages) ? event.messages : [];
+        const recallMessage = {
+          role: 'system',
+          content: recall.injection,
+        };
+        const lastUserIdx = (() => {
+          for (let i = existing.length - 1; i >= 0; i -= 1) {
+            if (String(existing[i]?.role || '').toLowerCase() === 'user') return i;
+          }
+          return -1;
+        })();
+        const injected = lastUserIdx >= 0
+          ? [
+            ...existing.slice(0, lastUserIdx),
+            recallMessage,
+            ...existing.slice(lastUserIdx),
+          ]
+          : [recallMessage, ...existing];
+        logger.info?.(`[gigabrain] recall injected ${recall.injection.length} chars`);
         return {
-          prependContext: recall.injection,
+          ...event,
+          messages: injected,
         };
       } catch (err) {
         logger.warn?.(`[gigabrain] recall hook error: ${err instanceof Error ? err.message : String(err)}`);
@@ -359,18 +334,10 @@ const gigabrainPlugin = {
       }
     });
 
-    api.on('agent_end', async (event: any, ctx?: HookContext) => {
-      // ── Session tracking ──
-      try {
-        withDb(dbPath, (db) => endSession(db, ctx, logger));
-      } catch (sessErr) {
-        logger.warn?.(`[gigabrain] session end error: ${sessErr instanceof Error ? sessErr.message : String(sessErr)}`);
-      }
-
-      // ── Memory capture ──
+    api.on('agent_end', async (event: any) => {
       if (config.capture.enabled === false) return;
       try {
-        const payload = extractCapturePayload(event, ctx);
+        const payload = extractCapturePayload(event);
         const result = withDb(dbPath, (db) => captureFromEvent({
           db,
           config,

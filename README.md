@@ -28,7 +28,7 @@ It is built for local-first production use: SQLite-backed recall, deterministic 
 
 ```bash
 cd ~/.openclaw/plugins   # or wherever your gateway loads plugins from
-git clone https://github.com/your-org/gigabrain.git
+git clone https://github.com/legendaryvibecoder/gigabrain.git
 ```
 
 2. Register the plugin in your `~/.openclaw/openclaw.json`:
@@ -243,10 +243,15 @@ Never include secrets, credentials, tokens, or API keys in memory notes.
 
 Before each prompt, Gigabrain:
 
-1. Searches the SQLite registry for memories relevant to the current query
-2. Searches native markdown files (`MEMORY.md`, daily notes) for matching chunks
-3. Applies class budgets (core / situational / decisions) and token limits
-4. Injects the top results as context the agent can "remember"
+1. **Sanitizes the user query** — strips prior `<gigabrain-context>` blocks, metadata lines, bootstrap injections, and markdown noise to extract the real question
+2. **Entity coreference resolution** — detects pronoun follow-ups (e.g. "was weisst du noch über sie?") and enriches the query with the entity from prior messages in the conversation
+3. Searches the SQLite registry for memories relevant to the sanitized query
+4. Searches native markdown files (`MEMORY.md`, daily notes) for matching chunks
+5. **Entity answer quality scoring** — for "who is" / "wer ist" queries, penalizes instruction-like memories ("Add to profile: ...") and boosts direct factual content
+6. **Deduplication** — removes duplicate memories by normalized content before ranking
+7. Applies class budgets (core / situational / decisions) and token limits
+8. **Entity answer hints** — for entity queries, extracts top-3 factual answers and includes them as `entity_answer_hints` in the injection block
+9. Injects the results as a system message placed before the last user message in the conversation
 
 The agent doesn't need to do anything special for recall — it happens automatically via the gateway plugin hooks.
 
@@ -287,6 +292,8 @@ The plugin registers these routes on the OpenClaw gateway:
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/gb/health` | No | Health check |
+| `POST` | `/gb/recall` | Token | Memory recall for a query |
+| `POST` | `/gb/suggestions` | Token | Structured suggestion ingest |
 | `POST` | `/gb/bench/recall` | Token | Recall benchmark endpoint |
 | `GET` | `/gb/memory/:id/timeline` | Token | Event timeline for a memory |
 
@@ -379,7 +386,7 @@ gigabrain/
 - Auth is **fail-closed**: if no token is configured, all requests are rejected
 - The web console escapes all user content to prevent XSS
 - The memory_api binds to `127.0.0.1` only — use Tailscale or SSH tunneling for remote access
-- Dependencies are audited with `pip-audit` (0 known vulnerabilities as of v0.3.0-rc1)
+- Dependencies are audited with `pip-audit` (0 known vulnerabilities as of v0.3.0)
 
 ## License
 
