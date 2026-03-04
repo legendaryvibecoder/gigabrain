@@ -15,6 +15,7 @@
     "engines": {
         "node": ">=22"
     },
+    "license": "MIT",
     "scripts": {
         "test": "node tests/run-all.js",
         "test:unit": "node tests/run-all.js --filter unit",

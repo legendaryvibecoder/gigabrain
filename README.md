@@ -1,6 +1,6 @@
 # Gigabrain
 
-Gigabrain is the long-term memory layer for [OpenClaw](https://github.com/anthropics/openclaw) agents. It converts conversations and native notes into durable, queryable memory, then injects the right context before each prompt so agents stay consistent across sessions.
+Gigabrain is the long-term memory layer for [OpenClaw](https://openclaw.ai) agents. It converts conversations and native notes into durable, queryable memory, then injects the right context before each prompt so agents stay consistent across sessions.
 
 It is built for local-first production use: SQLite-backed recall, deterministic dedupe/audit flows, native markdown sync, and an optional FastAPI console for memory operations.
 
@@ -366,8 +366,7 @@ gigabrain/
 ├── scripts/                    # CLI tools
 │   ├── gigabrainctl.js         # Main control plane
 │   ├── migrate-v3.js           # Schema migration
-│   ├── harmonize-memory.js     # Memory harmonization
-│   └── harness-lab-*.js        # Evaluation harness
+│   └── harmonize-memory.js     # Memory harmonization
 │
 ├── memory_api/                 # Optional web console (FastAPI)
 │   ├── app.py
@@ -376,8 +375,7 @@ gigabrain/
 │
 ├── tests/                      # Test suite
 ├── bench/memorybench/          # Benchmark harness
-├── eval/                       # Evaluation cases
-└── docs/                       # Additional documentation
+└── eval/                       # Evaluation cases
 ```
 
 ## Security
@@ -386,7 +384,7 @@ gigabrain/
 - Auth is **fail-closed**: if no token is configured, all requests are rejected
 - The web console escapes all user content to prevent XSS
 - The memory_api binds to `127.0.0.1` only — use Tailscale or SSH tunneling for remote access
-- Dependencies are audited with `pip-audit` (0 known vulnerabilities as of v0.3.0)
+- Dependencies are audited with `pip-audit` and `npm audit`. Transitive dependency alerts (e.g. from peer dependencies) are tracked via Dependabot
 
 ## License
 
