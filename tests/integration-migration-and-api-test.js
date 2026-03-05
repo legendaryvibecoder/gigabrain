@@ -127,6 +127,9 @@ const run = async () => {
   });
   const { server, baseUrl } = await startServer(handler);
   try {
+    const unauthorizedTimelineRes = await fetch(`${baseUrl}/gb/memory/${encodeURIComponent(sampleId)}/timeline`);
+    assert.equal(unauthorizedTimelineRes.status, 401, 'timeline endpoint should require auth');
+
     const timelineRes = await fetch(`${baseUrl}/gb/memory/${encodeURIComponent(sampleId)}/timeline`, {
       headers: { 'X-GB-Token': testToken },
     });
