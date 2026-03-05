@@ -280,11 +280,18 @@ const gigabrainPlugin = {
 
     if (api.registerHttpHandler) {
       const token = String((rawConfig as any)?.runtime?.apiToken || process.env.GB_UI_TOKEN || '').trim();
+      const allowNoAuth = ['1', 'true', 'yes'].includes(String(process.env.GB_ALLOW_NO_AUTH || '').trim().toLowerCase());
+      if (!token && !allowNoAuth) {
+        const message = '[gigabrain] missing GB_UI_TOKEN; set GB_UI_TOKEN or explicitly allow dev mode with GB_ALLOW_NO_AUTH=1';
+        logger.error?.(message);
+        throw new Error(message);
+      }
       const handler = createMemoryHttpHandler({
         dbPath,
         config,
         logger,
         token,
+        allowNoAuth,
       });
       api.registerHttpHandler(handler);
       logger.info?.('[gigabrain] /gb routes registered (including timeline endpoint)');
