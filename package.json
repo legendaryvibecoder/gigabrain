@@ -12,11 +12,16 @@
         "type": "git",
         "url": "https://github.com/legendaryvibecoder/gigabrain.git"
     },
+    "publishConfig": {
+        "access": "public"
+    },
     "engines": {
         "node": ">=22"
     },
     "license": "MIT",
     "scripts": {
+        "setup": "node scripts/setup-first-run.js",
+        "setup:easy": "node scripts/setup-first-run.js",
         "test": "node tests/run-all.js",
         "test:unit": "node tests/run-all.js --filter unit",
         "test:integration": "node tests/run-all.js --filter integration",

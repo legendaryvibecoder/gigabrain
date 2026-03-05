@@ -24,30 +24,54 @@ It is built for local-first production use: SQLite-backed recall, deterministic 
 
 ## Installation
 
-### Option A: npm (recommended)
+### Option A: npm install + setup wizard (recommended)
+
+Install:
 
 ```bash
-mkdir -p ~/.openclaw/plugins && cd ~/.openclaw/plugins
+mkdir -p ~/.openclaw/plugins
+cd ~/.openclaw/plugins
 npm install @legendaryvibecoder/gigabrain
+cd node_modules/@legendaryvibecoder/gigabrain
 ```
 
-### Option B: Clone from source
+Run the one-command setup wizard:
+
+```bash
+npm run setup -- --workspace /path/to/your-openclaw-workspace
+```
+
+What the setup wizard does:
+
+- Ensures `plugins.entries.gigabrain` exists in `~/.openclaw/openclaw.json`
+- Sets plugin path and runtime paths (`workspaceRoot`, `registryPath`)
+- Bootstraps the DB and indexes native memory files
+- Adds AGENTS memory protocol block (unless `--skip-agents`)
+- Restarts gateway (unless `--skip-restart`)
+
+Wizard help:
+
+```bash
+npm run setup -- --help
+```
+
+### Option B: Manual setup (custom environments)
+
+1. Install from source:
 
 ```bash
 cd ~/.openclaw/plugins
 git clone https://github.com/legendaryvibecoder/gigabrain.git
 ```
 
-### Register the plugin
-
-Add to your `~/.openclaw/openclaw.json`:
+2. Register plugin in `~/.openclaw/openclaw.json`:
 
 ```json
 {
   "plugins": {
     "entries": {
       "gigabrain": {
-        "path": "~/.openclaw/plugins/node_modules/@legendaryvibecoder/gigabrain",
+        "path": "~/.openclaw/plugins/gigabrain",
         "config": {
           "enabled": true
         }
@@ -57,12 +81,16 @@ Add to your `~/.openclaw/openclaw.json`:
 }
 ```
 
-> If you cloned from source, set `"path"` to `"~/.openclaw/plugins/gigabrain"` instead.
-
-Restart the gateway:
+3. Restart gateway:
 
 ```bash
 openclaw gateway restart
+```
+
+4. Run migration once:
+
+```bash
+node scripts/migrate-v3.js --apply --config ~/.openclaw/openclaw.json
 ```
 
 ## Configuration
@@ -183,15 +211,9 @@ Built-in junk patterns block system prompts, API keys, and benchmark artifacts f
 
 See [`openclaw.plugin.json`](openclaw.plugin.json) for the complete schema with all defaults.
 
-## First-time setup
+## First-time setup details
 
-After installing, run the migration script once:
-
-```bash
-node scripts/migrate-v3.js --apply --config ~/.openclaw/openclaw.json
-```
-
-This creates the database schema (`memory_events`, `memory_current`, `memory_native_chunks`, `memory_entity_mentions`) and backfills events from any existing data.
+Migration creates the database schema (`memory_events`, `memory_current`, `memory_native_chunks`, `memory_entity_mentions`) and backfills events from any existing data.
 
 A rollback metadata file is written to `output/rollback-meta.json` in case you need to revert.
 
@@ -223,7 +245,12 @@ Gigabrain captures memories when the agent emits `<memory_note>` XML tags in its
 
 ### Agent instructions (AGENTS.md)
 
-For the agent to emit memory notes correctly, you need to add instructions to your workspace's `AGENTS.md` (or equivalent instruction file). Here's a minimal example:
+For the agent to emit memory notes correctly, you need instructions in your workspace `AGENTS.md` (or equivalent instruction file).
+
+- If you used the setup wizard, this block is added automatically (unless `--skip-agents`).
+- If you used manual setup, add it yourself.
+
+Minimal example:
 
 ```markdown
 ## Memory
