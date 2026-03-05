@@ -24,21 +24,30 @@ It is built for local-first production use: SQLite-backed recall, deterministic 
 
 ## Installation
 
-1. Clone into your OpenClaw plugins directory:
+### Option A: npm (recommended)
 
 ```bash
-cd ~/.openclaw/plugins   # or wherever your gateway loads plugins from
+mkdir -p ~/.openclaw/plugins && cd ~/.openclaw/plugins
+npm install @legendaryvibecoder/gigabrain
+```
+
+### Option B: Clone from source
+
+```bash
+cd ~/.openclaw/plugins
 git clone https://github.com/legendaryvibecoder/gigabrain.git
 ```
 
-2. Register the plugin in your `~/.openclaw/openclaw.json`:
+### Register the plugin
+
+Add to your `~/.openclaw/openclaw.json`:
 
 ```json
 {
   "plugins": {
     "entries": {
       "gigabrain": {
-        "path": "~/.openclaw/plugins/gigabrain",
+        "path": "~/.openclaw/plugins/node_modules/@legendaryvibecoder/gigabrain",
         "config": {
           "enabled": true
         }
@@ -48,7 +57,9 @@ git clone https://github.com/legendaryvibecoder/gigabrain.git
 }
 ```
 
-3. Restart the gateway:
+> If you cloned from source, set `"path"` to `"~/.openclaw/plugins/gigabrain"` instead.
+
+Restart the gateway:
 
 ```bash
 openclaw gateway restart
