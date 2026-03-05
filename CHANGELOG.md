@@ -2,6 +2,21 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.3.0] — 2026-03-05
+
+### Security
+- Timing-safe token comparison (`crypto.timingSafeEqual` / `hmac.compare_digest`)
+- XML-escape query parameters in recall context to prevent injection
+- Bump `lxml-html-clean` 0.4.1 → 0.4.4 (CVE fix)
+- Remove stored auth token from `localStorage` on authentication failure
+- Auth startup fail-closed: gateway refuses to start without a valid token (unless `GB_ALLOW_NO_AUTH=1` for local dev)
+- Timeline endpoint auth test added to CI
+- Git history sanitized — single-commit squash to remove any leaked credentials from prior commits
+- Remove legacy `CLAWDBOT_WORKSPACE` env var and all `supermemory` references
+
+### Added
+- `SECURITY.md` with responsible disclosure instructions via GitHub Security Advisories
+
 ## [0.3.0-rc1] — 2026-02-26
 
 ### Added
