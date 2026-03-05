@@ -12,7 +12,7 @@ All notable changes to Gigabrain are documented in this file.
 - Auth startup fail-closed: gateway refuses to start without a valid token (unless `GB_ALLOW_NO_AUTH=1` for local dev)
 - Timeline endpoint auth test added to CI
 - Git history sanitized — single-commit squash to remove any leaked credentials from prior commits
-- Remove legacy `CLAWDBOT_WORKSPACE` env var and all `supermemory` references
+- Remove legacy `CLAWDBOT_WORKSPACE` env var and stale legacy references
 
 ### Added
 - `SECURITY.md` with responsible disclosure instructions via GitHub Security Advisories
