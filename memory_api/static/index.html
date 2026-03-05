@@ -469,12 +469,14 @@
   <script src="https://unpkg.com/force-graph@1.47.2/dist/force-graph.min.js"></script>
 <script>
 const api = (path) => `/gb${path}`;
-const tokenKey = 'gb_token';
-let token = localStorage.getItem(tokenKey) || '';
-if (!token) {
-  token = prompt('Enter GB_UI_TOKEN');
-  if (token) localStorage.setItem(tokenKey, token);
-}
+let token = '';
+const ensureToken = () => {
+  if (token) return true;
+  const entered = prompt('Enter GB_UI_TOKEN');
+  token = String(entered || '').trim();
+  return Boolean(token);
+};
+ensureToken();
 const authHeaders = () => token ? { 'X-GB-Token': token } : {};
 let memOffset = 0;
 let memLimit = 50;

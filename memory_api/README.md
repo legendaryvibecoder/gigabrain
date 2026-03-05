@@ -48,7 +48,7 @@ The UI is served at `http://127.0.0.1:7077/`.
 
 All endpoints require the `X-GB-Token` header matching `GB_UI_TOKEN`.
 
-If `GB_UI_TOKEN` is not set, **all requests are rejected** (fail-closed). The UI prompts for the token on first load and stores it in localStorage.
+If `GB_UI_TOKEN` is not set, **all requests are rejected** (fail-closed). The UI prompts for the token on first load and keeps it in memory for the current page session.
 
 ## Remote access
 
