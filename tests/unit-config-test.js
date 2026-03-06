@@ -37,6 +37,7 @@ const run = async () => {
   assert.equal(String(config.llm.taskProfiles.memory_review.model), 'qwen3.5:9b', 'memory review should default to qwen3.5:9b');
   assert.equal(Number(config.llm.taskProfiles.chat_general.temperature), 1, 'chat general should use official-ish default sampling');
   assert.equal(String(config.llm.review.profile), 'memory_review', 'review profile should default to memory_review');
+  assert.equal(String(config.vault.subdir), 'Gigabrain', 'vault mirror should default to Gigabrain subdir');
   assert.equal(Object.keys(V3_CONFIG_SCHEMA.properties || {}).length <= 25, true, 'top-level config keys must stay lean');
 };
 

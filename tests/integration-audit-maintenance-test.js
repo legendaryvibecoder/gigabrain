@@ -9,6 +9,12 @@ import { openDb, makeConfigObject, makeTempWorkspace, seedMemoryCurrent, getStat
 const run = async () => {
   const ws = makeTempWorkspace('gb-v3-int-maintain-');
   const openclaw = makeConfigObject(ws.workspace);
+  openclaw.plugins.entries.gigabrain.config.vault = {
+    enabled: true,
+    path: 'obsidian-vault',
+    subdir: 'Gigabrain',
+    clean: true,
+  };
   const config = normalizeConfig(openclaw.plugins.entries.gigabrain.config);
 
   const db = openDb(ws.dbPath);
@@ -41,6 +47,8 @@ const run = async () => {
   assertFileExists(maintain.artifacts.archivedOrKilledCsvPath, 'archived/killed csv');
   assertFileExists(maintain.artifacts.keptMdPath, 'kept md');
   assertFileExists(maintain.artifacts.executionArtifactPath, 'nightly execution artifact');
+  assertFileExists(maintain.artifacts.vaultMirrorReportPath, 'vault mirror report');
+  assertFileExists(path.join(config.vault.path, config.vault.subdir, 'vault-index.md'), 'vault index');
 
   const auditVersion = 'rv-audit-apply-int';
   const dbBeforeApply = openDb(ws.dbPath);

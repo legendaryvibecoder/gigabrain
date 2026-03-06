@@ -29,7 +29,8 @@
         "inventory": "node scripts/gigabrainctl.js inventory",
         "doctor": "node scripts/gigabrainctl.js doctor",
         "migrate:v3": "node scripts/migrate-v3.js",
-        "harmonize": "node scripts/harmonize-memory.js"
+        "harmonize": "node scripts/harmonize-memory.js",
+        "vault:export": "node scripts/vault-export.js"
     },
     "keywords": [
         "openclaw",

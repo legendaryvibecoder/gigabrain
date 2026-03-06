@@ -621,6 +621,28 @@
           }
         }
       },
+      "vault": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "path": {
+            "type": "string",
+            "default": "obsidian-vault"
+          },
+          "subdir": {
+            "type": "string",
+            "default": "Gigabrain"
+          },
+          "clean": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
       "person": {
         "type": "object",
         "additionalProperties": false,

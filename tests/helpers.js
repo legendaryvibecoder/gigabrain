@@ -179,6 +179,12 @@ const makeConfigObject = (workspace) => ({
             maxChunkChars: 900,
             onDemandTemporalDays: 3650,
           },
+          vault: {
+            enabled: false,
+            path: 'obsidian-vault',
+            subdir: 'Gigabrain',
+            clean: true,
+          },
           person: {
             keepPublicFacts: true,
             relationshipPriorityBoost: 0.35,

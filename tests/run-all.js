@@ -9,6 +9,7 @@ const TEST_FILES = [
   'unit-person-service-test.js',
   'unit-llm-router-test.js',
   'unit-native-sync-query-test.js',
+  'unit-vault-mirror-test.js',
   'integration-audit-maintenance-test.js',
   'integration-migration-and-api-test.js',
   'integration-native-recall-test.js',
