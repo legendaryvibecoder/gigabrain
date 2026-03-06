@@ -8,11 +8,11 @@ It is built for local-first production use: SQLite-backed recall, deterministic 
 
 - **Capture**: Extracts structured facts (preferences, decisions, entities, episodes) from conversations and stores them in a SQLite registry
 - **Recall**: Before each prompt, searches the registry and native markdown files to inject relevant context the agent "remembers"
-- **Dedupe**: Exact and semantic deduplication prevents the same fact from being stored twice (configurable thresholds)
+- **Dedupe**: Exact and hybrid semantic deduplication catches duplicates, paraphrases, and malformed near-duplicates with type-aware thresholds
 - **Native sync**: Indexes your workspace `MEMORY.md` and daily notes alongside the registry for unified recall
 - **Person service**: Tracks entity mentions across memories for person-aware retrieval ordering
-- **Quality gate**: Junk filter, confidence thresholds, and optional LLM-based review keep memory clean
-- **Audit**: Nightly maintenance with snapshot backups, compaction, and quality scoring
+- **Quality gate**: Junk filters, durable-personal retention bias, plausibility heuristics, and optional LLM second opinion keep memory clean without losing important relationship context
+- **Audit**: Nightly maintenance with snapshots, execution artifacts, archive reports, review queue retention, and quality scoring
 - **Web console**: Optional FastAPI dashboard for browsing, editing, and managing memories
 
 ## Prerequisites
@@ -172,15 +172,34 @@ All config lives under `plugins.entries.gigabrain.config` in `openclaw.json`. Th
   "llm": {
     "provider": "ollama",
     "baseUrl": "http://127.0.0.1:11434",
-    "model": "qwen2.5:14b",
+    "model": "qwen3.5:9b",
+    "taskProfiles": {
+      "memory_review": {
+        "temperature": 0.15,
+        "top_p": 0.8,
+        "top_k": 20,
+        "max_tokens": 180
+      },
+      "chat_general": {
+        "model": "qwen3.5:latest",
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_tokens": 1200,
+        "reasoning": "default"
+      }
+    },
     "review": {
-      "enabled": true
+      "enabled": true,
+      "profile": "memory_review"
     }
   }
 }
 ```
 
 Providers: `ollama`, `openai_compatible`, `openclaw`, or `none` (deterministic-only mode).
+
+Task profiles let you keep one local model family while changing sampling per job. `memory_review` intentionally uses a small non-zero temperature for stable JSON output with Qwen 3.5, while `chat_general` stays close to the model defaults.
 
 ### Native sync
 
@@ -202,12 +221,33 @@ Indexes workspace markdown files into `memory_native_chunks` for unified recall 
 {
   "quality": {
     "junkFilterEnabled": true,
-    "durableEnabled": true
+    "durableEnabled": true,
+    "plausibility": {
+      "enabled": true
+    },
+    "valueThresholds": {
+      "keep": 0.78,
+      "archive": 0.30,
+      "reject": 0.18
+    }
   }
 }
 ```
 
-Built-in junk patterns block system prompts, API keys, and benchmark artifacts from being stored. Durable patterns boost important relationship/identity facts.
+Built-in junk patterns block system prompts, API keys, and benchmark artifacts from being stored. Durable patterns and relationship-aware rules preserve important user, agent, and continuity facts. Plausibility heuristics help archive malformed captures such as broken paraphrases and noisy technical discoveries that should not live as durable memory.
+
+### Nightly maintenance
+
+`nightly` now runs a full maintenance pipeline:
+
+`snapshot -> native_sync -> quality_sweep -> exact_dedupe -> semantic_dedupe -> audit_delta -> archive_compression -> vacuum -> metrics_report`
+
+Important artifacts written by the run:
+
+- `output/nightly-execution-YYYY-MM-DD.json`
+- `output/memory-kept-YYYY-MM-DD.md`
+- `output/memory-archived-or-killed-YYYY-MM-DD.md`
+- `output/memory-review-queue.jsonl`
 
 See [`openclaw.plugin.json`](openclaw.plugin.json) for the complete schema with all defaults.
 
@@ -305,14 +345,14 @@ Configure scope behavior in `openclaw.json` under the agent's memory settings.
 The control plane is `scripts/gigabrainctl.js`:
 
 ```bash
-# Full nightly pipeline (maintain + audit + vault-export + graph-build)
+# Full nightly pipeline (maintain + optional harmonize + audit apply)
 node scripts/gigabrainctl.js nightly
 
-# Maintenance only (snapshot, compact, vacuum)
+# Maintenance only (snapshot, native sync, quality sweep, dedupe, artifacts, vacuum)
 node scripts/gigabrainctl.js maintain
 
-# Quality audit (shadow = dry-run, apply = commit changes, restore = rollback)
-node scripts/gigabrainctl.js audit --mode shadow|apply|restore
+# Quality audit (shadow = dry-run, apply = commit changes, restore = rollback, report = render)
+node scripts/gigabrainctl.js audit --mode shadow|apply|restore|report
 
 # Print memory inventory stats
 node scripts/gigabrainctl.js inventory
@@ -320,6 +360,8 @@ node scripts/gigabrainctl.js inventory
 # Health check
 node scripts/gigabrainctl.js doctor
 ```
+
+`nightly --help` is safe and prints usage instead of starting a real run.
 
 All commands are also available as npm scripts: `npm run nightly`, `npm run maintain`, etc.
 
@@ -356,7 +398,7 @@ npm run test:regression
 npm run test:performance
 ```
 
-The suite includes 10 tests covering config validation, policy rules, capture service, person service, LLM routing, audit maintenance, migration, native recall, regression behavior, and nightly performance.
+The suite includes 12 executable tests covering config validation, policy rules, capture service, person service, LLM routing, native-sync query handling, audit maintenance, migration, bridge routes, native recall, regression behavior, and nightly performance.
 
 ## Benchmarking
 
@@ -393,12 +435,12 @@ gigabrain/
 │   ├── projection-store.js     # Materialized current-state view
 │   ├── native-sync.js          # MEMORY.md + daily notes indexer
 │   ├── person-service.js       # Entity mention graph
-│   ├── policy.js               # Junk filter, quality rules
-│   ├── audit-service.js        # Quality scoring and review
-│   ├── maintenance-service.js  # Snapshots, compaction, vacuum
-│   ├── llm-router.js           # LLM provider abstraction
+│   ├── policy.js               # Junk filter, plausibility, retention rules
+│   ├── audit-service.js        # Quality scoring, review, restore/report flows
+│   ├── maintenance-service.js  # Nightly pipeline, snapshots, execution artifacts
+│   ├── llm-router.js           # LLM provider abstraction + task profiles
 │   ├── http-routes.js          # Gateway HTTP endpoints
-│   ├── review-queue.js         # Extraction review queue
+│   ├── review-queue.js         # Capture and audit review queue retention
 │   └── metrics.js              # Telemetry counters
 │
 ├── scripts/                    # CLI tools
