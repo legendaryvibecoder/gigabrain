@@ -40,6 +40,7 @@ const run = async () => {
   assertFileExists(maintain.artifacts.archivedOrKilledJsonlPath, 'archived/killed jsonl');
   assertFileExists(maintain.artifacts.archivedOrKilledCsvPath, 'archived/killed csv');
   assertFileExists(maintain.artifacts.keptMdPath, 'kept md');
+  assertFileExists(maintain.artifacts.executionArtifactPath, 'nightly execution artifact');
 
   const auditVersion = 'rv-audit-apply-int';
   const dbBeforeApply = openDb(ws.dbPath);

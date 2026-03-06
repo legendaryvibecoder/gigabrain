@@ -1,6 +1,6 @@
 {
     "name": "@legendaryvibecoder/gigabrain",
-    "version": "0.3.1",
+    "version": "0.3.2",
     "type": "module",
     "description": "Standalone OpenClaw memory plugin — capture, recall, dedupe, audit, native sync",
     "author": "Legendary Vibecoder",
@@ -12,16 +12,11 @@
         "type": "git",
         "url": "https://github.com/legendaryvibecoder/gigabrain.git"
     },
-    "publishConfig": {
-        "access": "public"
-    },
     "engines": {
         "node": ">=22"
     },
     "license": "MIT",
     "scripts": {
-        "setup": "node scripts/setup-first-run.js",
-        "setup:easy": "node scripts/setup-first-run.js",
         "test": "node tests/run-all.js",
         "test:unit": "node tests/run-all.js --filter unit",
         "test:integration": "node tests/run-all.js --filter integration",
@@ -54,12 +49,6 @@
         "openclaw": {
             "optional": false
         }
-    },
-    "overrides": {
-        "tar": "^7.5.10",
-        "hono": "^4.12.4",
-        "@hono/node-server": "^1.19.10",
-        "fast-xml-parser": "^5.3.8"
     },
     "files": [
         "index.ts",

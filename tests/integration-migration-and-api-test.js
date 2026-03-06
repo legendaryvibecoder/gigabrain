@@ -89,7 +89,7 @@ const run = async () => {
     memoryMinContentChars: 25,
     memoryMinConfidence: 0.6,
     ollamaUrl: 'http://127.0.0.1:11434',
-    translationModel: 'qwen2.5:14b',
+    translationModel: 'qwen3.5:9b',
   };
   writeConfigFile(ws.configPath, configObject);
 

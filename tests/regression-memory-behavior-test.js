@@ -17,6 +17,7 @@ const run = async () => {
       { memory_id: 'm-junk-1', type: 'CONTEXT', content: '<memory_clusters>meta wrapper</memory_clusters>', scope: 'shared', confidence: 0.8 },
       { memory_id: 'm-dupe-a', type: 'CONTEXT', content: 'Use markdown headings for release notes', scope: 'shared', confidence: 0.5 },
       { memory_id: 'm-dupe-b', type: 'CONTEXT', content: 'Use markdown headings for release notes', scope: 'shared', confidence: 0.45 },
+      { memory_id: 'm-jabber-1', type: 'USER_FACT', content: 'User started a jabber on January 11, 2026, at 90kg', scope: 'nimbusmain', confidence: 0.5 },
     ]);
   } finally {
     db.close();
@@ -54,6 +55,9 @@ const run = async () => {
 
     const junk = verifyDb.prepare('SELECT status FROM memory_current WHERE memory_id = ?').get('m-junk-1');
     assert.equal(String(junk?.status || ''), 'rejected', 'junk wrapper must be rejected');
+
+    const jabber = verifyDb.prepare('SELECT status FROM memory_current WHERE memory_id = ?').get('m-jabber-1');
+    assert.equal(String(jabber?.status || ''), 'archived', 'broken low-confidence user fact should be archived');
 
     const dupGroups = verifyDb.prepare(`
       SELECT COUNT(*) AS c

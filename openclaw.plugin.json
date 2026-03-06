@@ -261,15 +261,71 @@
             "properties": {
               "keep": {
                 "type": "number",
-                "default": 0.75
+                "default": 0.78
               },
               "archive": {
                 "type": "number",
-                "default": 0.45
+                "default": 0.3
               },
               "reject": {
                 "type": "number",
-                "default": 0.45
+                "default": 0.18
+              }
+            }
+          },
+          "plausibility": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "brokenPhrasePatternsBase": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [
+                  "\\b(?:jabber)\\b",
+                  "\\b(?:began|started)\\s+a\\s+\\d+\\b",
+                  "\\b\\d+\\s+jabber\\b",
+                  "\\b(?:started|began)\\s+a\\s+jabber\\b"
+                ]
+              },
+              "brokenPhrasePatternsAppend": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": []
+              },
+              "semanticAnchorsBase": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": [
+                  "started",
+                  "began",
+                  "journey",
+                  "weight",
+                  "loss",
+                  "target",
+                  "current",
+                  "kg",
+                  "newsletter",
+                  "launched",
+                  "founded",
+                  "joined"
+                ]
+              },
+              "semanticAnchorsAppend": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "default": []
               }
             }
           }
@@ -302,6 +358,144 @@
             "type": "number",
             "default": 12000
           },
+          "taskProfiles": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "memory_review": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "temperature": {
+                    "type": "number",
+                    "default": 0.15
+                  },
+                  "top_p": {
+                    "type": "number",
+                    "default": 0.8
+                  },
+                  "top_k": {
+                    "type": "number",
+                    "default": 20
+                  },
+                  "max_tokens": {
+                    "type": "number",
+                    "default": 180
+                  },
+                  "reasoning": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "default"
+                    ],
+                    "default": "off"
+                  }
+                }
+              },
+              "extraction_json": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "temperature": {
+                    "type": "number",
+                    "default": 0.1
+                  },
+                  "top_p": {
+                    "type": "number",
+                    "default": 0.75
+                  },
+                  "top_k": {
+                    "type": "number",
+                    "default": 20
+                  },
+                  "max_tokens": {
+                    "type": "number",
+                    "default": 220
+                  },
+                  "reasoning": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "default"
+                    ],
+                    "default": "off"
+                  }
+                }
+              },
+              "memory_canonicalize": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "temperature": {
+                    "type": "number",
+                    "default": 0.2
+                  },
+                  "top_p": {
+                    "type": "number",
+                    "default": 0.85
+                  },
+                  "top_k": {
+                    "type": "number",
+                    "default": 30
+                  },
+                  "max_tokens": {
+                    "type": "number",
+                    "default": 220
+                  },
+                  "reasoning": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "default"
+                    ],
+                    "default": "off"
+                  }
+                }
+              },
+              "chat_general": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "temperature": {
+                    "type": "number",
+                    "default": 1
+                  },
+                  "top_p": {
+                    "type": "number",
+                    "default": 0.95
+                  },
+                  "top_k": {
+                    "type": "number",
+                    "default": 40
+                  },
+                  "max_tokens": {
+                    "type": "number",
+                    "default": 1200
+                  },
+                  "reasoning": {
+                    "type": "string",
+                    "enum": [
+                      "off",
+                      "default"
+                    ],
+                    "default": "default"
+                  }
+                }
+              }
+            }
+          },
           "review": {
             "type": "object",
             "additionalProperties": false,
@@ -316,15 +510,19 @@
               },
               "minScore": {
                 "type": "number",
-                "default": 0.24
+                "default": 0.18
               },
               "maxScore": {
                 "type": "number",
-                "default": 0.52
+                "default": 0.62
               },
               "minConfidence": {
                 "type": "number",
-                "default": 0.7
+                "default": 0.8
+              },
+              "profile": {
+                "type": "string",
+                "default": "memory_review"
               }
             }
           }

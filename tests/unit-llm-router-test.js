@@ -7,6 +7,14 @@ const startMockServer = async () => {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', 'http://127.0.0.1');
     if (url.pathname === '/chat/completions' && req.method === 'POST') {
+      const body = [];
+      for await (const chunk of req) body.push(chunk);
+      const parsed = JSON.parse(Buffer.concat(body).toString('utf8'));
+      if (Number(parsed.temperature) !== 0.15) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('unexpected temperature');
+        return;
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         choices: [
@@ -20,9 +28,22 @@ const startMockServer = async () => {
       return;
     }
     if (url.pathname === '/api/generate' && req.method === 'POST') {
+      const body = [];
+      for await (const chunk of req) body.push(chunk);
+      const parsed = JSON.parse(Buffer.concat(body).toString('utf8'));
+      if (
+        Number(parsed?.options?.temperature) !== 0.15
+        || Number(parsed?.options?.top_k) !== 20
+        || parsed?.format !== 'json'
+      ) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('unexpected ollama profile');
+        return;
+      }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
-        response: JSON.stringify({ decision: 'archive', confidence: 0.83, reason: 'mock-ollama' }),
+        response: '',
+        thinking: JSON.stringify({ decision: 'archive', confidence: 0.83, reason: 'mock-ollama', canonical_hint: 'Chris started his weight loss journey on January 11, 2026 at 90kg.' }),
       }));
       return;
     }
@@ -65,6 +86,7 @@ const run = async () => {
       timeoutMs: 5000,
       memory,
       deterministic,
+      profile: 'memory_review',
     });
     assert.equal(openaiCompat.ok, true);
     assert.equal(openaiCompat.decision, 'keep');
@@ -76,6 +98,7 @@ const run = async () => {
       timeoutMs: 5000,
       memory,
       deterministic,
+      profile: 'memory_review',
     });
     assert.equal(openclaw.ok, true);
     assert.equal(openclaw.decision, 'keep');
@@ -87,9 +110,11 @@ const run = async () => {
       timeoutMs: 5000,
       memory,
       deterministic,
+      profile: 'memory_review',
     });
     assert.equal(ollama.ok, true);
     assert.equal(ollama.decision, 'archive');
+    assert.equal(ollama.canonical_hint.includes('weight loss journey'), true);
   } finally {
     await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve(undefined))));
   }

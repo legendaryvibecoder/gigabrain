@@ -41,6 +41,27 @@ const run = async () => {
     `).get();
     assert.equal(String(row?.type || ''), 'USER_FACT');
     assert.equal(Number(row?.confidence || 0).toFixed(2), '0.88', 'captured confidence should respect note attribute');
+
+    const noisy = captureFromEvent({
+      db,
+      config,
+      event: {
+        scope: 'shared',
+        agentId: 'main',
+        sessionKey: 'agent:main:main',
+        text: '<memory_note type="USER_FACT" confidence="0.5">User started a jabber on the 11th at 90kg</memory_note>',
+      },
+      runId: 'capture-unit-run',
+      reviewVersion: 'rv-capture-unit',
+      logger: { info: () => {} },
+    });
+    assert.equal(noisy.queued_review, 1, 'malformed low-confidence facts should be queued for review');
+    const queued = db.prepare(`
+      SELECT COUNT(*) AS c
+      FROM memory_current
+      WHERE content LIKE '%jabber%'
+    `).get();
+    assert.equal(Number(queued?.c || 0), 0, 'malformed low-confidence fact should not be inserted as active memory');
   } finally {
     db.close();
   }

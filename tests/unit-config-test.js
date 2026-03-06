@@ -34,6 +34,9 @@ const run = async () => {
   assert.equal(config.native.syncMode, 'hybrid', 'native sync mode should stay hybrid');
   assert.equal(Array.isArray(config.native.includeFiles), true, 'native include files should normalize to array');
   assert.equal(config.person.keepPublicFacts, true, 'person policy should keep public facts by default');
+  assert.equal(String(config.llm.taskProfiles.memory_review.model), 'qwen3.5:9b', 'memory review should default to qwen3.5:9b');
+  assert.equal(Number(config.llm.taskProfiles.chat_general.temperature), 1, 'chat general should use official-ish default sampling');
+  assert.equal(String(config.llm.review.profile), 'memory_review', 'review profile should default to memory_review');
   assert.equal(Object.keys(V3_CONFIG_SCHEMA.properties || {}).length <= 25, true, 'top-level config keys must stay lean');
 };
 

@@ -55,6 +55,8 @@ const readBool = (name, fallback = false) => {
   return fallback;
 };
 
+const wantsHelp = flags.includes('--help') || flags.includes('-h');
+
 const duplicateGroups = (db) => {
   ensureProjectionStore(db);
   const row = db.prepare(`
@@ -342,7 +344,7 @@ const commandDoctor = async () => {
 };
 
 const main = async () => {
-  if (['', 'help', '--help', '-h'].includes(command)) {
+  if (['', 'help', '--help', '-h'].includes(command) || wantsHelp) {
     console.log(HELP.trim());
     return;
   }
