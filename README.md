@@ -10,6 +10,7 @@ It is built for local-first production use: SQLite-backed recall, deterministic 
 - **Recall**: Before each prompt, searches the registry and native markdown files to inject relevant context the agent "remembers"
 - **Dedupe**: Exact and hybrid semantic deduplication catches duplicates, paraphrases, and malformed near-duplicates with type-aware thresholds
 - **Native sync**: Indexes your workspace `MEMORY.md` and daily notes alongside the registry for unified recall
+- **Vault mirror**: Builds an Obsidian-friendly vault folder from `MEMORY.md` plus curated `memory/*.md` files so Nimbus can sync it to another machine
 - **Person service**: Tracks entity mentions across memories for person-aware retrieval ordering
 - **Quality gate**: Junk filters, durable-personal retention bias, plausibility heuristics, and optional LLM second opinion keep memory clean without losing important relationship context
 - **Audit**: Nightly maintenance with snapshots, execution artifacts, archive reports, review queue retention, and quality scoring
@@ -215,6 +216,27 @@ Task profiles let you keep one local model family while changing sampling per jo
 
 Indexes workspace markdown files into `memory_native_chunks` for unified recall alongside the registry.
 
+### Vault mirror (optional)
+
+```json
+{
+  "vault": {
+    "enabled": true,
+    "path": "obsidian-vault",
+    "subdir": "Gigabrain",
+    "clean": true
+  }
+}
+```
+
+When enabled, Gigabrain mirrors the same native-memory source set it indexes for recall into an Obsidian-friendly folder:
+
+- `MEMORY.md`
+- daily notes matched by `native.dailyNotesGlob`
+- curated files from `native.includeFiles`
+
+The mirror is written under `<vault.path>/<vault.subdir>`, so you can safely sync the whole vault root with Syncthing or another file sync tool without reviving the old Obsidian ingest bridge.
+
 ### Quality
 
 ```json
@@ -240,7 +262,7 @@ Built-in junk patterns block system prompts, API keys, and benchmark artifacts f
 
 `nightly` now runs a full maintenance pipeline:
 
-`snapshot -> native_sync -> quality_sweep -> exact_dedupe -> semantic_dedupe -> audit_delta -> archive_compression -> vacuum -> metrics_report`
+`snapshot -> native_sync -> vault_mirror -> quality_sweep -> exact_dedupe -> semantic_dedupe -> audit_delta -> archive_compression -> vacuum -> metrics_report`
 
 Important artifacts written by the run:
 
@@ -248,6 +270,7 @@ Important artifacts written by the run:
 - `output/memory-kept-YYYY-MM-DD.md`
 - `output/memory-archived-or-killed-YYYY-MM-DD.md`
 - `output/memory-review-queue.jsonl`
+- `output/vault-mirror-YYYY-MM-DD.md`
 
 See [`openclaw.plugin.json`](openclaw.plugin.json) for the complete schema with all defaults.
 
@@ -359,11 +382,14 @@ node scripts/gigabrainctl.js inventory
 
 # Health check
 node scripts/gigabrainctl.js doctor
+
+# Build or refresh the Obsidian vault mirror
+node scripts/vault-export.js --config ~/.openclaw/openclaw.json
 ```
 
 `nightly --help` is safe and prints usage instead of starting a real run.
 
-All commands are also available as npm scripts: `npm run nightly`, `npm run maintain`, etc.
+All commands are also available as npm scripts: `npm run nightly`, `npm run maintain`, `npm run vault:export`, etc.
 
 ## HTTP endpoints
 
@@ -398,7 +424,7 @@ npm run test:regression
 npm run test:performance
 ```
 
-The suite includes 12 executable tests covering config validation, policy rules, capture service, person service, LLM routing, native-sync query handling, audit maintenance, migration, bridge routes, native recall, regression behavior, and nightly performance.
+The suite includes 13 executable tests covering config validation, policy rules, capture service, person service, LLM routing, native-sync query handling, vault mirroring, audit maintenance, migration, bridge routes, native recall, regression behavior, and nightly performance.
 
 ## Benchmarking
 
@@ -439,6 +465,7 @@ gigabrain/
 │   ├── audit-service.js        # Quality scoring, review, restore/report flows
 │   ├── maintenance-service.js  # Nightly pipeline, snapshots, execution artifacts
 │   ├── llm-router.js           # LLM provider abstraction + task profiles
+│   ├── vault-mirror.js         # Obsidian-friendly mirror of native memory files
 │   ├── http-routes.js          # Gateway HTTP endpoints
 │   ├── review-queue.js         # Capture and audit review queue retention
 │   └── metrics.js              # Telemetry counters
@@ -446,7 +473,8 @@ gigabrain/
 ├── scripts/                    # CLI tools
 │   ├── gigabrainctl.js         # Main control plane
 │   ├── migrate-v3.js           # Schema migration
-│   └── harmonize-memory.js     # Memory harmonization
+│   ├── harmonize-memory.js     # Memory harmonization
+│   └── vault-export.js         # Manual vault mirror refresh
 │
 ├── memory_api/                 # Optional web console (FastAPI)
 │   ├── app.py
