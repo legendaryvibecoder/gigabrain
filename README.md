@@ -475,7 +475,7 @@ node scripts/vault-export.js --config ~/.openclaw/openclaw.json
 
 `nightly --help` is safe and prints usage instead of starting a real run.
 
-All commands are also available as npm scripts: `npm run nightly`, `npm run maintain`, `npm run vault`, `npm run vault:doctor`, `npm run vault:pull`, `npm run vault:export`, etc.
+All commands are also available as npm scripts: `npm run setup`, `npm run nightly`, `npm run maintain`, `npm run vault`, `npm run vault:doctor`, `npm run vault:report`, `npm run vault:pull`, `npm run vault:export`, etc.
 
 Practical local-Obsidian flow:
 

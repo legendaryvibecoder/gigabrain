@@ -2,6 +2,18 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.4.2] — 2026-03-08
+
+### Added
+- `npm run setup` is now shipped in the published package, alongside `vault:report`
+- Setup integration test coverage for the first-run wizard, vault bootstrap, and AGENTS refresh flow
+- Release notes document for the `0.4` rollout
+
+### Changed
+- The setup wizard now enables the Obsidian surface by default, builds the first vault, and seeds hybrid-memory defaults when missing
+- Installation and onboarding docs now explain that Obsidian is recommended for the `v0.4` memory surface, what an initially sparse vault means, and how `vault pull` fits into the local workflow
+- Web console docs now frame the UI as the operational companion to the Obsidian surface
+
 ## [0.4.1] — 2026-03-07
 
 ### Fixed
