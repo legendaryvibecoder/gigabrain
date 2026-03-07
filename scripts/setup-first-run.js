@@ -9,6 +9,7 @@ import { ensureEventStore } from '../lib/core/event-store.js';
 import { ensureNativeStore, syncNativeMemory } from '../lib/core/native-sync.js';
 import { ensurePersonStore, rebuildEntityMentions } from '../lib/core/person-service.js';
 import { loadResolvedConfig } from '../lib/core/config.js';
+import { buildVaultSurface } from '../lib/core/vault-mirror.js';
 
 const HELP = `Gigabrain first-run setup
 
@@ -22,6 +23,9 @@ Flags:
   --workspace <path>    Workspace root for Gigabrain runtime paths
   --plugin-path <path>  Gigabrain plugin path (default: current directory)
   --agents-path <path>  AGENTS.md path (default: <workspace>/AGENTS.md)
+  --vault-path <path>   Vault root for the generated Obsidian surface
+  --vault-subdir <name> Subdirectory inside the vault root (default: Gigabrain)
+  --skip-vault          Do not enable/build the Obsidian memory surface
   --skip-agents         Do not add/update AGENTS.md memory protocol block
   --skip-restart        Do not run 'openclaw gateway restart'
   --help                Print this help
@@ -32,20 +36,26 @@ const END_MARKER = '<!-- GIGABRAIN_MEMORY_PROTOCOL_END -->';
 const MEMORY_BLOCK = `${START_MARKER}
 ## Memory
 
-Gigabrain handles memory capture and recall automatically.
+Gigabrain uses a hybrid memory model.
+
+- Native markdown (\`MEMORY.md\` and \`memory/YYYY-MM-DD.md\`) is the human-readable layer.
+- The Gigabrain registry is the structured recall layer built on top.
 
 ### Memory Note Protocol
 
 When the user explicitly asks you to remember or save something
-(for example: "remember that", "save this", "note that I prefer X"):
+(for example: "remember that", "remember this", "merk dir das", "note this down", "save this preference"):
 
-1. Emit a \`<memory_note>\` tag with the fact:
+1. Treat it as an explicit memory-save request.
+2. Emit a \`<memory_note>\` tag with the fact:
    \`\`\`xml
    <memory_note type="USER_FACT" confidence="0.9">Concrete fact here.</memory_note>
    \`\`\`
-2. Use one tag per fact.
-3. Keep facts short, concrete, and self-contained.
-4. Choose the appropriate type (USER_FACT, PREFERENCE, DECISION, ENTITY, EPISODE, AGENT_IDENTITY).
+3. Use one tag per fact.
+4. Keep facts short, concrete, and self-contained.
+5. Choose the appropriate type (USER_FACT, PREFERENCE, DECISION, ENTITY, EPISODE, AGENT_IDENTITY, CONTEXT).
+6. Do not mention the internal \`<memory_note>\` protocol to the user.
+7. Gigabrain will project explicit remembers into native markdown and the structured registry when configured.
 
 When the user does NOT explicitly ask to save memory:
 - Do NOT emit \`<memory_note>\` tags.
@@ -97,18 +107,37 @@ const ensureObject = (parent, key) => {
   return parent[key];
 };
 
+const upsertMarkedBlock = ({ existing, startMarker, endMarker, block }) => {
+  const start = existing.indexOf(startMarker);
+  const end = existing.indexOf(endMarker);
+  if (start !== -1 && end !== -1 && end >= start) {
+    const before = existing.slice(0, start).trimEnd();
+    const after = existing.slice(end + endMarker.length).trimStart();
+    const next = [
+      before,
+      block,
+      after,
+    ].filter((part) => String(part || '').trim().length > 0).join('\n\n');
+    return `${next}\n`;
+  }
+  return existing.trim().length > 0
+    ? `${existing.trimEnd()}\n\n${block}\n`
+    : `${block}\n`;
+};
+
 const upsertAgentsBlock = (agentsPath) => {
   const targetDir = path.dirname(agentsPath);
   ensureDir(targetDir);
   const existing = fs.existsSync(agentsPath) ? fs.readFileSync(agentsPath, 'utf8') : '';
-  if (existing.includes(START_MARKER) && existing.includes(END_MARKER)) {
-    return { changed: false, path: agentsPath };
-  }
-  const next = existing.trim().length > 0
-    ? `${existing.trimEnd()}\n\n${MEMORY_BLOCK}\n`
-    : `${MEMORY_BLOCK}\n`;
-  fs.writeFileSync(agentsPath, next, 'utf8');
-  return { changed: true, path: agentsPath };
+  const next = upsertMarkedBlock({
+    existing,
+    startMarker: START_MARKER,
+    endMarker: END_MARKER,
+    block: MEMORY_BLOCK,
+  });
+  const changed = next !== existing;
+  if (changed) fs.writeFileSync(agentsPath, next, 'utf8');
+  return { changed, path: agentsPath };
 };
 
 const writeJsonPretty = (filePath, obj) => {
@@ -173,6 +202,10 @@ const main = () => {
   const configPath = resolveAbsolute(readFlag('--config', defaultOpenclawConfigPath()));
   const pluginPath = resolveAbsolute(readFlag('--plugin-path', process.cwd()));
   const requestedWorkspace = readFlag('--workspace', '');
+  const requestedVaultPathRaw = readFlag('--vault-path', '');
+  const requestedVaultPath = requestedVaultPathRaw ? resolveAbsolute(requestedVaultPathRaw) : '';
+  const requestedVaultSubdir = readFlag('--vault-subdir', '');
+  const skipVault = hasFlag('--skip-vault');
   const skipAgents = hasFlag('--skip-agents');
   const skipRestart = hasFlag('--skip-restart');
 
@@ -187,6 +220,12 @@ const main = () => {
   const gigabrainConfig = ensureObject(gigabrain, 'config');
   const runtime = ensureObject(gigabrainConfig, 'runtime');
   const runtimePaths = ensureObject(runtime, 'paths');
+  const capture = ensureObject(gigabrainConfig, 'capture');
+  const rememberIntent = ensureObject(capture, 'rememberIntent');
+  const nativePromotion = ensureObject(gigabrainConfig, 'nativePromotion');
+  const vault = ensureObject(gigabrainConfig, 'vault');
+  const vaultViews = ensureObject(vault, 'views');
+  const vaultReports = ensureObject(vault, 'reports');
 
   const existingWorkspace = String(runtimePaths.workspaceRoot || '').trim();
   const workspaceRoot = resolveAbsolute(
@@ -212,7 +251,60 @@ const main = () => {
   gigabrain.enabled = true;
   gigabrainConfig.enabled = true;
   runtimePaths.workspaceRoot = workspaceRoot;
+  runtimePaths.memoryRoot = memoryRootRaw;
+  runtimePaths.outputDir = outputDirRaw;
   runtimePaths.registryPath = registryPath;
+  if (!String(runtimePaths.reviewQueuePath || '').trim()) {
+    runtimePaths.reviewQueuePath = 'output/memory-review-queue.jsonl';
+  }
+
+  if (capture.enabled === undefined) capture.enabled = true;
+  if (capture.requireMemoryNote === undefined) capture.requireMemoryNote = true;
+  if (rememberIntent.enabled === undefined) rememberIntent.enabled = true;
+  if (!Array.isArray(rememberIntent.phrasesBase) || rememberIntent.phrasesBase.length === 0) {
+    rememberIntent.phrasesBase = [
+      'remember this',
+      'remember that',
+      'merk dir',
+      'note this',
+      'note that',
+      'note this down',
+      'save this',
+      'save this preference',
+    ];
+  }
+  if (rememberIntent.writeNative === undefined) rememberIntent.writeNative = true;
+  if (rememberIntent.writeRegistry === undefined) rememberIntent.writeRegistry = true;
+
+  if (nativePromotion.enabled === undefined) nativePromotion.enabled = true;
+  if (nativePromotion.promoteFromDaily === undefined) nativePromotion.promoteFromDaily = true;
+  if (nativePromotion.promoteFromMemoryMd === undefined) nativePromotion.promoteFromMemoryMd = true;
+  if (nativePromotion.minConfidence === undefined) nativePromotion.minConfidence = 0.72;
+
+  if (skipVault) {
+    vault.enabled = false;
+  } else if (vault.enabled === undefined) {
+    vault.enabled = true;
+  }
+  if (requestedVaultPath) {
+    vault.path = requestedVaultPath;
+  } else if (!String(vault.path || '').trim()) {
+    vault.path = 'obsidian-vault';
+  }
+  if (requestedVaultSubdir) {
+    vault.subdir = requestedVaultSubdir;
+  } else if (!String(vault.subdir || '').trim()) {
+    vault.subdir = 'Gigabrain';
+  }
+  if (vault.clean === undefined) vault.clean = true;
+  if (!String(vault.homeNoteName || '').trim()) vault.homeNoteName = 'Home';
+  if (vault.exportActiveNodes === undefined) vault.exportActiveNodes = true;
+  if (vault.exportRecentArchivesLimit === undefined) vault.exportRecentArchivesLimit = 200;
+  if (!Array.isArray(vault.manualFolders) || vault.manualFolders.length === 0) {
+    vault.manualFolders = ['Inbox', 'Manual'];
+  }
+  if (vaultViews.enabled === undefined) vaultViews.enabled = true;
+  if (vaultReports.enabled === undefined) vaultReports.enabled = true;
 
   ensureDir(workspaceRoot);
   ensureDir(memoryRootPath);
@@ -224,6 +316,45 @@ const main = () => {
     configPath,
     workspaceRoot,
   });
+  const resolved = loadResolvedConfig({
+    configPath,
+    workspaceRoot,
+  });
+
+  let vaultResult = {
+    enabled: resolved.config?.vault?.enabled === true,
+    built: false,
+    surfacePath: '',
+    homeNotePath: '',
+    activeNodes: 0,
+    sourceFiles: 0,
+  };
+  if (resolved.config?.vault?.enabled === true) {
+    const db = openDatabase(bootstrap.dbPath);
+    try {
+      const surface = buildVaultSurface({
+        db,
+        dbPath: bootstrap.dbPath,
+        config: resolved.config,
+        dryRun: false,
+        runId: 'setup-first-run',
+      });
+      const surfacePath = path.join(
+        String(surface.vault_root || resolved.config.vault.path || ''),
+        String(surface.subdir || resolved.config.vault.subdir || 'Gigabrain'),
+      );
+      vaultResult = {
+        enabled: true,
+        built: true,
+        surfacePath,
+        homeNotePath: path.join(surfacePath, '00 Home', `${String(resolved.config.vault.homeNoteName || 'Home')}.md`),
+        activeNodes: Number(surface.active_nodes || 0),
+        sourceFiles: Number(surface.source_files || 0),
+      };
+    } finally {
+      db.close();
+    }
+  }
 
   let agentsResult = { changed: false, path: '' };
   if (!skipAgents) {
@@ -236,6 +367,17 @@ const main = () => {
     restartOk = run('openclaw', ['gateway', 'restart']);
   }
 
+  const nextSteps = [];
+  if (restartOk || skipRestart) {
+    nextSteps.push('Run a chat and try: "Remember that my preference is concise status updates."');
+  } else {
+    nextSteps.push("Run 'openclaw gateway restart' manually, then test memory capture.");
+  }
+  if (vaultResult.enabled) {
+    nextSteps.push(`Install Obsidian (recommended) and open ${vaultResult.surfacePath}. Start at ${vaultResult.homeNotePath}.`);
+    nextSteps.push('If the surface looks sparse, that is normal on a fresh install: add native notes or save a few memories first.');
+  }
+
   const summary = {
     ok: true,
     configPath,
@@ -243,11 +385,11 @@ const main = () => {
     workspaceRoot,
     registryPath: bootstrap.dbPath,
     bootstrap,
+    vault: vaultResult,
     agents: skipAgents ? 'skipped' : (agentsResult.changed ? `updated:${agentsResult.path}` : `already_present:${agentsResult.path}`),
     gatewayRestart: skipRestart ? 'skipped' : (restartOk ? 'ok' : 'failed'),
-    nextStep: restartOk || skipRestart
-      ? 'Run a chat and try: "Remember that my preference is concise status updates."'
-      : "Run 'openclaw gateway restart' manually, then test memory capture.",
+    nextStep: nextSteps[0] || '',
+    nextSteps,
   };
   console.log(JSON.stringify(summary, null, 2));
 };

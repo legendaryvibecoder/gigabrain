@@ -12,6 +12,7 @@ const TEST_FILES = [
   'unit-native-sync-query-test.js',
   'unit-vault-mirror-test.js',
   'integration-audit-maintenance-test.js',
+  'integration-setup-first-run-test.js',
   'integration-vault-cli-test.js',
   'integration-migration-and-api-test.js',
   'integration-native-recall-test.js',

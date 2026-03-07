@@ -22,6 +22,7 @@ It is built for local-first production use: SQLite-backed recall, deterministic 
 - **OpenClaw** >= 2026.2.15 (gateway + plugin loader)
 - **Python** >= 3.10 (only for the optional web console)
 - **Ollama** (optional, for local LLM-based extraction review and semantic search)
+- **Obsidian** (recommended for the `v0.4` memory surface; core capture/recall still works without it)
 
 ## Installation
 
@@ -45,15 +46,31 @@ npm run setup -- --workspace /path/to/your-openclaw-workspace
 What the setup wizard does:
 
 - Ensures `plugins.entries.gigabrain` exists in `~/.openclaw/openclaw.json`
-- Sets plugin path and runtime paths (`workspaceRoot`, `registryPath`)
+- Sets plugin path and runtime paths (`workspaceRoot`, `memoryRoot`, `outputDir`, `registryPath`)
+- Enables the `v0.4` hybrid memory defaults for explicit remember intent and native promotion
 - Bootstraps the DB and indexes native memory files
-- Adds AGENTS memory protocol block (unless `--skip-agents`)
+- Enables the Obsidian memory surface by default and builds the first vault unless `--skip-vault`
+- Adds or refreshes the AGENTS memory protocol block (unless `--skip-agents`)
 - Restarts gateway (unless `--skip-restart`)
+
+Recommended follow-up after setup:
+
+1. Install Obsidian if you want the `v0.4` memory surface.
+2. Open `<workspace>/obsidian-vault/Gigabrain`.
+3. Start at `00 Home/Home.md`.
+4. If the vault looks sparse at first, that is normal: Gigabrain only shows memories that already exist in native notes or the registry.
 
 Wizard help:
 
 ```bash
 npm run setup -- --help
+```
+
+Useful setup flags:
+
+```bash
+npm run setup -- --workspace /path/to/workspace --vault-path ~/Documents/gigabrainvault
+npm run setup -- --workspace /path/to/workspace --skip-vault
 ```
 
 ### Option B: Manual setup (custom environments)
@@ -244,7 +261,7 @@ Indexes workspace markdown files into `memory_native_chunks` for unified recall 
 
 Native promotion turns durable native bullets back into structured registry memories with provenance (`source_layer`, `source_path`, `source_line`). This keeps OpenClaw-style native memory first-class while still giving Gigabrain structured recall, dedupe, and archive behavior.
 
-### Obsidian surface (optional)
+### Obsidian surface (recommended in `v0.4`)
 
 ```json
 {
@@ -263,6 +280,8 @@ Native promotion turns durable native bullets back into structured registry memo
 }
 ```
 
+Gigabrain does not require Obsidian for core capture/recall, but you do need Obsidian if you want the visual memory surface introduced in `v0.4`.
+
 When enabled, Gigabrain builds a read-only Obsidian memory surface under `<vault.path>/<vault.subdir>`:
 
 - `00 Home/` landing note and health summary
@@ -272,6 +291,15 @@ When enabled, Gigabrain builds a read-only Obsidian memory surface under `<vault
 - `40 Reports/` manifest, freshness, latest nightly/native-sync summaries, and the latest vault build summary
 
 `Inbox/` and `Manual/` are reserved human-written folders inside the generated subdir and are never cleaned. The surface is intentionally read-only from Obsidian in `v0.4.0`: the runtime workspace remains the source of truth, and local sync is a one-way pull.
+
+Quickstart:
+
+1. Run `npm run setup -- --workspace /path/to/workspace` or enable `vault.enabled=true` manually.
+2. Open the generated folder `<workspace>/obsidian-vault/Gigabrain` in Obsidian.
+3. Start in `00 Home/Home.md`, then inspect `10 Native/`, `20 Nodes/active/`, and `30 Views/`.
+4. On a second machine, use `vault pull` and open the pulled `Gigabrain` folder in Obsidian locally.
+
+If you have almost no native notes or remembered facts yet, the initial vault will mostly contain the shell, reports, and empty views. That is expected.
 
 ### Quality
 
@@ -355,20 +383,26 @@ Minimal example:
 ```markdown
 ## Memory
 
-Gigabrain handles memory capture and recall automatically.
+Gigabrain uses a hybrid memory model.
+
+- Native markdown (`MEMORY.md` and `memory/YYYY-MM-DD.md`) is the human-readable layer.
+- The Gigabrain registry is the structured recall layer built on top.
 
 ### Memory Note Protocol
 
 When the user explicitly asks you to remember or save something
-(e.g. "remember that", "save this", "note that I prefer X"):
+(e.g. "remember that", "remember this", "merk dir das", "note this down", "save this preference"):
 
-1. Emit a `<memory_note>` tag with the fact:
+1. Treat it as an explicit memory-save request.
+2. Emit a `<memory_note>` tag with the fact:
    ```xml
    <memory_note type="USER_FACT" confidence="0.9">Concrete fact here.</memory_note>
    ```
-2. Use one tag per fact.
-3. Keep facts short, concrete, and self-contained.
-4. Choose the appropriate type (USER_FACT, PREFERENCE, DECISION, ENTITY, EPISODE, AGENT_IDENTITY).
+3. Use one tag per fact.
+4. Keep facts short, concrete, and self-contained.
+5. Choose the appropriate type (USER_FACT, PREFERENCE, DECISION, ENTITY, EPISODE, AGENT_IDENTITY, CONTEXT).
+6. Do not mention the internal `<memory_note>` protocol to the user.
+7. Gigabrain will project explicit remembers into native markdown and the structured registry when configured.
 
 When the user does NOT explicitly ask to save memory:
 - Do NOT emit `<memory_note>` tags.
@@ -443,6 +477,12 @@ node scripts/vault-export.js --config ~/.openclaw/openclaw.json
 
 All commands are also available as npm scripts: `npm run nightly`, `npm run maintain`, `npm run vault`, `npm run vault:doctor`, `npm run vault:pull`, `npm run vault:export`, etc.
 
+Practical local-Obsidian flow:
+
+1. Build or refresh the surface on the runtime machine: `npm run vault`
+2. Pull it to your laptop: `npm run vault:pull -- --host nimbus --remote-path /path/to/obsidian-vault --target ~/Documents/gigabrainvault`
+3. Open `~/Documents/gigabrainvault/Gigabrain` in Obsidian
+
 ## HTTP endpoints
 
 The plugin registers these routes on the OpenClaw gateway:
@@ -476,7 +516,7 @@ npm run test:regression
 npm run test:performance
 ```
 
-The suite includes 14 executable tests covering config validation, policy rules, capture service, person service, LLM routing, native-sync query handling, vault surface generation and pull, audit maintenance, vault CLI, migration, bridge routes, native recall, regression behavior, and nightly performance.
+The suite includes 16 executable tests covering config validation, policy rules, capture service, person service, LLM routing, native-sync query handling, vault surface generation and pull, setup wizard behavior, audit maintenance, vault CLI, migration, bridge routes, native recall, regression behavior, and nightly performance.
 
 ## Benchmarking
 

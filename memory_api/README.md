@@ -2,6 +2,11 @@
 
 Local-only FastAPI dashboard for browsing, editing, and managing the Gigabrain memory registry.
 
+In `v0.4`, this is the operational companion to the Obsidian memory surface:
+
+- Use Obsidian for the human-readable memory view (`00 Home`, `10 Native`, `20 Nodes`, `30 Views`)
+- Use the web console for operations, review queues, edits, graph inspection, and audit workflows
+
 ## Features
 
 - **Memory browser** — search, filter, paginate, edit, confirm/reject memories

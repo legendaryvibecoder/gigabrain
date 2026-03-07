@@ -17,6 +17,7 @@
     },
     "license": "MIT",
     "scripts": {
+        "setup": "node scripts/setup-first-run.js",
         "test": "node tests/run-all.js",
         "test:unit": "node tests/run-all.js --filter unit",
         "test:integration": "node tests/run-all.js --filter integration",
@@ -30,6 +31,7 @@
         "doctor": "node scripts/gigabrainctl.js doctor",
         "vault": "node scripts/gigabrainctl.js vault build",
         "vault:doctor": "node scripts/gigabrainctl.js vault doctor",
+        "vault:report": "node scripts/gigabrainctl.js vault report",
         "vault:pull": "node scripts/gigabrainctl.js vault pull",
         "migrate:v3": "node scripts/migrate-v3.js",
         "harmonize": "node scripts/harmonize-memory.js",

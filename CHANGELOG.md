@@ -2,6 +2,34 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.4.1] — 2026-03-07
+
+### Fixed
+- Published a clean npm patch release after auditing the `0.4.0` tarball and removing Nimbus-specific example paths from the package contents
+
+### Changed
+- GitHub `main`, npm `latest`, and release metadata are aligned on the scrubbed `0.4.1` package
+
+## [0.4.0] — 2026-03-07
+
+### Added
+- Obsidian Memory Surface with structured vault export under `00 Home`, `10 Native`, `20 Nodes/active`, `30 Views`, and `40 Reports`
+- `vault build`, `vault doctor`, `vault report`, and `vault pull` workflows for building and syncing the surface to another machine
+- Shared surface summary model used by both Obsidian and the FastAPI web console
+- Hybrid memory model with explicit remember intent, native-to-registry promotion, and provenance fields like `source_layer`, `source_path`, and `source_line`
+- Task-specific local Qwen 3.5 profiles for memory review and other structured LLM work
+
+### Changed
+- Explicit remember/save requests can now project to native markdown and structured registry memory together
+- Nightly maintenance now ends with `vault_build` and emits surface artifacts such as `memory-surface-summary.json`
+- Web console gained a surface landing view with freshness, native-vs-registry counts, review queue, and recent archive summaries
+- Setup guidance now centers the Obsidian surface as the recommended `v0.4` browse experience while keeping the runtime workspace as the source of truth
+
+### Fixed
+- Production hardening for the new surface and hybrid memory rollout, including dry-run artifact isolation, vault health checks, and manual-folder preservation
+- Remember-intent fallback now queues review instead of silently dropping explicit save requests when the internal tag is missing
+- Shared-scope durable remembers no longer leak into `MEMORY.md`
+
 ## [0.3.0] — 2026-03-05
 
 ### Security
