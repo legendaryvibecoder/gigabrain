@@ -2,6 +2,16 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.4.3] — 2026-03-08
+
+### Fixed
+- Recall injection no longer exposes internal provenance such as `src=...`, memory ids, or source paths in the hidden Gigabrain context block
+- Native recall no longer re-indexes persisted recall artifacts like `<gigabrain-context>`, `query:`, `Source:`, or transcript-style `user:` / `assistant:` lines from session notes
+- Older memories containing relative wording like `today` / `heute` are now marked with their recorded date in recall injection so stale plans are not presented as if they refer to the current day
+
+### Changed
+- README now clarifies the recall hygiene behavior and notes that OpenClaw's separate `memory_search` tool controls its own visible citations via `memory.citations`
+
 ## [0.4.2] — 2026-03-08
 
 ### Added

@@ -419,13 +419,17 @@ Before each prompt, Gigabrain:
 2. **Entity coreference resolution** — detects pronoun follow-ups (e.g. "was weisst du noch über sie?") and enriches the query with the entity from prior messages in the conversation
 3. Searches the SQLite registry for memories relevant to the sanitized query
 4. Searches native markdown files (`MEMORY.md`, daily notes) for matching chunks
-5. **Entity answer quality scoring** — for "who is" / "wer ist" queries, penalizes instruction-like memories ("Add to profile: ...") and boosts direct factual content
-6. **Deduplication** — removes duplicate memories by normalized content before ranking
-7. Applies class budgets (core / situational / decisions) and token limits
-8. **Entity answer hints** — for entity queries, extracts top-3 factual answers and includes them as `entity_answer_hints` in the injection block
-9. Injects the results as a system message placed before the last user message in the conversation
+5. **Recall hygiene** — strips persisted recall artifacts and transcript-style control lines out of native recall so old `<gigabrain-context>`, `query:`, `Source:`, or `user:` / `assistant:` lines do not feed back into future answers
+6. **Entity answer quality scoring** — for "who is" / "wer ist" queries, penalizes instruction-like memories ("Add to profile: ...") and boosts direct factual content
+7. **Deduplication** — removes duplicate memories by normalized content before ranking
+8. **Temporal safety** — older memories that say `today` / `heute` / `currently` are marked with their recorded date instead of being treated as if they refer to the current day
+9. Applies class budgets (core / situational / decisions) and token limits
+10. **Entity answer hints** — for entity queries, extracts top-3 factual answers and includes them as `entity_answer_hints` in the injection block
+11. Injects the results as a system message placed before the last user message in the conversation, without exposing internal provenance like file paths or memory ids
 
 The agent doesn't need to do anything special for recall — it happens automatically via the gateway plugin hooks.
+
+If you also use OpenClaw's separate `memory_search` / `memory_get` tools, note that their visible `Source:` behavior is controlled by OpenClaw's own `memory.citations` setting, not by Gigabrain.
 
 ### Scope rules
 
