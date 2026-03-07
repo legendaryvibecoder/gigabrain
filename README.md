@@ -522,6 +522,17 @@ npm run test:performance
 
 The suite includes 16 executable tests covering config validation, policy rules, capture service, person service, LLM routing, native-sync query handling, vault surface generation and pull, setup wizard behavior, audit maintenance, vault CLI, migration, bridge routes, native recall, regression behavior, and nightly performance.
 
+## Contributing
+
+External contributions are welcome.
+
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR.
+- Use Issues for concrete bugs or scoped feature requests.
+- Use Discussions for design questions, product ideas, or usage help.
+- Please avoid posting secrets, private paths, or personal runtime artifacts in issues or PRs.
+
+If you want to propose a bigger memory-behavior change, open a discussion first. Small, well-tested PRs are much easier to review.
+
 ## Benchmarking
 
 ```bash
@@ -589,6 +600,8 @@ gigabrain/
 - The web console escapes all user content to prevent XSS
 - The memory_api binds to `127.0.0.1` only — use Tailscale or SSH tunneling for remote access
 - Dependencies are audited with `pip-audit` and `npm audit`. Transitive dependency alerts (e.g. from peer dependencies) are tracked via Dependabot
+
+Please do not open public issues for vulnerabilities. Use the private reporting flow in [SECURITY.md](SECURITY.md).
 
 ## License
 

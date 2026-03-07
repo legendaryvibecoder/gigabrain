@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible bug or regression in Gigabrain.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting this. Please include enough detail for someone else to reproduce the issue.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the bug and the behavior you expected instead.
+      placeholder: A short, concrete description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include the smallest reliable reproduction you can.
+      placeholder: |
+        1. Configure ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Versions, OS, OpenClaw/Gigabrain setup, provider, and anything else relevant.
+      placeholder: Node version, Gigabrain version, OpenClaw version, local vs Nimbus, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or screenshots
+      description: Paste trimmed logs or screenshots if they help.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched for existing issues and discussions first.
+          required: true
+        - label: I removed secrets, private paths, and personal data from the report.
+          required: true
