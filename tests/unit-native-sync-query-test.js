@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import { normalizeConfig } from '../lib/core/config.js';
-import { ensureNativeStore, queryNativeChunks } from '../lib/core/native-sync.js';
+import { ensureNativeStore, queryNativeChunks, syncNativeMemory } from '../lib/core/native-sync.js';
 import { makeConfigObject, makeTempWorkspace, openDb } from './helpers.js';
 
 const run = async () => {
@@ -89,6 +91,40 @@ const run = async () => {
       'active',
     );
 
+    insert.run(
+      'artifact-source-hit',
+      '/tmp/memory/2026-03-03-session-start.md',
+      'daily_note',
+      '2026-03-03',
+      'Conversation Summary',
+      1004,
+      1004,
+      'Source: memory/whois.md#L1-L8, memory/gigabrain-harmonized.md#L208-L218',
+      'source memory whois md l1 l8 memory gigabrain harmonized md l208 l218',
+      randomUUID(),
+      null,
+      nowIso,
+      nowIso,
+      'active',
+    );
+
+    insert.run(
+      'artifact-context-hit',
+      '/tmp/memory/2026-03-03-session-start.md',
+      'daily_note',
+      '2026-03-03',
+      'Conversation Summary',
+      1005,
+      1005,
+      'query: wer ist liz?',
+      'query wer ist liz',
+      randomUUID(),
+      null,
+      nowIso,
+      nowIso,
+      'active',
+    );
+
     const rows = queryNativeChunks({
       db,
       config,
@@ -112,6 +148,47 @@ const run = async () => {
     assert.equal(hasSam, true, 'native query should return real entity hits');
     const hasInitSubstring = samRows.some((row) => String(row.content || '').toLowerCase().includes('initialization'));
     assert.equal(hasInitSubstring, false, 'native entity match must not trigger on substrings inside other words');
+
+    const artifactRows = queryNativeChunks({
+      db,
+      config,
+      query: 'liz',
+      scope: 'main',
+      limit: 24,
+      entityKeys: ['liz'],
+    });
+    const hasArtifact = artifactRows.some((row) => /source:|query:/i.test(String(row.content || '')));
+    assert.equal(hasArtifact, false, 'native recall should filter persisted recall/transcript artifacts');
+
+    fs.mkdirSync(path.join(ws.workspace, 'memory'), { recursive: true });
+    fs.writeFileSync(path.join(ws.workspace, 'memory', '2026-03-08-session-start.md'), `
+# 2026-03-08 session start
+
+## Conversation Summary
+
+<gigabrain-context>
+query: wer ist liz?
+fallback: active_or_native
+- [USER_FACT] Liz is Alex partner.
+</gigabrain-context>
+
+- user: Wer ist Liz?
+- assistant: Liz ist Alex Partnerin.
+- Durable fact about Liz and Alex.
+`, 'utf8');
+
+    const syncSummary = syncNativeMemory({ db, config, dryRun: false });
+    assert.equal(syncSummary.changed_files >= 1, true, 'native sync should process new session file');
+
+    const syncedRows = db.prepare(`
+      SELECT content
+      FROM memory_native_chunks
+      WHERE source_path = ?
+      ORDER BY line_start ASC
+    `).all(path.join(ws.workspace, 'memory', '2026-03-08-session-start.md'));
+    const syncedContents = syncedRows.map((row) => String(row.content || ''));
+    assert.equal(syncedContents.some((content) => /query:|fallback:|user:|assistant:/i.test(content)), false, 'native sync should not index recall or transcript control lines');
+    assert.equal(syncedContents.some((content) => content.includes('Durable fact about Liz and Alex.')), true, 'native sync should keep human-readable durable notes from the same file');
   } finally {
     db.close();
   }

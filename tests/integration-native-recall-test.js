@@ -27,6 +27,14 @@ const run = async () => {
 ### CONTEXT
 - [m:abc12345-aaaa-bbbb-cccc-1234567890ab] In January 2026, Jordan and Atlas worked on gigabrain architecture.
 `, 'utf8');
+  fs.writeFileSync(path.join(memoryDir, '2026-02-01.md'), `
+# 2026-02-01
+
+## 09:00 UTC
+
+### CONTEXT
+- Today Jordan planned an intro interview with Tria.
+`, 'utf8');
   fs.writeFileSync(path.join(memoryDir, 'whois.md'), `
 # whois
 
@@ -110,6 +118,17 @@ const run = async () => {
     const hintsSection = inj.split('entity_answer_hints:')[1]?.split('\nmemories:')[0] || '';
     assert.equal(hintsSection.includes('novara is jordan partner and birthday nov 6.'), true, 'entity hints should include direct fact');
     assert.equal(hintsSection.includes('add to profile: novara is jordan partner and birthday nov 6.'), false, 'entity hints should exclude instruction-like text');
+    assert.equal(inj.includes('src='), false, 'entity injection should not expose internal source provenance');
+
+    const tria = recallForQuery({
+      db,
+      config,
+      query: 'what do we know about tria?',
+      scope: 'main',
+    });
+    const triaInjection = String(tria.injection || '');
+    assert.equal(triaInjection.includes('src='), false, 'recall injection should not expose source paths');
+    assert.equal(triaInjection.includes('Recorded on 2026-02-01; any relative dates in this memory refer to that date.'), true, 'stale relative memories should be marked with their recorded date');
   } finally {
     db.close();
   }
