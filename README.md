@@ -10,7 +10,7 @@ It is built for local-first production use: SQLite-backed recall, deterministic 
 - **Recall**: Before each prompt, searches the registry and native markdown files to inject relevant context the agent "remembers"
 - **Dedupe**: Exact and hybrid semantic deduplication catches duplicates, paraphrases, and malformed near-duplicates with type-aware thresholds
 - **Native sync**: Indexes your workspace `MEMORY.md` and daily notes alongside the registry for unified recall
-- **Obsidian surface**: Builds a structured vault with native files, active memory nodes, reports, and views so Nimbus can expose memory clearly in Obsidian and sync it to another machine
+- **Obsidian surface**: Builds a structured vault with native files, active memory nodes, reports, and views so your agent can expose memory clearly in Obsidian and sync it to another machine
 - **Person service**: Tracks entity mentions across memories for person-aware retrieval ordering
 - **Quality gate**: Junk filters, durable-personal retention bias, plausibility heuristics, and optional LLM second opinion keep memory clean without losing important relationship context
 - **Audit**: Nightly maintenance with snapshots, execution artifacts, archive reports, review queue retention, and quality scoring
@@ -271,7 +271,7 @@ When enabled, Gigabrain builds a read-only Obsidian memory surface under `<vault
 - `30 Views/` dashboards such as Active Memories, Relationships, Review Queue, Recent Archives, Native Sources, Promoted Memories, and Registry-only Memories
 - `40 Reports/` manifest, freshness, latest nightly/native-sync summaries, and the latest vault build summary
 
-`Inbox/` and `Manual/` are reserved human-written folders inside the generated subdir and are never cleaned. The surface is intentionally read-only from Obsidian in `v0.4.0`: Nimbus remains the source of truth, and local sync is a one-way pull.
+`Inbox/` and `Manual/` are reserved human-written folders inside the generated subdir and are never cleaned. The surface is intentionally read-only from Obsidian in `v0.4.0`: the runtime workspace remains the source of truth, and local sync is a one-way pull.
 
 ### Quality
 
@@ -429,10 +429,10 @@ node scripts/gigabrainctl.js vault doctor --config ~/.openclaw/openclaw.json
 # Print the latest surface summary
 node scripts/gigabrainctl.js vault report --config ~/.openclaw/openclaw.json
 
-# Pull the generated surface from Nimbus to a local vault root
+# Pull the generated surface from a remote host to a local vault root
 node scripts/gigabrainctl.js vault pull \
-  --host nimbus \
-  --remote-path /Users/Nimbus/clawd/obsidian-vault \
+  --host memory-host \
+  --remote-path /path/to/obsidian-vault \
   --target ~/Documents/gigabrainvault
 
 # Compatibility helper for a direct build

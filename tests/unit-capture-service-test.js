@@ -102,8 +102,8 @@ const run = async () => {
         scope: 'shared',
         agentId: 'main',
         sessionKey: 'agent:main:main',
-        messages: [{ role: 'user', content: 'remember that I am in Graz today and tired.' }],
-        text: '<memory_note type="CONTEXT" confidence="0.84">User is in Graz today and tired.</memory_note>',
+        messages: [{ role: 'user', content: 'remember that I am travelling today and tired.' }],
+        text: '<memory_note type="CONTEXT" confidence="0.84">User is travelling today and tired.</memory_note>',
       },
       runId: 'capture-unit-run',
       reviewVersion: 'rv-capture-unit',
@@ -114,7 +114,7 @@ const run = async () => {
     const dailyPath = path.join(ws.memoryRoot, `${new Date().toISOString().slice(0, 10)}.md`);
     assert.equal(fs.existsSync(dailyPath), true, "ephemeral remember intent should create today's daily note");
     const dailyBody = fs.readFileSync(dailyPath, 'utf8');
-    assert.match(dailyBody, /User is in Graz today and tired\./, 'daily note should contain the remembered ephemeral context');
+    assert.match(dailyBody, /User is travelling today and tired\./, 'daily note should contain the remembered ephemeral context');
 
     const missingNote = captureFromEvent({
       db,
@@ -123,7 +123,7 @@ const run = async () => {
         scope: 'shared',
         agentId: 'main',
         sessionKey: 'agent:main:main',
-        messages: [{ role: 'user', content: 'remember that I prefer cold brew.' }],
+        messages: [{ role: 'user', content: 'remember that I prefer herbal tea.' }],
         text: 'Okay, I will remember that.',
       },
       runId: 'capture-unit-run',

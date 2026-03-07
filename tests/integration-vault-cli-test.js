@@ -46,7 +46,7 @@ const run = async () => {
       {
         memory_id: 'cli-node-1',
         type: 'PREFERENCE',
-        content: 'Chris prefers working with Obsidian as a memory surface.',
+        content: 'Jordan prefers working with Obsidian as a memory surface.',
         scope: 'shared',
         confidence: 0.88,
         value_score: 0.8,

@@ -9,8 +9,8 @@ import { makeConfigObject, makeTempWorkspace, openDb } from './helpers.js';
 
 const run = async () => {
   const ws = makeTempWorkspace('gb-v4-native-promotion-');
-  fs.writeFileSync(path.join(ws.workspace, 'MEMORY.md'), '# MEMORY\n\n## Preferences\n\n- Chris prefers oat milk in coffee.\n', 'utf8');
-  fs.writeFileSync(path.join(ws.memoryRoot, `${new Date().toISOString().slice(0, 10)}.md`), '# Daily\n\n## Session Notes\n\n- Chris is in Graz today and tired.\n', 'utf8');
+  fs.writeFileSync(path.join(ws.workspace, 'MEMORY.md'), '# MEMORY\n\n## Preferences\n\n- Jordan prefers pour-over coffee.\n', 'utf8');
+  fs.writeFileSync(path.join(ws.memoryRoot, `${new Date().toISOString().slice(0, 10)}.md`), '# Daily\n\n## Session Notes\n\n- Jordan is travelling today and tired.\n', 'utf8');
 
   const config = normalizeConfig(makeConfigObject(ws.workspace).plugins.entries.gigabrain.config);
   const db = openDb(ws.dbPath);
@@ -46,7 +46,7 @@ const run = async () => {
     const dailyPromoted = db.prepare(`
       SELECT COUNT(*) AS c
       FROM memory_current
-      WHERE content LIKE '%Graz today and tired%'
+      WHERE content LIKE '%travelling today and tired%'
     `).get();
     assert.equal(Number(dailyPromoted?.c || 0), 0, 'situational daily note should not auto-promote into registry');
 

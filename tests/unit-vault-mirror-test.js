@@ -10,7 +10,7 @@ import { makeConfigObject, makeTempWorkspace, openDb, seedMemoryCurrent } from '
 
 const run = async () => {
   const ws = makeTempWorkspace('gb-v4-vault-surface-');
-  fs.writeFileSync(path.join(ws.workspace, 'MEMORY.md'), '# MEMORY\n\n- [m:m-1] Chris treats Nimbus as someone, not something.\n', 'utf8');
+  fs.writeFileSync(path.join(ws.workspace, 'MEMORY.md'), '# MEMORY\n\n- [m:m-1] Jordan treats Atlas as a teammate, not a tool.\n', 'utf8');
   fs.writeFileSync(path.join(ws.memoryRoot, '2026-03-06-session-start.md'), '# Session\n\n- kicked off vault planning\n', 'utf8');
   fs.writeFileSync(path.join(ws.memoryRoot, 'latest.md'), '# Latest\n\n- current state\n', 'utf8');
   fs.mkdirSync(path.join(ws.memoryRoot, 'private'), { recursive: true });
@@ -47,7 +47,7 @@ const run = async () => {
       {
         memory_id: 'm-1',
         type: 'PREFERENCE',
-        content: 'Chris treats Nimbus as someone, not something.',
+        content: 'Jordan treats Atlas as a teammate, not a tool.',
         scope: 'nimbusmain',
         confidence: 0.92,
         value_score: 0.91,
@@ -56,7 +56,7 @@ const run = async () => {
       {
         memory_id: 'm-2',
         type: 'USER_FACT',
-        content: 'Chris wants to lose weight and reach 80kg.',
+        content: 'Jordan wants to improve fitness and reach a healthier goal weight.',
         scope: 'nimbusmain',
         confidence: 0.87,
         value_score: 0.84,
@@ -65,7 +65,7 @@ const run = async () => {
       {
         memory_id: 'm-3',
         type: 'PREFERENCE',
-        content: 'Chris prefers oat milk in coffee.',
+        content: 'Jordan prefers pour-over coffee.',
         scope: 'profile:main',
         confidence: 0.86,
         value_score: 0.83,
@@ -91,7 +91,7 @@ const run = async () => {
       'MEMORY',
       2,
       2,
-      'Chris treats Nimbus as someone, not something.',
+      'Jordan treats Atlas as a teammate, not a tool.',
       'chris treats nimbus as someone not something',
       'hash-1',
       'm-1',
@@ -104,8 +104,8 @@ const run = async () => {
         id, memory_id, entity_key, entity_display, role, confidence, source
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    mentionInsert.run('m-1|nimbus', 'm-1', 'nimbus', 'Nimbus', 'relationship', 0.95, 'memory_current');
-    mentionInsert.run('m-2|nimbus', 'm-2', 'nimbus', 'Nimbus', 'relationship', 0.9, 'memory_current');
+    mentionInsert.run('m-1|atlas', 'm-1', 'atlas', 'Atlas', 'relationship', 0.95, 'memory_current');
+    mentionInsert.run('m-2|atlas', 'm-2', 'atlas', 'Atlas', 'relationship', 0.9, 'memory_current');
 
     const summary = buildVaultSurface({
       db,
@@ -141,7 +141,7 @@ const run = async () => {
     assert.match(nodeContent, /\[\[10 Native\/MEMORY(?:\|[^\]]+)?\]\]/, 'node should link to native source');
 
     const promotedView = fs.readFileSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Promoted Memories.md'), 'utf8');
-    assert.match(promotedView, /Chris prefers oat milk in coffee\./, 'promoted memories view should list promoted-native nodes');
+    assert.match(promotedView, /Jordan prefers pour-over coffee\./, 'promoted memories view should list promoted-native nodes');
 
     const health = inspectVaultHealth({ config, db });
     assert.equal(health.enabled, true, 'vault doctor should report enabled');

@@ -34,7 +34,7 @@ Examples:
   node scripts/gigabrainctl.js audit --mode shadow --db ~/.openclaw/gigabrain/memory/registry.sqlite
   node scripts/gigabrainctl.js audit --mode restore --review-version rv-2026-02-22
   node scripts/gigabrainctl.js vault build --config ~/.openclaw/openclaw.json
-  node scripts/gigabrainctl.js vault pull --host nimbus --remote-path /Users/Nimbus/clawd/obsidian-vault --target ~/Documents/gigabrainvault
+  node scripts/gigabrainctl.js vault pull --host memory-host --remote-path /path/to/obsidian-vault --target ~/Documents/gigabrainvault
 `;
 
 const args = process.argv.slice(2);
