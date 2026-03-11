@@ -28,6 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field
 _home = os.path.expanduser("~")
 DB_PATH = os.getenv("GB_REGISTRY_PATH", os.path.join(_home, ".openclaw", "gigabrain", "memory", "registry.sqlite"))
 TOKEN = os.getenv("GB_UI_TOKEN", "")
+OPENCLAW_CONFIG_PATH = os.getenv("GB_OPENCLAW_CONFIG", os.path.join(_home, ".openclaw", "openclaw.json"))
 DOCS_DIR = os.getenv("GB_DOCS_PATH", os.path.join(_home, ".openclaw", "gigabrain", "memory", "docs"))
 DOC_INDEX_AGENT = os.getenv("GB_DOC_INDEX_AGENT", "shared-docs")
 DOC_INDEX_DEBOUNCE_SECONDS = int(os.getenv("GB_DOC_INDEX_DEBOUNCE", "10"))
@@ -36,6 +37,7 @@ DOC_INDEX_LOCK_PATH = os.getenv("GB_DOC_INDEX_LOCK", os.path.join(_home, ".openc
 GRAPH_PATH = os.getenv("GB_GRAPH_PATH", os.path.join(_home, ".openclaw", "gigabrain", "memory", "graph.json"))
 OUTPUT_DIR = os.getenv("GB_OUTPUT_DIR", os.path.realpath(os.path.join(os.path.dirname(DB_PATH), "..", "output")))
 SURFACE_SUMMARY_PATH = os.getenv("GB_SURFACE_SUMMARY_PATH", os.path.join(OUTPUT_DIR, "memory-surface-summary.json"))
+GB_RECALL_EXPLAIN_URL = os.getenv("GB_RECALL_EXPLAIN_URL", "http://127.0.0.1:18789/gb/recall/explain")
 ALLOW_PRIVATE_URLS = os.getenv("GB_ALLOW_PRIVATE_URLS", "").lower() in ("1", "true", "yes")
 ENABLE_API_DOCS = os.getenv("GB_ENABLE_API_DOCS", "").lower() in ("1", "true", "yes")
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
@@ -52,6 +54,22 @@ _rate_limit_buckets = defaultdict(deque)
 _logging = logging.getLogger("gigabrain")
 if not TOKEN:
     _logging.warning("GB_UI_TOKEN is not set — authenticated endpoints will reject all requests")
+
+
+def _load_gateway_token() -> str:
+    for env_name in ("GB_GATEWAY_TOKEN", "OPENCLAW_GATEWAY_TOKEN"):
+        candidate = str(os.getenv(env_name, "")).strip()
+        if candidate:
+            return candidate
+    try:
+        with open(OPENCLAW_CONFIG_PATH, "r", encoding="utf-8") as fh:
+            config = json.load(fh)
+        return str((((config.get("gateway") or {}).get("auth") or {}).get("token")) or "").strip()
+    except Exception:
+        return ""
+
+
+PLUGIN_PROXY_TOKEN = str(TOKEN or _load_gateway_token()).strip()
 
 SCOPE_TOKENS = {}
 _raw_scope_tokens = os.getenv("GB_UI_SCOPE_TOKENS", "").strip()
@@ -236,6 +254,19 @@ def _is_within_docs_dir(file_path: str) -> bool:
         return os.path.commonpath([docs_root, target]) == docs_root
     except Exception:
         return False
+
+
+def _has_table(conn: sqlite3.Connection, table_name: str) -> bool:
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1",
+        (str(table_name or ""),),
+    ).fetchone()
+    return bool(row and row["name"])
+
+
+def _require_admin_world(auth: dict) -> None:
+    if not _is_admin(auth):
+        raise HTTPException(status_code=403, detail="World-model endpoints require admin token")
 
 
 def _default_surface_summary() -> dict:
@@ -1526,9 +1557,25 @@ def merge_memories(payload: MergeMemoriesPayload, auth: dict = Depends(require_t
 @app.post("/recall/explain")
 def recall_explain(payload: RecallExplainPayload, auth: dict = Depends(require_token)):
     query = payload.query
+    if not query.strip():
+        return {"strategy": "quick_context", "result_count": 0, "results": []}
+
+    try:
+        headers = {"Authorization": f"Bearer {PLUGIN_PROXY_TOKEN}"} if PLUGIN_PROXY_TOKEN else {}
+        with httpx.Client(timeout=4.0) as client:
+            response = client.post(
+                GB_RECALL_EXPLAIN_URL,
+                headers=headers,
+                json={"query": query, "scope": payload.scope or ""},
+            )
+            if response.status_code == 200:
+                return response.json()
+    except Exception:
+        pass
+
     tokens = normalize_content(query).split()
     if not tokens:
-        return []
+        return {"strategy": "quick_context", "result_count": 0, "results": []}
     like = _contains_like(" ".join(tokens[:3]))
 
     conn = get_db()
@@ -1541,7 +1588,13 @@ def recall_explain(payload: RecallExplainPayload, auth: dict = Depends(require_t
         params,
     ).fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    return {
+        "strategy": "fallback_sql_like",
+        "deep_lookup_allowed": False,
+        "used_world_model": False,
+        "result_count": len(rows),
+        "results": [dict(r) for r in rows],
+    }
 
 
 @app.get("/graph")
@@ -1575,6 +1628,322 @@ def surface(auth: dict = Depends(require_token)):
         return data
     except Exception:
         return _default_surface_summary()
+
+
+@app.get("/world/summary")
+def world_summary(auth: dict = Depends(require_token)):
+    _require_admin_world(auth)
+    conn = get_db()
+    try:
+        if not _has_table(conn, "memory_entities"):
+            return {
+                "generated_at": None,
+                "counts": {
+                    "entities": 0,
+                    "beliefs": 0,
+                    "episodes": 0,
+                    "open_loops": 0,
+                    "contradictions": 0,
+                    "syntheses": 0,
+                },
+                "latest_session_brief": None,
+            }
+        counts = {}
+        entity_rows = conn.execute("SELECT payload FROM memory_entities").fetchall()
+        visible_entities = 0
+        for row in entity_rows:
+            try:
+                payload = json.loads(row["payload"] or "{}")
+            except Exception:
+                payload = {}
+            if payload.get("surface_visible", True) is False:
+                continue
+            visible_entities += 1
+        counts["entities"] = visible_entities
+        for table_name in ["memory_beliefs", "memory_episodes", "memory_open_loops", "memory_syntheses"]:
+            counts[table_name.replace("memory_", "")] = int(
+                conn.execute(f"SELECT COUNT(*) AS c FROM {table_name}").fetchone()["c"] or 0
+            )
+        contradictions = int(
+            conn.execute(
+                "SELECT COUNT(*) AS c FROM memory_open_loops WHERE kind = 'contradiction_review'"
+            ).fetchone()["c"] or 0
+        )
+        latest = conn.execute(
+            """
+            SELECT synthesis_id, kind, content, generated_at, confidence
+            FROM memory_syntheses
+            WHERE kind = 'session_brief'
+            ORDER BY generated_at DESC
+            LIMIT 1
+            """
+        ).fetchone()
+        generated = conn.execute(
+            "SELECT COALESCE(MAX(generated_at), '') AS generated_at FROM memory_syntheses"
+        ).fetchone()["generated_at"]
+        return {
+            "generated_at": generated or None,
+            "counts": {
+                "entities": counts.get("entities", 0),
+                "beliefs": counts.get("beliefs", 0),
+                "episodes": counts.get("episodes", 0),
+                "open_loops": counts.get("open_loops", 0),
+                "contradictions": contradictions,
+                "syntheses": counts.get("syntheses", 0),
+            },
+            "latest_session_brief": dict(latest) if latest else None,
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/world/entities")
+def world_entities(
+    kind: Optional[str] = None,
+    limit: int = 200,
+    auth: dict = Depends(require_token),
+):
+    _require_admin_world(auth)
+    conn = get_db()
+    try:
+        if not _has_table(conn, "memory_entities"):
+            return []
+        clauses = []
+        params: list[Any] = []
+        if kind:
+            clauses.append("kind = ?")
+            params.append(kind)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = conn.execute(
+            f"""
+            SELECT entity_id, kind, display_name, normalized_name, status, confidence, aliases, created_at, updated_at, payload
+            FROM memory_entities
+            {where}
+            ORDER BY updated_at DESC, display_name ASC
+            LIMIT ?
+            """,
+            (*params, max(1, min(limit, 1000))),
+        ).fetchall()
+        items = []
+        for row in rows:
+            payload = json.loads(row["payload"] or "{}")
+            if payload.get("surface_visible", True) is False:
+                continue
+            items.append({
+                **dict(row),
+                "aliases": json.loads(row["aliases"] or "[]"),
+                "payload": payload,
+            })
+        return items
+    finally:
+        conn.close()
+
+
+@app.get("/world/entities/{entity_id}")
+def world_entity_detail(entity_id: str, auth: dict = Depends(require_token)):
+    _require_admin_world(auth)
+    conn = get_db()
+    try:
+        if not _has_table(conn, "memory_entities"):
+            raise HTTPException(status_code=404, detail="World model unavailable")
+        entity = conn.execute(
+            """
+            SELECT entity_id, kind, display_name, normalized_name, status, confidence, aliases, created_at, updated_at, payload
+            FROM memory_entities
+            WHERE entity_id = ?
+            LIMIT 1
+            """,
+            (entity_id,),
+        ).fetchone()
+        if not entity:
+            raise HTTPException(status_code=404, detail="Entity not found")
+        beliefs = conn.execute(
+            """
+            SELECT belief_id, entity_id, type, content, status, confidence, valid_from, valid_to,
+                   supersedes_belief_id, source_memory_id, source_layer, source_path, source_line, payload
+            FROM memory_beliefs
+            WHERE entity_id = ?
+            ORDER BY COALESCE(valid_from, '') DESC, confidence DESC
+            LIMIT 200
+            """,
+            (entity_id,),
+        ).fetchall()
+        episodes = conn.execute(
+            """
+            SELECT episode_id, title, summary, start_date, end_date, status, primary_entity_id, source_memory_ids, payload
+            FROM memory_episodes
+            WHERE primary_entity_id = ?
+            ORDER BY COALESCE(start_date, '') DESC
+            LIMIT 100
+            """,
+            (entity_id,),
+        ).fetchall()
+        loops = conn.execute(
+            """
+            SELECT loop_id, kind, title, status, priority, related_entity_id, source_memory_ids, payload
+            FROM memory_open_loops
+            WHERE related_entity_id = ?
+            ORDER BY priority DESC, title ASC
+            LIMIT 100
+            """,
+            (entity_id,),
+        ).fetchall()
+        syntheses = conn.execute(
+            """
+            SELECT synthesis_id, kind, subject_type, subject_id, content, stale, confidence, generated_at, input_hash, payload
+            FROM memory_syntheses
+            WHERE subject_type = 'entity' AND subject_id = ?
+            ORDER BY generated_at DESC, kind ASC
+            LIMIT 50
+            """,
+            (entity_id,),
+        ).fetchall()
+        return {
+            **dict(entity),
+            "aliases": json.loads(entity["aliases"] or "[]"),
+            "payload": json.loads(entity["payload"] or "{}"),
+            "beliefs": [{**dict(row), "payload": json.loads(row["payload"] or "{}")} for row in beliefs],
+            "episodes": [
+                {
+                    **dict(row),
+                    "source_memory_ids": json.loads(row["source_memory_ids"] or "[]"),
+                    "payload": json.loads(row["payload"] or "{}"),
+                }
+                for row in episodes
+            ],
+            "open_loops": [
+                {
+                    **dict(row),
+                    "source_memory_ids": json.loads(row["source_memory_ids"] or "[]"),
+                    "payload": json.loads(row["payload"] or "{}"),
+                }
+                for row in loops
+            ],
+            "syntheses": [
+                {
+                    **dict(row),
+                    "stale": bool(row["stale"]),
+                    "payload": json.loads(row["payload"] or "{}"),
+                }
+                for row in syntheses
+            ],
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/world/beliefs")
+def world_beliefs(
+    entity_id: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 200,
+    auth: dict = Depends(require_token),
+):
+    _require_admin_world(auth)
+    conn = get_db()
+    try:
+        if not _has_table(conn, "memory_beliefs"):
+            return []
+        clauses = []
+        params: list[Any] = []
+        if entity_id:
+            clauses.append("entity_id = ?")
+            params.append(entity_id)
+        if status:
+            clauses.append("status = ?")
+            params.append(status)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = conn.execute(
+            f"""
+            SELECT belief_id, entity_id, type, content, status, confidence, valid_from, valid_to,
+                   supersedes_belief_id, source_memory_id, source_layer, source_path, source_line, payload
+            FROM memory_beliefs
+            {where}
+            ORDER BY COALESCE(valid_from, '') DESC, confidence DESC
+            LIMIT ?
+            """,
+            (*params, max(1, min(limit, 1000))),
+        ).fetchall()
+        return [{**dict(row), "payload": json.loads(row["payload"] or "{}")} for row in rows]
+    finally:
+        conn.close()
+
+
+@app.get("/world/open-loops")
+def world_open_loops(
+    entity_id: Optional[str] = None,
+    kind: Optional[str] = None,
+    limit: int = 200,
+    auth: dict = Depends(require_token),
+):
+    _require_admin_world(auth)
+    conn = get_db()
+    try:
+        if not _has_table(conn, "memory_open_loops"):
+            return []
+        clauses = []
+        params: list[Any] = []
+        if entity_id:
+            clauses.append("related_entity_id = ?")
+            params.append(entity_id)
+        if kind:
+            clauses.append("kind = ?")
+            params.append(kind)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = conn.execute(
+            f"""
+            SELECT loop_id, kind, title, status, priority, related_entity_id, source_memory_ids, payload
+            FROM memory_open_loops
+            {where}
+            ORDER BY priority DESC, title ASC
+            LIMIT ?
+            """,
+            (*params, max(1, min(limit, 1000))),
+        ).fetchall()
+        return [
+            {
+                **dict(row),
+                "source_memory_ids": json.loads(row["source_memory_ids"] or "[]"),
+                "payload": json.loads(row["payload"] or "{}"),
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
+
+
+@app.get("/world/contradictions")
+def world_contradictions(limit: int = 200, auth: dict = Depends(require_token)):
+    return world_open_loops(kind="contradiction_review", limit=limit, auth=auth)
+
+
+@app.get("/world/briefings")
+def world_briefings(limit: int = 50, auth: dict = Depends(require_token)):
+    _require_admin_world(auth)
+    conn = get_db()
+    try:
+        if not _has_table(conn, "memory_syntheses"):
+            return []
+        rows = conn.execute(
+            """
+            SELECT synthesis_id, kind, subject_type, subject_id, content, stale, confidence, generated_at, input_hash, payload
+            FROM memory_syntheses
+            WHERE kind IN ('session_brief', 'daily_memory_briefing', 'what_changed', 'open_loops_report', 'contradiction_report')
+            ORDER BY generated_at DESC, kind ASC
+            LIMIT ?
+            """,
+            (max(1, min(limit, 200)),),
+        ).fetchall()
+        return [
+            {
+                **dict(row),
+                "stale": bool(row["stale"]),
+                "payload": json.loads(row["payload"] or "{}"),
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
 
 
 @app.get("/metrics")

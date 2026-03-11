@@ -2,6 +2,29 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.5.0] — 2026-03-11
+
+### Added
+- World-model projection layer with additive SQLite tables for `memory_entities`, `memory_entity_aliases`, `memory_beliefs`, `memory_episodes`, `memory_open_loops`, and `memory_syntheses`
+- Recall orchestrator that classifies queries into strategies such as `quick_context`, `entity_brief`, `timeline_brief`, `relationship_brief`, and `verification_lookup`
+- New HTTP APIs for entities, beliefs, episodes, open loops, contradictions, and rich recall explain output
+- New CLI workflows: `world rebuild`, `orchestrator explain`, `synthesis build/list`, `briefing`, and `review contradictions|open-loops`
+- Obsidian Surface 2.0 additions: entity pages, people/projects/open-loop/contradiction/current-belief/stale-belief views, review notes, and generated session briefings
+- World-model and orchestrator test coverage, plus API regression coverage for the new routes
+
+### Changed
+- Nightly maintenance now refreshes the world model and synthesis layer after native sync/promotion and dedupe stages
+- Startup and HTTP request paths automatically warm the world-model layer when it is empty but active memories exist
+- Vault summaries and home note now expose entities and synthesis-driven memory-OS concepts in addition to raw nodes
+- Config and plugin schema gained additive `orchestrator`, `worldModel`, `synthesis`, `control`, and `surface` sections while remaining backward-compatible with `0.4.x`
+
+### Fixed
+- Nightly maintenance now rebuilds FTS5 and runs `graph_build` after `vault_build`, keeping lexical recall and graph artifacts aligned with the latest vault state
+- Fresh-workspace nightly runs no longer fail when `memory_relations` has not been created yet; graph generation degrades cleanly to an empty graph
+- Temporal month recall now prefers source-dated memories over generic rows whose `updated_at` merely falls inside the same month
+- Person and world-model projections now suppress common metadata noise such as `archive`, `contact`, `content`, `date`, `link`, `name`, and `status`
+- Gigabrain now registers as a `memory` plugin so OpenClaw can assign it to the memory slot without persistent doctor warnings
+
 ## [0.4.3] — 2026-03-08
 
 ### Fixed

@@ -1,6 +1,6 @@
 {
   "id": "gigabrain",
-  "kind": "utility",
+  "kind": "memory",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -177,6 +177,232 @@
               "decisions": {
                 "type": "number",
                 "default": 0.25
+              }
+            }
+          }
+        }
+      },
+      "orchestrator": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "defaultStrategy": {
+            "type": "string",
+            "default": "auto"
+          },
+          "allowDeepLookup": {
+            "type": "boolean",
+            "default": true
+          },
+          "deepLookupRequires": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "explicit",
+              "exact_date",
+              "source_request",
+              "exact_wording",
+              "low_confidence_no_brief"
+            ]
+          },
+          "profileFirst": {
+            "type": "boolean",
+            "default": true
+          },
+          "entityLockEnabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "strategyRerankEnabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "lowConfidenceNoBriefThreshold": {
+            "type": "number",
+            "default": 0.62
+          },
+          "entityLockMinScore": {
+            "type": "number",
+            "default": 0.58
+          },
+          "temporalEntityPenaltyKinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "topic"
+            ]
+          }
+        }
+      },
+      "worldModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "entityKinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "person",
+              "project",
+              "organization",
+              "place",
+              "topic"
+            ]
+          },
+          "surfaceEntityMinConfidence": {
+            "type": "number",
+            "default": 0.78
+          },
+          "surfaceEntityMinEvidence": {
+            "type": "number",
+            "default": 2
+          },
+          "surfaceEntityKinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+              "person",
+              "project",
+              "organization"
+            ]
+          },
+          "topicEntities": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "strict",
+                  "strict_hidden",
+                  "balanced",
+                  "broad"
+                ],
+                "default": "strict_hidden"
+              },
+              "minEvidenceCount": {
+                "type": "number",
+                "default": 2
+              },
+              "requireCuratedOrMemoryMd": {
+                "type": "boolean",
+                "default": true
+              },
+              "minAliasLength": {
+                "type": "number",
+                "default": 4
+              },
+              "exportToSurface": {
+                "type": "boolean",
+                "default": false
+              },
+              "allowForRecall": {
+                "type": "boolean",
+                "default": true
+              },
+              "maxGenerated": {
+                "type": "number",
+                "default": 80
+              }
+            }
+          }
+        }
+      },
+      "synthesis": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "briefing": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "includeSessionPrelude": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
+        }
+      },
+      "control": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "memoryActions": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
+        }
+      },
+      "surface": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+        "obsidian": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "curated",
+                "diagnostic"
+              ],
+              "default": "curated"
+            },
+            "exportDiagnostics": {
+              "type": "boolean",
+              "default": false
+            },
+            "exportEntityPages": {
+              "type": "string",
+              "enum": [
+                "off",
+                "stable_only",
+                "all"
+              ],
+              "default": "stable_only"
+            },
+            "entityPages": {
+              "type": "boolean",
+              "default": true
+            }
+          }
+          },
+          "webConsole": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "recallTrace": {
+                "type": "boolean",
+                "default": true
               }
             }
           }
@@ -703,7 +929,7 @@
           },
           "exportActiveNodes": {
             "type": "boolean",
-            "default": true
+            "default": false
           },
           "exportRecentArchivesLimit": {
             "type": "number",

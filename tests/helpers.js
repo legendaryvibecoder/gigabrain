@@ -200,7 +200,7 @@ const makeConfigObject = (workspace) => ({
             subdir: 'Gigabrain',
             clean: true,
             homeNoteName: 'Home',
-            exportActiveNodes: true,
+            exportActiveNodes: false,
             exportRecentArchivesLimit: 200,
             manualFolders: ['Inbox', 'Manual'],
             views: {

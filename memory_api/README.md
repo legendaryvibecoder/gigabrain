@@ -2,17 +2,17 @@
 
 Local-only FastAPI dashboard for browsing, editing, and managing the Gigabrain memory registry.
 
-In `v0.4`, this is the operational companion to the Obsidian memory surface:
+In `v0.5`, this is the operational companion to the Obsidian memory surface and world-model layer:
 
-- Use Obsidian for the human-readable memory view (`00 Home`, `10 Native`, `20 Nodes`, `30 Views`)
-- Use the web console for operations, review queues, edits, graph inspection, and audit workflows
+- Use Obsidian for the human-readable curated memory view (`00 Home`, `30 Views`, `50 Briefings`, `10 Native`)
+- Use the web console for operations, inspection, graph debugging, and audit workflows
 
 ## Features
 
 - **Memory browser** — search, filter, paginate, edit, confirm/reject memories
-- **Surface landing view** — shared vault summary with freshness, active node counts, source-layer breakdown, review queue, and recent archives
+- **Surface landing view** — shared vault summary with freshness, current state, important people/projects, and recent archives
 - **Concept dedup** — group by concept, select duplicates, bulk merge/reject
-- **Audit queue** — review flagged items with reasons, advance through queue
+- **Diagnostics** — internal explainability and maintenance diagnostics for advanced operators
 - **Document store** — add text/URL/file documents, search, delete
 - **Profile viewer** — static + dynamic profile facts at a glance
 - **Knowledge graph** — interactive force-directed graph visualization

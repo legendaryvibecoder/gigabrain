@@ -4,13 +4,19 @@ Gigabrain is the long-term memory layer for [OpenClaw](https://openclaw.ai) agen
 
 It is built for local-first production use: SQLite-backed recall, deterministic dedupe/audit flows, native markdown sync, and an optional FastAPI console for memory operations.
 
+Release references:
+
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md)
+- `v0.5.0` release notes: [`release-notes/v0.5.0.md`](release-notes/v0.5.0.md)
+
 ## What it does
 
 - **Capture**: Uses a hybrid memory model where explicit remember intent can write concise native markdown and structured registry memories together
-- **Recall**: Before each prompt, searches the registry and native markdown files to inject relevant context the agent "remembers"
+- **Recall**: Before each prompt, the recall orchestrator chooses between quick context, entity briefs, timeline briefs, and verification-oriented recall
 - **Dedupe**: Exact and hybrid semantic deduplication catches duplicates, paraphrases, and malformed near-duplicates with type-aware thresholds
 - **Native sync**: Indexes your workspace `MEMORY.md` and daily notes alongside the registry for unified recall
-- **Obsidian surface**: Builds a structured vault with native files, active memory nodes, reports, and views so your agent can expose memory clearly in Obsidian and sync it to another machine
+- **World model**: Projects atomic memories into entities, beliefs, episodes, open loops, contradictions, and syntheses that can power better recall and review
+- **Obsidian surface**: Builds a structured vault with native files, active memory nodes, entity pages, briefings, reports, and views so your agent can expose memory clearly in Obsidian and sync it to another machine
 - **Person service**: Tracks entity mentions across memories for person-aware retrieval ordering
 - **Quality gate**: Junk filters, durable-personal retention bias, plausibility heuristics, and optional LLM second opinion keep memory clean without losing important relationship context
 - **Audit**: Nightly maintenance with snapshots, execution artifacts, archive reports, review queue retention, and quality scoring
@@ -22,7 +28,7 @@ It is built for local-first production use: SQLite-backed recall, deterministic 
 - **OpenClaw** >= 2026.2.15 (gateway + plugin loader)
 - **Python** >= 3.10 (only for the optional web console)
 - **Ollama** (optional, for local LLM-based extraction review and semantic search)
-- **Obsidian** (recommended for the `v0.4` memory surface; core capture/recall still works without it)
+- **Obsidian** (recommended for the `v0.5` memory surface; core capture/recall still works without it)
 
 ## Installation
 
@@ -47,7 +53,7 @@ What the setup wizard does:
 
 - Ensures `plugins.entries.gigabrain` exists in `~/.openclaw/openclaw.json`
 - Sets plugin path and runtime paths (`workspaceRoot`, `memoryRoot`, `outputDir`, `registryPath`)
-- Enables the `v0.4` hybrid memory defaults for explicit remember intent and native promotion
+- Enables the `v0.5` hybrid memory defaults for explicit remember intent, native promotion, and world-model-aware surfaces
 - Bootstraps the DB and indexes native memory files
 - Enables the Obsidian memory surface by default and builds the first vault unless `--skip-vault`
 - Adds or refreshes the AGENTS memory protocol block (unless `--skip-agents`)
@@ -55,7 +61,7 @@ What the setup wizard does:
 
 Recommended follow-up after setup:
 
-1. Install Obsidian if you want the `v0.4` memory surface.
+1. Install Obsidian if you want the `v0.5` memory surface.
 2. Open `<workspace>/obsidian-vault/Gigabrain`.
 3. Start at `00 Home/Home.md`.
 4. If the vault looks sparse at first, that is normal: Gigabrain only shows memories that already exist in native notes or the registry.
@@ -87,6 +93,9 @@ git clone https://github.com/legendaryvibecoder/gigabrain.git
 ```json
 {
   "plugins": {
+    "slots": {
+      "memory": "gigabrain"
+    },
     "entries": {
       "gigabrain": {
         "path": "~/.openclaw/plugins/gigabrain",
@@ -98,6 +107,8 @@ git clone https://github.com/legendaryvibecoder/gigabrain.git
   }
 }
 ```
+
+`plugins.slots.memory = "gigabrain"` is the important part that tells OpenClaw to use Gigabrain as the active memory-slot provider.
 
 3. Restart gateway:
 
@@ -157,7 +168,7 @@ All config lives under `plugins.entries.gigabrain.config` in `openclaw.json`. Th
 - `minConfidence` — minimum confidence score to store a memory (0.0–1.0)
 - `rememberIntent` — lets the agent treat natural phrases like `remember that` as an explicit memory-save instruction without exposing the internal `<memory_note>` protocol to the user
 
-Hybrid capture behavior in `v0.4.0`:
+Hybrid capture behavior in `v0.5.0`:
 
 - Explicit durable remember intent writes a concise native note and a matching registry memory when the model emits `<memory_note>`
 - Explicit ephemeral remember intent writes to the daily note and stays out of the durable registry by default
@@ -179,6 +190,41 @@ Hybrid capture behavior in `v0.4.0`:
 - `topK` — maximum memories injected per prompt
 - `mode` — `personal_core` (identity-heavy), `project_context` (task-heavy), or `hybrid`
 - `classBudgets` — budget split between core/situational/decisions (must sum to 1.0)
+
+### Orchestrator and world model
+
+```json
+{
+  "orchestrator": {
+    "defaultStrategy": "auto",
+    "allowDeepLookup": true,
+    "deepLookupRequires": ["source_request", "exact_date", "exact_wording", "low_confidence_no_brief"],
+    "profileFirst": true,
+    "entityLockEnabled": true,
+    "strategyRerankEnabled": true
+  },
+  "worldModel": {
+    "enabled": true,
+    "entityKinds": ["person", "project", "organization", "place", "topic"],
+    "surfaceEntityKinds": ["person", "project", "organization"],
+    "topicEntities": {
+      "mode": "strict_hidden",
+      "exportToSurface": false
+    }
+  },
+  "synthesis": {
+    "enabled": true,
+    "briefing": {
+      "enabled": true,
+      "includeSessionPrelude": true
+    }
+  }
+}
+```
+
+- The orchestrator chooses a profile-first recall path and only allows deep lookup for source/date/wording verification or true low-confidence-no-brief cases
+- The world model projects atomic memories into internal entities, beliefs, episodes, contradictions, and syntheses without replacing the underlying registry
+- Syntheses generate reusable briefs for recall, current state, what changed, and session-start context
 
 ### Dedupe
 
@@ -246,6 +292,17 @@ Task profiles let you keep one local model family while changing sampling per jo
 
 Indexes workspace markdown files into `memory_native_chunks` for unified recall alongside the registry.
 
+### Architecture note
+
+`v0.5` keeps the memory architecture intentionally simple:
+
+- native markdown (`MEMORY.md`, daily notes, curated files) is the human-readable source layer
+- SQLite is the operational registry, projection, and query layer
+- FTS5 is an in-database lexical accelerator for active registry recall
+- there is no separate vector database requirement for core capture, nightly maintenance, or plugin recall
+
+This means changing a local LLM or embedding model does not break the core write/recall path. Optional LLM profiles help with review and extraction quality, but native writes, SQLite indexing, and orchestrated recall still work in deterministic mode.
+
 ### Native promotion
 
 ```json
@@ -261,7 +318,7 @@ Indexes workspace markdown files into `memory_native_chunks` for unified recall 
 
 Native promotion turns durable native bullets back into structured registry memories with provenance (`source_layer`, `source_path`, `source_line`). This keeps OpenClaw-style native memory first-class while still giving Gigabrain structured recall, dedupe, and archive behavior.
 
-### Obsidian surface (recommended in `v0.4`)
+### Obsidian surface (recommended in `v0.5`)
 
 ```json
 {
@@ -271,7 +328,7 @@ Native promotion turns durable native bullets back into structured registry memo
     "subdir": "Gigabrain",
     "clean": true,
     "homeNoteName": "Home",
-    "exportActiveNodes": true,
+    "exportActiveNodes": false,
     "exportRecentArchivesLimit": 200,
     "manualFolders": ["Inbox", "Manual"],
     "views": { "enabled": true },
@@ -280,23 +337,35 @@ Native promotion turns durable native bullets back into structured registry memo
 }
 ```
 
-Gigabrain does not require Obsidian for core capture/recall, but you do need Obsidian if you want the visual memory surface introduced in `v0.4`.
+Gigabrain does not require Obsidian for core capture/recall, but you do need Obsidian if you want the visual memory surface introduced in `v0.5`.
 
-When enabled, Gigabrain builds a read-only Obsidian memory surface under `<vault.path>/<vault.subdir>`:
+The default `v0.5` surface is intentionally curated. When enabled, Gigabrain builds a read-only Obsidian memory surface under `<vault.path>/<vault.subdir>` with:
 
-- `00 Home/` landing note and health summary
+- `00 Home/Home.md`
+- `30 Views/Current State.md`
+- `30 Views/What Changed.md`
+- `30 Views/Important People.md`
+- `30 Views/Important Projects.md`
+- `30 Views/Native Notes.md`
+- `50 Briefings/Session Brief.md`
+
+Large diagnostic exports, raw review queues, and broad entity dumps are not part of the default curated surface.
 - `10 Native/` mirrored `MEMORY.md`, daily/session notes, and curated native files
+- `20 Entities/` people, project, organization, and place pages generated from the world model
 - `20 Nodes/active/` one note per active registry memory with provenance fields like `source_layer`, `source_path`, and `source_line`
-- `30 Views/` dashboards such as Active Memories, Relationships, Review Queue, Recent Archives, Native Sources, Promoted Memories, and Registry-only Memories
+- `30 Views/` dashboards such as Active Memories, Relationships, Review Queue, Recent Archives, Native Sources, Promoted Memories, Registry-only Memories, People, Projects, Open Loops, Contradictions, Current Beliefs, Stale Beliefs, and What Changed
+- `40 Reviews/` generated contradiction/open-loop review artifacts
+- `50 Briefings/` session and nightly briefing notes
+- `60 Reports/` deeper synthesis reports such as contradiction/open-loop summaries
 - `40 Reports/` manifest, freshness, latest nightly/native-sync summaries, and the latest vault build summary
 
-`Inbox/` and `Manual/` are reserved human-written folders inside the generated subdir and are never cleaned. The surface is intentionally read-only from Obsidian in `v0.4.0`: the runtime workspace remains the source of truth, and local sync is a one-way pull.
+`Inbox/` and `Manual/` are reserved human-written folders inside the generated subdir and are never cleaned. The surface is intentionally read-only from Obsidian in `v0.5.0`: the runtime workspace remains the source of truth, and local sync is a one-way pull.
 
 Quickstart:
 
 1. Run `npm run setup -- --workspace /path/to/workspace` or enable `vault.enabled=true` manually.
 2. Open the generated folder `<workspace>/obsidian-vault/Gigabrain` in Obsidian.
-3. Start in `00 Home/Home.md`, then inspect `10 Native/`, `20 Nodes/active/`, and `30 Views/`.
+3. Start in `00 Home/Home.md`, then inspect `10 Native/`, `20 Entities/`, `20 Nodes/active/`, `30 Views/`, and `50 Briefings/`.
 4. On a second machine, use `vault pull` and open the pulled `Gigabrain` folder in Obsidian locally.
 
 If you have almost no native notes or remembered facts yet, the initial vault will mostly contain the shell, reports, and empty views. That is expected.
@@ -326,7 +395,7 @@ Built-in junk patterns block system prompts, API keys, and benchmark artifacts f
 
 `nightly` now runs a full maintenance pipeline:
 
-`snapshot -> native_sync -> quality_sweep -> exact_dedupe -> semantic_dedupe -> audit_delta -> archive_compression -> vacuum -> metrics_report -> vault_build`
+`snapshot -> native_sync -> quality_sweep -> exact_dedupe -> semantic_dedupe -> audit_delta -> archive_compression -> vacuum -> metrics_report -> vault_build -> graph_build`
 
 Important artifacts written by the run:
 
@@ -337,11 +406,13 @@ Important artifacts written by the run:
 - `output/vault-build-YYYY-MM-DD.md`
 - `output/memory-surface-summary.json`
 
+During nightly maintenance Gigabrain also refreshes the registry FTS5 table after `VACUUM`, so active-memory lexical recall stays aligned with the current SQLite projection.
+
 See [`openclaw.plugin.json`](openclaw.plugin.json) for the complete schema with all defaults.
 
 ## First-time setup details
 
-Migration creates the database schema (`memory_events`, `memory_current`, `memory_native_chunks`, `memory_entity_mentions`) and backfills events from any existing data.
+Migration creates the core SQLite schema (`memory_events`, `memory_current`, `memory_native_chunks`, `memory_entity_mentions`, optional `memory_fts`, and world-model tables when enabled) and backfills events from any existing data.
 
 A rollback metadata file is written to `output/rollback-meta.json` in case you need to revert.
 
@@ -389,20 +460,14 @@ Gigabrain uses a hybrid memory model.
 - The Gigabrain registry is the structured recall layer built on top.
 
 ### Memory Note Protocol
+Gigabrain is native-memory-first. For users, the important behavior is:
 
-When the user explicitly asks you to remember or save something
-(e.g. "remember that", "remember this", "merk dir das", "note this down", "save this preference"):
+- `MEMORY.md` is the curated durable layer
+- `memory/YYYY-MM-DD.md` is the daily native layer
+- explicit "remember that" moments project into native memory and the structured registry
+- the user never needs to know the internal XML protocol
 
-1. Treat it as an explicit memory-save request.
-2. Emit a `<memory_note>` tag with the fact:
-   ```xml
-   <memory_note type="USER_FACT" confidence="0.9">Concrete fact here.</memory_note>
-   ```
-3. Use one tag per fact.
-4. Keep facts short, concrete, and self-contained.
-5. Choose the appropriate type (USER_FACT, PREFERENCE, DECISION, ENTITY, EPISODE, AGENT_IDENTITY, CONTEXT).
-6. Do not mention the internal `<memory_note>` protocol to the user.
-7. Gigabrain will project explicit remembers into native markdown and the structured registry when configured.
+Internally, explicit remembers still use `<memory_note>` tags for compatibility and structured capture.
 
 When the user does NOT explicitly ask to save memory:
 - Do NOT emit `<memory_note>` tags.
@@ -417,14 +482,14 @@ Before each prompt, Gigabrain:
 
 1. **Sanitizes the user query** — strips prior `<gigabrain-context>` blocks, metadata lines, bootstrap injections, and markdown noise to extract the real question
 2. **Entity coreference resolution** — detects pronoun follow-ups (e.g. "was weisst du noch über sie?") and enriches the query with the entity from prior messages in the conversation
-3. Searches the SQLite registry for memories relevant to the sanitized query
-4. Searches native markdown files (`MEMORY.md`, daily notes) for matching chunks
+3. Uses the recall orchestrator to choose between quick context, entity brief, timeline brief, relationship brief, or verification-oriented recall
+4. Searches the SQLite registry and native markdown files (`MEMORY.md`, daily notes) for the right supporting context behind that strategy
 5. **Recall hygiene** — strips persisted recall artifacts and transcript-style control lines out of native recall so old `<gigabrain-context>`, `query:`, `Source:`, or `user:` / `assistant:` lines do not feed back into future answers
 6. **Entity answer quality scoring** — for "who is" / "wer ist" queries, penalizes instruction-like memories ("Add to profile: ...") and boosts direct factual content
 7. **Deduplication** — removes duplicate memories by normalized content before ranking
 8. **Temporal safety** — older memories that say `today` / `heute` / `currently` are marked with their recorded date instead of being treated as if they refer to the current day
-9. Applies class budgets (core / situational / decisions) and token limits
-10. **Entity answer hints** — for entity queries, extracts top-3 factual answers and includes them as `entity_answer_hints` in the injection block
+9. **World-model synthesis** — where possible, prefers entity/timeline syntheses over raw snippet piles
+10. Applies class budgets (core / situational / decisions) and token limits
 11. Injects the results as a system message placed before the last user message in the conversation, without exposing internal provenance like file paths or memory ids
 
 The agent doesn't need to do anything special for recall — it happens automatically via the gateway plugin hooks.
@@ -457,6 +522,20 @@ node scripts/gigabrainctl.js inventory
 
 # Health check
 node scripts/gigabrainctl.js doctor
+
+# Rebuild world-model projections
+node scripts/gigabrainctl.js world rebuild --config ~/.openclaw/openclaw.json
+
+# Explain recall strategy selection for a query
+node scripts/gigabrainctl.js orchestrator explain --query "Who is Liz?" --config ~/.openclaw/openclaw.json
+
+# Rebuild or inspect synthesis artifacts
+node scripts/gigabrainctl.js synthesis build --config ~/.openclaw/openclaw.json
+node scripts/gigabrainctl.js synthesis list --config ~/.openclaw/openclaw.json
+
+# Inspect open loops / contradictions
+node scripts/gigabrainctl.js review open-loops --config ~/.openclaw/openclaw.json
+node scripts/gigabrainctl.js review contradictions --config ~/.openclaw/openclaw.json
 
 # Build the Obsidian memory surface
 node scripts/gigabrainctl.js vault build --config ~/.openclaw/openclaw.json
@@ -520,7 +599,7 @@ npm run test:regression
 npm run test:performance
 ```
 
-The suite includes 16 executable tests covering config validation, policy rules, capture service, person service, LLM routing, native-sync query handling, vault surface generation and pull, setup wizard behavior, audit maintenance, vault CLI, migration, bridge routes, native recall, regression behavior, and nightly performance.
+The suite includes 20 executable tests covering config validation, policy rules, capture service, memory actions, orchestrator behavior, projection store FTS behavior, person service, world-model behavior, LLM routing, native-sync query handling, vault surface generation and pull, setup wizard behavior, audit maintenance, vault CLI, migration, bridge routes, native recall, regression behavior, and nightly performance.
 
 ## Contributing
 

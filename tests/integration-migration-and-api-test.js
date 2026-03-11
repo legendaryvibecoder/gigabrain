@@ -68,6 +68,9 @@ const startServer = async (handler) => {
 };
 
 const run = async () => {
+  const pluginManifest = JSON.parse(fs.readFileSync(path.join(repoRoot, 'openclaw.plugin.json'), 'utf8'));
+  assert.equal(pluginManifest.kind, 'memory', 'plugin manifest must declare kind=memory for OpenClaw memory slot registration');
+
   const ws = makeTempWorkspace('gb-v3-int-migrate-');
   createLegacyFixtureDb(ws.dbPath);
 
@@ -143,6 +146,53 @@ const run = async () => {
       const prev = Date.parse(timelineJson.timeline[i - 1].timestamp);
       const curr = Date.parse(timelineJson.timeline[i].timestamp);
       assert.equal(prev <= curr, true, 'timeline should be ordered ascending');
+    }
+
+    const entitiesRes = await fetch(`${baseUrl}/gb/entities`, {
+      headers: { 'X-GB-Token': testToken },
+    });
+    assert.equal(entitiesRes.ok, true, 'entities endpoint should return 200');
+    const entitiesJson = await entitiesRes.json();
+    assert.equal(Array.isArray(entitiesJson.items), true);
+
+    const explainRes = await fetch(`${baseUrl}/gb/recall/explain`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-GB-Token': testToken,
+      },
+      body: JSON.stringify({
+        query: 'Who is Atlas?',
+        scope: 'profile:main',
+      }),
+    });
+    assert.equal(explainRes.ok, true, 'recall explain endpoint should return 200');
+    const explainJson = await explainRes.json();
+    assert.equal(typeof explainJson.strategy, 'string');
+    assert.equal(Object.prototype.hasOwnProperty.call(explainJson, 'deep_lookup_allowed'), true, 'explain payload should expose deep lookup gating');
+
+    const controlRes = await fetch(`${baseUrl}/gb/control/apply`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-GB-Token': testToken,
+      },
+      body: JSON.stringify({
+        action: 'protect',
+        target_memory_id: sampleId,
+      }),
+    });
+    assert.equal(controlRes.ok, true, 'control apply endpoint should return 200');
+    const controlJson = await controlRes.json();
+    assert.equal(controlJson.ok, true);
+    assert.equal(Number(controlJson?.result?.actions_protected || 0) >= 1, true, 'protect action should be applied through the HTTP route');
+
+    const verifyDb = new DatabaseSync(ws.dbPath);
+    try {
+      const protectedRow = verifyDb.prepare('SELECT tags FROM memory_current WHERE memory_id = ?').get(sampleId);
+      assert.equal(String(protectedRow?.tags || '').includes('protected'), true, 'control action should persist protected tag');
+    } finally {
+      verifyDb.close();
     }
   } finally {
     await new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve(undefined))));

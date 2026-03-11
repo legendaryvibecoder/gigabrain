@@ -191,6 +191,7 @@
     <h1>🧠 Gigabrain Memory Console</h1>
     <div class="tabs">
       <button class="tab active" data-tab="surface">Surface</button>
+      <button class="tab" data-tab="world">World Model</button>
       <button class="tab" data-tab="memories">Memories</button>
       <button class="tab" data-tab="agent-profile">Agent Profile</button>
       <button class="tab" data-tab="docs">Docs</button>
@@ -260,6 +261,79 @@
           <div class="card stack">
             <h3>Recent Archives</h3>
             <ol id="surface-archive-list" class="surface-list"></ol>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="panel-world" class="panel">
+      <div class="stack">
+        <div class="surface-grid">
+          <div class="card metric-card">
+            <h3>Entities</h3>
+            <div id="world-entities-count" class="metric-value">0</div>
+            <div class="metric-meta">people, projects, orgs, places</div>
+          </div>
+          <div class="card metric-card">
+            <h3>Beliefs</h3>
+            <div id="world-beliefs-count" class="metric-value">0</div>
+            <div class="metric-meta">current, stale, uncertain</div>
+          </div>
+          <div class="card metric-card">
+            <h3>Open Loops</h3>
+            <div id="world-open-loops-count" class="metric-value">0</div>
+            <div class="metric-meta">follow-ups and questions</div>
+          </div>
+          <div class="card metric-card">
+            <h3>Contradictions</h3>
+            <div id="world-contradictions-count" class="metric-value">0</div>
+            <div class="metric-meta">belief conflicts to review</div>
+          </div>
+        </div>
+
+        <div class="card stack">
+          <div class="controls">
+            <input id="world-kind" placeholder="Filter kind (person, project, organization, place, topic)" />
+            <button id="world-refresh" class="btn-primary">Refresh World Model</button>
+            <span id="world-generated-at" class="muted">generated: unknown</span>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card stack">
+            <h3>Entities</h3>
+            <table id="world-entity-table">
+              <thead>
+                <tr><th>Kind</th><th>Name</th><th>Confidence</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="card detail" id="world-detail">
+            <h3>Entity Detail</h3>
+            <div class="muted">Select an entity.</div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card stack">
+            <h3>Open Loops</h3>
+            <ol id="world-open-loops-list" class="surface-list"></ol>
+          </div>
+          <div class="card stack">
+            <h3>Contradictions</h3>
+            <ol id="world-contradictions-list" class="surface-list"></ol>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="card stack">
+            <h3>Recent Briefings</h3>
+            <ol id="world-briefings-list" class="surface-list"></ol>
+          </div>
+          <div class="card stack">
+            <h3>Current Beliefs Snapshot</h3>
+            <ol id="world-beliefs-list" class="surface-list"></ol>
           </div>
         </div>
       </div>
@@ -570,6 +644,8 @@ let auditLimit = 50;
 let auditRows = [];
 let selectedAuditIndex = -1;
 let auditReasonsById = new Map();
+let worldEntities = [];
+let selectedWorldEntityId = '';
 
 function escapeHtml(str) {
   if (str == null) return '';
@@ -646,9 +722,11 @@ function renderSurface(data) {
   ].join('');
 
   renderSurfaceList('surface-review-list', summary?.review_queue?.items || [], (row) => {
-    const reason = row.reason || row.reason_code || 'queue';
-    const memoryId = row.memory_id || 'unknown';
-    return `${escapeHtml(reason)} · ${escapeHtml(memoryId)}`;
+    const title = row.title || `${row.reason || row.reason_code || 'queue'} · ${row.memory_id || 'unknown'}`;
+    const command = Array.isArray(row.suggested_commands) && row.suggested_commands.length > 0
+      ? `<div class="muted">command: <code>${escapeHtml(row.suggested_commands[0])}</code></div>`
+      : '';
+    return `${escapeHtml(title)}${command}`;
   });
 
   renderSurfaceList('surface-archive-list', summary?.recent_archives?.items || [], (row) => {
@@ -661,6 +739,118 @@ async function fetchSurface() {
   const res = await fetch(api('/surface'), { headers: authHeaders() });
   const data = await res.json();
   renderSurface(data);
+}
+
+function renderWorldEntityTable(rows) {
+  const tbody = document.querySelector('#world-entity-table tbody');
+  tbody.innerHTML = '';
+  (rows || []).forEach((row) => {
+    const tr = document.createElement('tr');
+    if (String(row.entity_id || '') === String(selectedWorldEntityId || '')) tr.classList.add('selected');
+    tr.innerHTML = `<td><span class="tag">${escapeHtml(row.kind || 'entity')}</span></td><td>${escapeHtml(row.display_name || row.entity_id || '')}</td><td>${Number(row.confidence || 0).toFixed(2)}</td>`;
+    tr.onclick = () => loadWorldEntityDetail(row.entity_id);
+    tbody.appendChild(tr);
+  });
+}
+
+function renderWorldEntityDetail(entity) {
+  const detail = document.getElementById('world-detail');
+  const beliefs = Array.isArray(entity?.beliefs) ? entity.beliefs : [];
+  const episodes = Array.isArray(entity?.episodes) ? entity.episodes : [];
+  const loops = Array.isArray(entity?.open_loops) ? entity.open_loops : [];
+  const syntheses = Array.isArray(entity?.syntheses) ? entity.syntheses : [];
+  const loopLines = loops.slice(0, 6).map((loop) => {
+    const payload = loop?.payload || {};
+    const candidates = Array.isArray(payload?.candidate_beliefs)
+      ? payload.candidate_beliefs.map((item) => String(item?.content || '').trim()).filter(Boolean)
+      : Array.isArray(payload?.candidate_contents)
+        ? payload.candidate_contents
+        : [];
+    const extra = candidates.length > 0
+      ? `\n  candidates:\n${candidates.slice(0, 3).map((item) => `  - ${item}`).join('\n')}`
+      : '';
+    return `[${loop.kind}] ${loop.title}${extra}`;
+  });
+  detail.innerHTML = `
+    <h3>${escapeHtml(entity?.display_name || 'Entity')} <span class="tag">${escapeHtml(entity?.kind || 'entity')}</span></h3>
+    <p class="muted">id: ${escapeHtml(entity?.entity_id || '')}</p>
+    <p class="muted">aliases: ${escapeHtml((entity?.aliases || []).join(', ') || 'none')}</p>
+    <p class="muted">confidence: ${Number(entity?.confidence || 0).toFixed(2)}</p>
+    <h4>Current Beliefs</h4>
+    <pre>${escapeHtml(beliefs.slice(0, 8).map((belief) => `[${belief.status}] ${belief.content}`).join('\n') || 'none')}</pre>
+    <h4>Episodes</h4>
+    <pre>${escapeHtml(episodes.slice(0, 6).map((episode) => `${episode.start_date || 'undated'} · ${episode.summary || episode.title}`).join('\n') || 'none')}</pre>
+    <h4>Open Loops</h4>
+    <pre>${escapeHtml(loopLines.join('\n') || 'none')}</pre>
+    <h4>Syntheses</h4>
+    <pre>${escapeHtml(syntheses.slice(0, 4).map((row) => `${row.kind}\n${row.content}`).join('\n\n---\n\n') || 'none')}</pre>
+  `;
+}
+
+async function loadWorldEntityDetail(entityId) {
+  if (!entityId) return;
+  selectedWorldEntityId = entityId;
+  renderWorldEntityTable(worldEntities);
+  const res = await fetch(api(`/world/entities/${encodeURIComponent(entityId)}`), { headers: authHeaders() });
+  const data = await res.json();
+  renderWorldEntityDetail(data);
+}
+
+async function fetchWorldModel() {
+  const kind = document.getElementById('world-kind').value.trim();
+  const summaryRes = await fetch(api('/world/summary'), { headers: authHeaders() });
+  const summary = await summaryRes.json();
+  const entityParams = new URLSearchParams();
+  if (kind) entityParams.set('kind', kind);
+  entityParams.set('limit', '200');
+  const [entitiesRes, loopsRes, contradictionsRes, briefingsRes, beliefsRes] = await Promise.all([
+    fetch(api(`/world/entities?${entityParams.toString()}`), { headers: authHeaders() }),
+    fetch(api('/world/open-loops?limit=20'), { headers: authHeaders() }),
+    fetch(api('/world/contradictions?limit=20'), { headers: authHeaders() }),
+    fetch(api('/world/briefings?limit=10'), { headers: authHeaders() }),
+    fetch(api('/world/beliefs?status=current&limit=12'), { headers: authHeaders() }),
+  ]);
+  worldEntities = await entitiesRes.json();
+  const openLoops = await loopsRes.json();
+  const contradictions = await contradictionsRes.json();
+  const briefings = await briefingsRes.json();
+  const beliefs = await beliefsRes.json();
+
+  document.getElementById('world-entities-count').textContent = String(summary?.counts?.entities || 0);
+  document.getElementById('world-beliefs-count').textContent = String(summary?.counts?.beliefs || 0);
+  document.getElementById('world-open-loops-count').textContent = String(summary?.counts?.open_loops || 0);
+  document.getElementById('world-contradictions-count').textContent = String(summary?.counts?.contradictions || 0);
+  document.getElementById('world-generated-at').textContent = `generated: ${summary?.generated_at || 'unknown'}`;
+
+  renderWorldEntityTable(worldEntities);
+  renderSurfaceList('world-open-loops-list', openLoops || [], (row) => {
+    const payload = row?.payload || {};
+    const subtopic = payload?.subtopic ? ` <span class="muted">(${escapeHtml(payload.subtopic)})</span>` : '';
+    return `${escapeHtml(row.kind || 'loop')} · ${escapeHtml(row.title || '')}${subtopic}`;
+  });
+  renderSurfaceList('world-contradictions-list', contradictions || [], (row) => {
+    const payload = row?.payload || {};
+    const candidates = Array.isArray(payload?.candidate_beliefs)
+      ? payload.candidate_beliefs.map((item) => String(item?.content || '').trim()).filter(Boolean)
+      : Array.isArray(payload?.candidate_contents)
+        ? payload.candidate_contents
+        : [];
+    const extra = candidates.length > 0
+      ? `<div class="muted">${escapeHtml(candidates.slice(0, 2).join(' | '))}</div>`
+      : '';
+    return `${escapeHtml(row.title || '')}${extra}`;
+  });
+  renderSurfaceList('world-briefings-list', briefings || [], (row) => `${escapeHtml(row.kind || '')} <span class="muted">(${escapeHtml(row.generated_at || 'unknown')})</span>`);
+  renderSurfaceList('world-beliefs-list', beliefs || [], (row) => `${escapeHtml(row.content || '')} <span class="muted">[${escapeHtml(row.type || '')}]</span>`);
+
+  const nextEntityId = selectedWorldEntityId && worldEntities.some((row) => row.entity_id === selectedWorldEntityId)
+    ? selectedWorldEntityId
+    : (worldEntities[0]?.entity_id || '');
+  if (nextEntityId) {
+    await loadWorldEntityDetail(nextEntityId);
+  } else {
+    document.getElementById('world-detail').innerHTML = '<h3>Entity Detail</h3><div class="muted">No entities found.</div>';
+  }
 }
 
 // Memories
@@ -1317,6 +1507,7 @@ Array.from(document.querySelectorAll('.tab')).forEach(btn => {
     const tab = btn.dataset.tab;
     showPanel(tab);
     if (tab === 'surface') fetchSurface();
+    if (tab === 'world') fetchWorldModel();
     if (tab === 'memories') fetchMemories();
     if (tab === 'agent-profile') fetchProfileMemories();
     if (tab === 'docs') fetchDocs();
@@ -1328,6 +1519,7 @@ Array.from(document.querySelectorAll('.tab')).forEach(btn => {
 });
 
 document.getElementById('surface-refresh').onclick = fetchSurface;
+document.getElementById('world-refresh').onclick = fetchWorldModel;
 document.getElementById('surface-open-graph').onclick = () => {
   showPanel('graph');
   fetchGraph();
@@ -1340,6 +1532,7 @@ document.getElementById('surface-open-memories').onclick = () => {
   showPanel('memories');
   fetchMemories();
 };
+document.getElementById('world-kind').onchange = fetchWorldModel;
 document.getElementById('mem-refresh').onclick = fetchMemories;
 document.getElementById('mem-prev').onclick = () => {
   memOffset = Math.max(0, memOffset - memLimit);

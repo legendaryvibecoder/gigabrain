@@ -16,6 +16,15 @@ import fs from 'node:fs';
 import { openDatabase } from '../lib/core/sqlite.js';
 import { loadResolvedConfig } from '../lib/core/config.js';
 
+const hasTable = (db, tableName) => {
+  const row = db.prepare(`
+    SELECT name
+    FROM sqlite_master
+    WHERE type = 'table' AND name = ?
+  `).get(String(tableName || ''));
+  return Boolean(row?.name);
+};
+
 /* ── CLI flags ─────────────────────────────────────────────────── */
 const args = process.argv.slice(2);
 const readFlag = (name, fallback = '') => {
@@ -118,10 +127,12 @@ for (const row of mentionRows) {
 console.log(`[graph-build] ${entityNodes.size} entity nodes (filtered from ${entityCounts.size} total, min ${MIN_MENTIONS} mentions)`);
 
 // Explicit memory relations
-const relRows = reg.prepare(`
-  SELECT id, from_memory_id, to_memory_id, relation_type, confidence
-  FROM memory_relations
-`).all();
+const relRows = hasTable(reg, 'memory_relations')
+  ? reg.prepare(`
+    SELECT id, from_memory_id, to_memory_id, relation_type, confidence
+    FROM memory_relations
+  `).all()
+  : [];
 
 reg.close();
 

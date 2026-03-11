@@ -79,6 +79,30 @@ const run = async () => {
       'novara is jordan partner and birthday nov 6',
       'h-novara-fact',
     );
+    db.prepare(`
+      INSERT INTO memory_current (
+        memory_id, type, content, normalized, normalized_hash, source, confidence, scope, status, value_score, value_label, created_at, updated_at
+      ) VALUES (
+        ?, 'DECISION', ?, ?, ?, 'capture', 0.98, 'main', 'active', 0.99, 'core', datetime('now'), datetime('now')
+      )
+    `).run(
+      'm-feb-timeline-high',
+      'In February 2026, Jordan finalized the owl avatar rollout.',
+      'in february 2026 jordan finalized the owl avatar rollout',
+      'h-feb-timeline-high',
+    );
+    db.prepare(`
+      INSERT INTO memory_current (
+        memory_id, type, content, normalized, normalized_hash, source, confidence, scope, status, value_score, value_label, created_at, updated_at
+      ) VALUES (
+        ?, 'DECISION', ?, ?, ?, 'capture', 0.9, 'main', 'active', 0.72, 'core', datetime('now'), datetime('now')
+      )
+    `).run(
+      'm-march-timeline',
+      'In March 2026, Jordan completed the vault sync stabilization.',
+      'in march 2026 jordan completed the vault sync stabilization',
+      'h-march-timeline',
+    );
     rebuildEntityMentions(db);
 
     const jan = recallForQuery({
@@ -129,6 +153,16 @@ const run = async () => {
     const triaInjection = String(tria.injection || '');
     assert.equal(triaInjection.includes('src='), false, 'recall injection should not expose source paths');
     assert.equal(triaInjection.includes('Recorded on 2026-02-01; any relative dates in this memory refer to that date.'), true, 'stale relative memories should be marked with their recorded date');
+
+    const march = recallForQuery({
+      db,
+      config,
+      query: 'What happened in March 2026?',
+      scope: 'main',
+    });
+    assert.equal(march.results.length >= 1, true, 'month-specific temporal query should return at least one result');
+    assert.equal(String(march.results[0]?.content || '').includes('March 2026'), true, 'month-specific temporal query should prioritize matching month rows');
+    assert.equal(march.results.some((row) => String(row.content || '').includes('February 2026')), false, 'month-specific temporal query should filter out rows outside the requested month when temporal matches exist');
   } finally {
     db.close();
   }

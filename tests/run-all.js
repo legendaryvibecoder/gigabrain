@@ -5,9 +5,13 @@ import { pathToFileURL } from 'node:url';
 const TEST_FILES = [
   'unit-config-test.js',
   'unit-policy-test.js',
+  'unit-projection-store-test.js',
   'unit-capture-service-test.js',
+  'unit-memory-actions-test.js',
   'unit-native-promotion-test.js',
   'unit-person-service-test.js',
+  'unit-world-model-test.js',
+  'unit-orchestrator-test.js',
   'unit-llm-router-test.js',
   'unit-native-sync-query-test.js',
   'unit-vault-mirror-test.js',
