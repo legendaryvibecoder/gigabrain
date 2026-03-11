@@ -4,6 +4,11 @@ Gigabrain is the long-term memory layer for [OpenClaw](https://openclaw.ai) agen
 
 It is built for local-first production use: SQLite-backed recall, deterministic dedupe/audit flows, native markdown sync, and an optional FastAPI console for memory operations.
 
+Release references:
+
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md)
+- `v0.5.0` release notes: [`release-notes/v0.5.0.md`](release-notes/v0.5.0.md)
+
 ## What it does
 
 - **Capture**: Uses a hybrid memory model where explicit remember intent can write concise native markdown and structured registry memories together
@@ -88,6 +93,9 @@ git clone https://github.com/legendaryvibecoder/gigabrain.git
 ```json
 {
   "plugins": {
+    "slots": {
+      "memory": "gigabrain"
+    },
     "entries": {
       "gigabrain": {
         "path": "~/.openclaw/plugins/gigabrain",
@@ -99,6 +107,8 @@ git clone https://github.com/legendaryvibecoder/gigabrain.git
   }
 }
 ```
+
+`plugins.slots.memory = "gigabrain"` is the important part that tells OpenClaw to use Gigabrain as the active memory-slot provider.
 
 3. Restart gateway:
 
@@ -282,6 +292,17 @@ Task profiles let you keep one local model family while changing sampling per jo
 
 Indexes workspace markdown files into `memory_native_chunks` for unified recall alongside the registry.
 
+### Architecture note
+
+`v0.5` keeps the memory architecture intentionally simple:
+
+- native markdown (`MEMORY.md`, daily notes, curated files) is the human-readable source layer
+- SQLite is the operational registry, projection, and query layer
+- FTS5 is an in-database lexical accelerator for active registry recall
+- there is no separate vector database requirement for core capture, nightly maintenance, or plugin recall
+
+This means changing a local LLM or embedding model does not break the core write/recall path. Optional LLM profiles help with review and extraction quality, but native writes, SQLite indexing, and orchestrated recall still work in deterministic mode.
+
 ### Native promotion
 
 ```json
@@ -374,7 +395,7 @@ Built-in junk patterns block system prompts, API keys, and benchmark artifacts f
 
 `nightly` now runs a full maintenance pipeline:
 
-`snapshot -> native_sync -> quality_sweep -> exact_dedupe -> semantic_dedupe -> audit_delta -> archive_compression -> vacuum -> metrics_report -> vault_build`
+`snapshot -> native_sync -> quality_sweep -> exact_dedupe -> semantic_dedupe -> audit_delta -> archive_compression -> vacuum -> metrics_report -> vault_build -> graph_build`
 
 Important artifacts written by the run:
 
@@ -385,11 +406,13 @@ Important artifacts written by the run:
 - `output/vault-build-YYYY-MM-DD.md`
 - `output/memory-surface-summary.json`
 
+During nightly maintenance Gigabrain also refreshes the registry FTS5 table after `VACUUM`, so active-memory lexical recall stays aligned with the current SQLite projection.
+
 See [`openclaw.plugin.json`](openclaw.plugin.json) for the complete schema with all defaults.
 
 ## First-time setup details
 
-Migration creates the database schema (`memory_events`, `memory_current`, `memory_native_chunks`, `memory_entity_mentions`) and backfills events from any existing data.
+Migration creates the core SQLite schema (`memory_events`, `memory_current`, `memory_native_chunks`, `memory_entity_mentions`, optional `memory_fts`, and world-model tables when enabled) and backfills events from any existing data.
 
 A rollback metadata file is written to `output/rollback-meta.json` in case you need to revert.
 
@@ -576,7 +599,7 @@ npm run test:regression
 npm run test:performance
 ```
 
-The suite includes 16 executable tests covering config validation, policy rules, capture service, person service, LLM routing, native-sync query handling, vault surface generation and pull, setup wizard behavior, audit maintenance, vault CLI, migration, bridge routes, native recall, regression behavior, and nightly performance.
+The suite includes 20 executable tests covering config validation, policy rules, capture service, memory actions, orchestrator behavior, projection store FTS behavior, person service, world-model behavior, LLM routing, native-sync query handling, vault surface generation and pull, setup wizard behavior, audit maintenance, vault CLI, migration, bridge routes, native recall, regression behavior, and nightly performance.
 
 ## Contributing
 

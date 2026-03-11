@@ -20,8 +20,10 @@ All notable changes to Gigabrain are documented in this file.
 
 ### Fixed
 - Nightly maintenance now rebuilds FTS5 and runs `graph_build` after `vault_build`, keeping lexical recall and graph artifacts aligned with the latest vault state
+- Fresh-workspace nightly runs no longer fail when `memory_relations` has not been created yet; graph generation degrades cleanly to an empty graph
 - Temporal month recall now prefers source-dated memories over generic rows whose `updated_at` merely falls inside the same month
 - Person and world-model projections now suppress common metadata noise such as `archive`, `contact`, `content`, `date`, `link`, `name`, and `status`
+- Gigabrain now registers as a `memory` plugin so OpenClaw can assign it to the memory slot without persistent doctor warnings
 
 ## [0.4.3] — 2026-03-08
 
