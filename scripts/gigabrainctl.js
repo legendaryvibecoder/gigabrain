@@ -10,6 +10,17 @@ import { runAudit, runAuditRestore, runAuditReport } from '../lib/core/audit-ser
 import { ensureProjectionStore, materializeProjectionFromMemories } from '../lib/core/projection-store.js';
 import { captureSnapshotMetrics } from '../lib/core/metrics.js';
 import { buildVaultSurface, inspectVaultHealth, loadSurfaceSummary, syncVaultPull } from '../lib/core/vault-mirror.js';
+import { orchestrateRecall } from '../lib/core/orchestrator.js';
+import { captureFromEvent } from '../lib/core/capture-service.js';
+import {
+  ensureWorldModelReady,
+  getEntityDetail,
+  listContradictions,
+  listEntities,
+  listOpenLoops,
+  rebuildWorldModel,
+  listSyntheses,
+} from '../lib/core/world-model.js';
 
 const THIS_FILE = fileURLToPath(import.meta.url);
 const THIS_DIR = path.dirname(THIS_FILE);
@@ -25,6 +36,12 @@ Commands:
   audit        Run audit service (--mode shadow|apply|restore)
   inventory    Print current memory inventory metrics
   doctor       Validate config/db + print health checks
+  world        Rebuild or inspect the world-model layer
+  control      Apply structured memory actions
+  orchestrator Explain how Gigabrain would answer a recall query
+  synthesis    Inspect or rebuild synthesis artifacts
+  briefing     Print the latest generated briefing artifacts
+  review       Inspect contradictions or open loops
   vault        Build/report/doctor/pull the Obsidian memory surface
 
 Examples:
@@ -33,6 +50,9 @@ Examples:
   node scripts/gigabrainctl.js nightly --skip-harmonize
   node scripts/gigabrainctl.js audit --mode shadow --db ~/.openclaw/gigabrain/memory/registry.sqlite
   node scripts/gigabrainctl.js audit --mode restore --review-version rv-2026-02-22
+  node scripts/gigabrainctl.js world rebuild --config ~/.openclaw/openclaw.json
+  node scripts/gigabrainctl.js control apply --action replace --target-memory-id <id> --content "Liz moved to Graz" --scope nimbusmain
+  node scripts/gigabrainctl.js orchestrator explain --query "Who is Liz?" --config ~/.openclaw/openclaw.json
   node scripts/gigabrainctl.js vault build --config ~/.openclaw/openclaw.json
   node scripts/gigabrainctl.js vault pull --host memory-host --remote-path /path/to/obsidian-vault --target ~/Documents/gigabrainvault
 `;
@@ -168,13 +188,14 @@ const runNightlyHarmonize = ({
 };
 
 const commandMaintain = async () => {
-  const { config, dbPath } = loadConfigAndDbPath();
+  const { configPath, config, dbPath } = loadConfigAndDbPath();
   const dryRun = readBool('--dry-run', false);
   const reviewVersion = readFlag('--review-version', '');
   const runId = readFlag('--run-id', '');
   const result = runMaintenance({
     dbPath,
     config,
+    configPath,
     dryRun,
     reviewVersion,
     runId,
@@ -235,6 +256,96 @@ const commandAudit = async () => {
   console.log(JSON.stringify(result, null, 2));
 };
 
+const renderMemoryActionTag = ({
+  action = '',
+  type = '',
+  confidence = '',
+  scope = '',
+  target = '',
+  targetMemoryId = '',
+  content = '',
+} = {}) => {
+  const attrs = [];
+  const pushAttr = (key, value) => {
+    const text = String(value || '').trim();
+    if (!text) return;
+    const escaped = text.replace(/"/g, '&quot;');
+    attrs.push(`${key}="${escaped}"`);
+  };
+  pushAttr('action', action);
+  pushAttr('type', type);
+  pushAttr('confidence', confidence);
+  pushAttr('scope', scope);
+  pushAttr('target', target);
+  pushAttr('target_memory_id', targetMemoryId);
+  const body = String(content || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  return `<memory_action ${attrs.join(' ')}>${body}</memory_action>`;
+};
+
+const commandControl = async () => {
+  const subcommand = String(flags[0] || '').trim().toLowerCase();
+  if (!subcommand || subcommand === '--help' || subcommand === '-h') {
+    console.log(JSON.stringify({
+      ok: true,
+      usage: 'node scripts/gigabrainctl.js control apply --action <remember|update|replace|forget|protect|do_not_store> [--target-memory-id <id> | --target <text>] [--content <text>] [--scope <scope>] [--type <type>] [--confidence <n>]',
+    }, null, 2));
+    return;
+  }
+  if (subcommand !== 'apply') {
+    throw new Error(`unknown control subcommand: ${subcommand}`);
+  }
+  const actionFlags = flags.slice(1);
+  const action = String(readFlag('--action', '', actionFlags)).trim().toLowerCase();
+  const content = String(readFlag('--content', '', actionFlags)).trim();
+  const target = String(readFlag('--target', '', actionFlags)).trim();
+  const targetMemoryId = String(readFlag('--target-memory-id', '', actionFlags)).trim();
+  const scope = String(readFlag('--scope', 'shared', actionFlags)).trim() || 'shared';
+  const type = String(readFlag('--type', '', actionFlags)).trim();
+  const confidence = String(readFlag('--confidence', '', actionFlags)).trim();
+  if (!action) throw new Error('--action is required');
+
+  const { config, dbPath } = loadConfigAndDbPath();
+  const db = openDatabase(dbPath);
+  try {
+    const tag = renderMemoryActionTag({
+      action,
+      type,
+      confidence,
+      scope,
+      target,
+      targetMemoryId,
+      content,
+    });
+    const result = captureFromEvent({
+      db,
+      config,
+      event: {
+        scope,
+        agentId: scope,
+        sessionKey: `control:${scope}`,
+        text: tag,
+        output: tag,
+        prompt: '',
+        messages: [],
+      },
+      logger: console,
+      runId: `control-${new Date().toISOString().replace(/[:.]/g, '-')}`,
+      reviewVersion: '',
+    });
+    console.log(JSON.stringify({
+      ok: true,
+      action,
+      scope,
+      result,
+    }, null, 2));
+  } finally {
+    db.close();
+  }
+};
+
 const commandNightly = async () => {
   const { configPath, config, dbPath } = loadConfigAndDbPath();
   const dryRun = readBool('--dry-run', false);
@@ -243,6 +354,7 @@ const commandNightly = async () => {
   const maintain = runMaintenance({
     dbPath,
     config,
+    configPath,
     dryRun,
     reviewVersion,
     runId,
@@ -353,6 +465,149 @@ const commandDoctor = async () => {
   }, null, 2));
 };
 
+const commandWorld = async () => {
+  const action = String(flags[0] || 'rebuild').trim().toLowerCase();
+  const worldFlags = flags.slice(1);
+  const configPath = readFlag('--config', '', worldFlags);
+  const workspaceOverride = readFlag('--workspace', '', worldFlags);
+  const loaded = loadResolvedConfig({
+    configPath,
+    workspaceRoot: workspaceOverride || undefined,
+  });
+  const config = loaded.config;
+  const dbPath = path.resolve(readFlag('--db', config.runtime.paths.registryPath, worldFlags));
+  const db = openDatabase(dbPath);
+  try {
+    ensureProjectionStore(db);
+    ensureWorldModelReady({ db, config, rebuildIfEmpty: false });
+    if (action === 'rebuild') {
+      const result = rebuildWorldModel({ db, config });
+      console.log(JSON.stringify({ ok: true, action: 'world_rebuild', configPath: loaded.configPath, dbPath, result }, null, 2));
+      return;
+    }
+    if (action === 'entities') {
+      const items = listEntities(db, { kind: readFlag('--kind', '', worldFlags), limit: Number(readFlag('--limit', '200', worldFlags) || 200) });
+      console.log(JSON.stringify({ ok: true, action: 'world_entities', items, count: items.length }, null, 2));
+      return;
+    }
+    throw new Error(`Unknown world action: ${action || '(none)'}`);
+  } finally {
+    db.close();
+  }
+};
+
+const commandOrchestrator = async () => {
+  const action = String(flags[0] || 'explain').trim().toLowerCase();
+  const orchestratorFlags = flags.slice(1);
+  if (action !== 'explain') throw new Error(`Unknown orchestrator action: ${action || '(none)'}`);
+  const query = String(readFlag('--query', '', orchestratorFlags)).trim();
+  if (!query) throw new Error('orchestrator explain requires --query');
+  const configPath = readFlag('--config', '', orchestratorFlags);
+  const workspaceOverride = readFlag('--workspace', '', orchestratorFlags);
+  const loaded = loadResolvedConfig({
+    configPath,
+    workspaceRoot: workspaceOverride || undefined,
+  });
+  const config = loaded.config;
+  const dbPath = path.resolve(readFlag('--db', config.runtime.paths.registryPath, orchestratorFlags));
+  const db = openDatabase(dbPath);
+  try {
+    ensureProjectionStore(db);
+    ensureWorldModelReady({ db, config, rebuildIfEmpty: true });
+    const result = orchestrateRecall({
+      db,
+      config,
+      query,
+      scope: String(readFlag('--scope', '', orchestratorFlags)).trim(),
+    });
+    console.log(JSON.stringify({ ok: true, action: 'orchestrator_explain', result }, null, 2));
+  } finally {
+    db.close();
+  }
+};
+
+const commandSynthesis = async () => {
+  const action = String(flags[0] || 'build').trim().toLowerCase();
+  const synthesisFlags = flags.slice(1);
+  const configPath = readFlag('--config', '', synthesisFlags);
+  const workspaceOverride = readFlag('--workspace', '', synthesisFlags);
+  const loaded = loadResolvedConfig({
+    configPath,
+    workspaceRoot: workspaceOverride || undefined,
+  });
+  const config = loaded.config;
+  const dbPath = path.resolve(readFlag('--db', config.runtime.paths.registryPath, synthesisFlags));
+  const db = openDatabase(dbPath);
+  try {
+    ensureProjectionStore(db);
+    ensureWorldModelReady({ db, config, rebuildIfEmpty: true });
+    if (action === 'build') {
+      const result = rebuildWorldModel({ db, config });
+      console.log(JSON.stringify({ ok: true, action: 'synthesis_build', result }, null, 2));
+      return;
+    }
+    if (action === 'list') {
+      const items = listSyntheses(db, { kind: readFlag('--kind', '', synthesisFlags), limit: Number(readFlag('--limit', '200', synthesisFlags) || 200) });
+      console.log(JSON.stringify({ ok: true, action: 'synthesis_list', items, count: items.length }, null, 2));
+      return;
+    }
+    throw new Error(`Unknown synthesis action: ${action || '(none)'}`);
+  } finally {
+    db.close();
+  }
+};
+
+const commandBriefing = async () => {
+  const configPath = readFlag('--config', '');
+  const workspaceOverride = readFlag('--workspace', '');
+  const loaded = loadResolvedConfig({
+    configPath,
+    workspaceRoot: workspaceOverride || undefined,
+  });
+  const config = loaded.config;
+  const dbPath = path.resolve(readFlag('--db', config.runtime.paths.registryPath));
+  const db = openDatabase(dbPath);
+  try {
+    ensureProjectionStore(db);
+    ensureWorldModelReady({ db, config, rebuildIfEmpty: true });
+    const items = listSyntheses(db, { kind: 'session_brief', limit: 5 });
+    console.log(JSON.stringify({ ok: true, action: 'briefing_build', items, count: items.length }, null, 2));
+  } finally {
+    db.close();
+  }
+};
+
+const commandReview = async () => {
+  const action = String(flags[0] || '').trim().toLowerCase();
+  const reviewFlags = flags.slice(1);
+  const configPath = readFlag('--config', '', reviewFlags);
+  const workspaceOverride = readFlag('--workspace', '', reviewFlags);
+  const loaded = loadResolvedConfig({
+    configPath,
+    workspaceRoot: workspaceOverride || undefined,
+  });
+  const config = loaded.config;
+  const dbPath = path.resolve(readFlag('--db', config.runtime.paths.registryPath, reviewFlags));
+  const db = openDatabase(dbPath);
+  try {
+    ensureProjectionStore(db);
+    ensureWorldModelReady({ db, config, rebuildIfEmpty: true });
+    if (action === 'contradictions') {
+      const items = listContradictions(db, { limit: Number(readFlag('--limit', '200', reviewFlags) || 200) });
+      console.log(JSON.stringify({ ok: true, action: 'review_contradictions', items, count: items.length }, null, 2));
+      return;
+    }
+    if (action === 'open-loops') {
+      const items = listOpenLoops(db, { limit: Number(readFlag('--limit', '200', reviewFlags) || 200) });
+      console.log(JSON.stringify({ ok: true, action: 'review_open_loops', items, count: items.length }, null, 2));
+      return;
+    }
+    throw new Error(`Unknown review action: ${action || '(none)'}`);
+  } finally {
+    db.close();
+  }
+};
+
 const commandVault = async () => {
   const action = String(flags[0] || 'build').trim().toLowerCase();
   const vaultFlags = flags.slice(1);
@@ -457,6 +712,30 @@ const main = async () => {
   }
   if (command === 'doctor') {
     await commandDoctor();
+    return;
+  }
+  if (command === 'world') {
+    await commandWorld();
+    return;
+  }
+  if (command === 'control') {
+    await commandControl();
+    return;
+  }
+  if (command === 'orchestrator') {
+    await commandOrchestrator();
+    return;
+  }
+  if (command === 'synthesis') {
+    await commandSynthesis();
+    return;
+  }
+  if (command === 'briefing') {
+    await commandBriefing();
+    return;
+  }
+  if (command === 'review') {
+    await commandReview();
     return;
   }
   if (command === 'vault') {

@@ -1,0 +1,125 @@
+import assert from 'node:assert/strict';
+
+import { rebuildEntityMentions } from '../lib/core/person-service.js';
+import { ensureNativeStore } from '../lib/core/native-sync.js';
+import { classifyQueryIntent, orchestrateRecall } from '../lib/core/orchestrator.js';
+import { normalizeConfig } from '../lib/core/config.js';
+import { makeConfigObject, makeTempWorkspace, openDb, seedMemoryCurrent } from './helpers.js';
+
+const run = async () => {
+  const ws = makeTempWorkspace('gb-v5-orchestrator-');
+  const config = normalizeConfig(makeConfigObject(ws.workspace).plugins.entries.gigabrain.config);
+  const db = openDb(ws.dbPath);
+  try {
+    seedMemoryCurrent(db, [
+      {
+        memory_id: 'm-1',
+        type: 'USER_FACT',
+        content: 'Liz is Chris partner and works as a life coach in Vienna.',
+        scope: 'nimbusmain',
+        confidence: 0.92,
+        value_score: 0.91,
+      },
+      {
+        memory_id: 'm-1b',
+        type: 'USER_FACT',
+        content: 'Liz prefers structured Memory-Notes.',
+        scope: 'nimbusmain',
+        confidence: 0.95,
+        value_score: 0.84,
+      },
+      {
+        memory_id: 'm-2',
+        type: 'EPISODE',
+        content: 'The Tria interview happened on January 29 2026 and went well afterwards.',
+        scope: 'shared',
+        confidence: 0.81,
+        value_score: 0.79,
+        content_time: '2026-01-29',
+      },
+      {
+        memory_id: 'm-3',
+        type: 'USER_FACT',
+        content: 'Tria is a neobank and Chris is an investor there.',
+        scope: 'shared',
+        confidence: 0.78,
+        value_score: 0.77,
+      },
+      {
+        memory_id: 'm-4',
+        type: 'USER_FACT',
+        content: 'Chris started his weight loss journey at 90kg and wants to reach 80kg.',
+        scope: 'shared',
+        confidence: 0.95,
+        value_score: 0.99,
+      },
+      {
+        memory_id: 'm-5',
+        type: 'EPISODE',
+        content: 'Calorie tracker research found Austrian terminology like Topfen and Semmel in the nutrition database.',
+        scope: 'shared',
+        confidence: 0.88,
+        value_score: 0.84,
+        content_time: '2026-02-17',
+      },
+    ]);
+    ensureNativeStore(db);
+    rebuildEntityMentions(db);
+
+    assert.equal(classifyQueryIntent('Who is Liz?').strategy, 'entity_brief');
+    assert.equal(classifyQueryIntent('When did the Tria interview happen?').strategy, 'timeline_brief');
+    assert.equal(classifyQueryIntent('Where is that written exactly?').strategy, 'verification_lookup');
+
+    const entityRecall = orchestrateRecall({
+      db,
+      config,
+      query: 'Who is Liz?',
+      scope: 'nimbusmain',
+    });
+    assert.equal(entityRecall.strategy, 'entity_brief');
+    assert.equal(entityRecall.profile, 'identity_profile');
+    assert.equal(entityRecall.usedWorldModel, true, 'entity query should prefer world-model brief');
+    assert.equal(entityRecall.deepLookupAllowed, false, 'normal entity queries should not automatically allow deep lookup');
+    assert.equal(entityRecall.deepLookupReason, 'none', 'normal entity queries should stay in Gigabrain-first mode');
+    assert.equal(entityRecall.selectedEntityId, 'person:liz');
+    assert.equal(entityRecall.rankingMode, 'entity_brief:entity_locked');
+    assert.equal(entityRecall.injection.includes('world_model_brief:'), true, 'injection should contain a synthesized brief');
+    assert.equal(entityRecall.injection.includes('Source:'), false, 'injection must not leak visible provenance');
+    assert.equal(entityRecall.results.every((row) => !String(row.content || '').includes('weight loss journey')), true, 'entity-locked recall should suppress unrelated high-value rows');
+    assert.equal(String(entityRecall.results[0]?.content || '').toLowerCase().includes('memory-notes'), false, 'entity recall should not rank weak memory-note meta above direct relationship/profile facts');
+
+    const timelineRecall = orchestrateRecall({
+      db,
+      config,
+      query: 'What happened with Tria in January 2026?',
+      scope: 'shared',
+    });
+    assert.equal(timelineRecall.strategy, 'timeline_brief');
+    assert.equal(timelineRecall.profile, 'project_profile');
+    assert.equal(timelineRecall.deepLookupAllowed, false, 'timeline brief should not enable deep lookup unless exact verification is requested');
+    assert.equal(timelineRecall.entityIds[0], 'organization:tria', 'timeline brief should prefer the real subject entity over temporal topic aliases');
+    assert.equal(timelineRecall.rankingMode, 'timeline_brief:entity_locked');
+    assert.equal(timelineRecall.injection.includes('timeline_items:'), true, 'timeline brief should include timeline items');
+    assert.equal(Boolean(timelineRecall.temporalWindow), true, 'timeline brief should carry a temporal window');
+    assert.equal(String(timelineRecall.results[0]?.content || '').toLowerCase().includes('tria'), true, 'timeline recall should keep the selected entity at the top of supporting rows');
+    assert.equal(String(timelineRecall.results[0]?.content || '').toLowerCase().includes('weight loss'), false, 'timeline recall should not promote unrelated high-value rows');
+    assert.equal(timelineRecall.results.every((row) => !String(row.content || '').toLowerCase().includes('austrian terminology')), true, 'timeline recall should not treat substring matches like tria/austrian as entity-linked evidence');
+
+    const verifyRecall = orchestrateRecall({
+      db,
+      config,
+      query: 'Where is that written for Tria exactly?',
+      scope: 'shared',
+    });
+    assert.equal(verifyRecall.strategy, 'verification_lookup');
+    assert.equal(verifyRecall.profile, 'verification_profile');
+    assert.equal(verifyRecall.deepLookupAllowed, true, 'exact/source request should allow deep lookup');
+    assert.equal(verifyRecall.deepLookupReason, 'source_request', 'source request should surface a single normalized deep lookup reason');
+    assert.equal(Array.isArray(verifyRecall.explain.result_breakdown), true, 'explain output should expose ranked result breakdown');
+    assert.equal(verifyRecall.results.every((row) => String(row.content || '').toLowerCase().includes('tria')), true, 'verification recall should stay scoped to the selected entity when one is available');
+  } finally {
+    db.close();
+  }
+};
+
+export { run };

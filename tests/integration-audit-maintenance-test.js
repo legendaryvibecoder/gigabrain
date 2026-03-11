@@ -24,6 +24,7 @@ const run = async () => {
       { type: 'AGENT_IDENTITY', content: 'I am Atlas and I evolve over time', scope: 'profile:main', confidence: 0.74 },
       { type: 'CONTEXT', content: '<working_memory>tmp wrapper</working_memory>', scope: 'shared', confidence: 0.6 },
       { type: 'CONTEXT', content: 'run script deploy.sh every night', scope: 'shared', confidence: 0.45 },
+      { memory_id: 'protected-ops', type: 'CONTEXT', content: 'run script deploy.sh every night', scope: 'shared', confidence: 0.41, tags: ['protected'] },
       { type: 'DECISION', content: 'Use markdown headings for weekly release notes', scope: 'shared', confidence: 0.63 },
     ]);
   } finally {
@@ -52,6 +53,13 @@ const run = async () => {
   assertFileExists(path.join(config.vault.path, config.vault.subdir, 'vault-index.md'), 'vault index');
   assertFileExists(path.join(config.vault.path, config.vault.subdir, '00 Home', 'Home.md'), 'vault home note');
   assertFileExists(path.join(config.vault.path, config.vault.subdir, '40 Reports', 'vault-manifest.json'), 'vault manifest');
+  const protectedCheckDb = openDb(ws.dbPath);
+  try {
+    const protectedRow = protectedCheckDb.prepare('SELECT status FROM memory_current WHERE memory_id = ?').get('protected-ops');
+    assert.equal(protectedRow?.status, 'active', 'protected memories should survive maintenance');
+  } finally {
+    protectedCheckDb.close();
+  }
 
   const maintainDryRun = runMaintenance({
     dbPath: ws.dbPath,

@@ -75,6 +75,42 @@ const run = async () => {
         source_path: path.join(ws.workspace, 'MEMORY.md'),
         source_line: 2,
       },
+      {
+        memory_id: 'm-4',
+        type: 'CONTEXT',
+        content: '2026-03-06 heartbeat: New unread emails in atlas@agentmail.to and Jordan should book a call.',
+        scope: 'nimbusmain',
+        confidence: 0.88,
+        value_score: 0.4,
+        value_label: 'archive_candidate',
+      },
+      {
+        memory_id: 'm-5',
+        type: 'USER_FACT',
+        content: 'Atlas TTS default engine: Pocket TTS voice preset azelma.',
+        scope: 'nimbusmain',
+        confidence: 0.91,
+        value_score: 0.76,
+        value_label: 'keep',
+      },
+      {
+        memory_id: 'm-6',
+        type: 'USER_FACT',
+        content: 'Jordan — Telegram: 779443319 (@legendary_gainz)',
+        scope: 'shared',
+        confidence: 0.9,
+        value_score: 0.74,
+        value_label: 'keep',
+      },
+      {
+        memory_id: 'm-7',
+        type: 'ENTITY',
+        content: 'Atlas — relationship: Jordan treats Atlas as a teammate, not a tool.',
+        scope: 'shared',
+        confidence: 0.94,
+        value_score: 0.89,
+        value_label: 'core',
+      },
     ]);
     ensureNativeStore(db);
     ensurePersonStore(db);
@@ -106,6 +142,7 @@ const run = async () => {
     `);
     mentionInsert.run('m-1|atlas', 'm-1', 'atlas', 'Atlas', 'relationship', 0.95, 'memory_current');
     mentionInsert.run('m-2|atlas', 'm-2', 'atlas', 'Atlas', 'relationship', 0.9, 'memory_current');
+    mentionInsert.run('m-7|atlas', 'm-7', 'atlas', 'Atlas', 'relationship', 0.98, 'memory_current');
 
     const summary = buildVaultSurface({
       db,
@@ -121,10 +158,16 @@ const run = async () => {
     assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '10 Native', 'MEMORY.md')), true, 'MEMORY.md should be mirrored into 10 Native');
     assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '10 Native', 'memory', '2026-03-06-session-start.md')), true, 'daily note should be mirrored into 10 Native');
     assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '20 Nodes', 'active', 'PREFERENCE', 'm-1.md')), true, 'node note should exist');
-    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Relationships.md')), true, 'relationships view should exist');
-    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Promoted Memories.md')), true, 'promoted memories view should exist');
-    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Registry-only Memories.md')), true, 'registry-only memories view should exist');
+    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '20 Entities', 'people')), true, 'entity folders should exist');
+    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Current State.md')), true, 'current state view should exist');
+    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Important People.md')), true, 'important people view should exist');
+    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Important Projects.md')), true, 'important projects view should exist');
+    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Native Notes.md')), true, 'native notes view should exist');
+    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Open Loops.md')), false, 'open loops review should not be surfaced in curated mode');
+    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Promoted Memories.md')), false, 'promoted memories should not be a default curated view');
+    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Registry-only Memories.md')), false, 'registry-only memories should not be a default curated view');
     assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '40 Reports', 'vault-manifest.json')), true, 'manifest should exist');
+    assert.equal(fs.existsSync(path.join(config.vault.path, config.vault.subdir, '50 Briefings', 'Session Brief.md')), true, 'session brief should exist');
     assert.equal(fs.existsSync(path.join(ws.outputRoot, 'memory-surface-summary.json')), true, 'shared surface summary should exist in output');
     assert.equal(fs.existsSync(stalePath), false, 'stale generated file should be removed');
     assert.equal(fs.existsSync(legacyMemoryPath), false, 'legacy flat mirror paths should be removed');
@@ -140,8 +183,22 @@ const run = async () => {
     assert.match(nodeContent, /source_layer: native/, 'node frontmatter should include source layer');
     assert.match(nodeContent, /\[\[10 Native\/MEMORY(?:\|[^\]]+)?\]\]/, 'node should link to native source');
 
-    const promotedView = fs.readFileSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Promoted Memories.md'), 'utf8');
-    assert.match(promotedView, /Jordan prefers pour-over coffee\./, 'promoted memories view should list promoted-native nodes');
+    const currentStateView = fs.readFileSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Current State.md'), 'utf8');
+    assert.match(currentStateView, /Current State/, 'current state view should render');
+    assert.match(currentStateView, /Jordan treats Atlas as a teammate, not a tool\./, 'current state should include high-confidence state');
+    assert.doesNotMatch(currentStateView, /Telegram:\s*779443319|@legendary_gainz/i, 'current state should exclude contact-style Telegram facts');
+
+    const peopleView = fs.readFileSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Important People.md'), 'utf8');
+    assert.doesNotMatch(peopleView, /\[\[20 Entities\/people\/person_jordan\|jordan\]\]/i, 'important people should not list people without a strong direct summary');
+    assert.doesNotMatch(peopleView, /\[\[20 Entities\/people\/person_chris\|chris\]\]/i, 'important people should not reuse another person relationship line as the summary for chris');
+    assert.doesNotMatch(peopleView, /agentmail|unread emails|book a call/i, 'important people view should not surface operational heartbeat snippets');
+    assert.doesNotMatch(peopleView, /default engine|voice preset/i, 'important people view should not use tooling defaults as the human summary');
+
+    const projectsView = fs.readFileSync(path.join(config.vault.path, config.vault.subdir, '30 Views', 'Important Projects.md'), 'utf8');
+    assert.doesNotMatch(projectsView, /telegram \(project\)/i, 'important projects should not list blank or contact-only project placeholders');
+
+    const sessionBrief = fs.readFileSync(path.join(config.vault.path, config.vault.subdir, '50 Briefings', 'Session Brief.md'), 'utf8');
+    assert.doesNotMatch(sessionBrief, /default engine|voice preset|agentmail|book a call/i, 'session brief should stay free of tooling and ops noise');
 
     const health = inspectVaultHealth({ config, db });
     assert.equal(health.enabled, true, 'vault doctor should report enabled');
