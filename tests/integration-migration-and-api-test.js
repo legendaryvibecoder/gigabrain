@@ -68,6 +68,9 @@ const startServer = async (handler) => {
 };
 
 const run = async () => {
+  const pluginManifest = JSON.parse(fs.readFileSync(path.join(repoRoot, 'openclaw.plugin.json'), 'utf8'));
+  assert.equal(pluginManifest.kind, 'memory', 'plugin manifest must declare kind=memory for OpenClaw memory slot registration');
+
   const ws = makeTempWorkspace('gb-v3-int-migrate-');
   createLegacyFixtureDb(ws.dbPath);
 

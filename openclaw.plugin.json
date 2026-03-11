@@ -1,6 +1,6 @@
 {
   "id": "gigabrain",
-  "kind": "utility",
+  "kind": "memory",
   "configSchema": {
     "type": "object",
     "additionalProperties": false,

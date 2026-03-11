@@ -278,7 +278,7 @@ const gigabrainPlugin = {
   id: 'gigabrain',
   name: 'Gigabrain',
   description: 'Gigabrain v3 lean memory engine (event timeline + current projection)',
-  kind: 'utility' as const,
+  kind: 'memory' as const,
   configSchema: V3_CONFIG_SCHEMA,
 
   register(api: PluginApi) {
