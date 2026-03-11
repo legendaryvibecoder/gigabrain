@@ -4,7 +4,7 @@ import path from 'node:path';
 import { normalizeConfig } from '../lib/core/config.js';
 import { runMaintenance } from '../lib/core/maintenance-service.js';
 import { runAudit, runAuditRestore } from '../lib/core/audit-service.js';
-import { openDb, makeConfigObject, makeTempWorkspace, seedMemoryCurrent, getStatusCounts, assertFileExists } from './helpers.js';
+import { openDb, makeConfigObject, makeTempWorkspace, seedMemoryCurrent, getStatusCounts, assertFileExists, writeConfigFile } from './helpers.js';
 
 const run = async () => {
   const ws = makeTempWorkspace('gb-v3-int-maintain-');
@@ -15,6 +15,7 @@ const run = async () => {
     subdir: 'Gigabrain',
     clean: true,
   };
+  writeConfigFile(ws.configPath, openclaw);
   const config = normalizeConfig(openclaw.plugins.entries.gigabrain.config);
 
   const db = openDb(ws.dbPath);
@@ -37,6 +38,7 @@ const run = async () => {
     dryRun: false,
     reviewVersion: 'rv-maintain-int',
     runId: 'run-maintain-int',
+    configPath: ws.configPath,
   });
   assert.equal(maintain.ok, true);
   assertFileExists(config.maintenance.eventsPath, 'maintenance events');
@@ -50,6 +52,7 @@ const run = async () => {
   assertFileExists(maintain.artifacts.executionArtifactPath, 'nightly execution artifact');
   assertFileExists(maintain.artifacts.vaultBuildReportPath, 'vault build report');
   assertFileExists(maintain.artifacts.surfaceSummaryPath, 'surface summary');
+  assertFileExists(path.join(ws.memoryRoot, 'graph.db'), 'graph db');
   assertFileExists(path.join(config.vault.path, config.vault.subdir, 'vault-index.md'), 'vault index');
   assertFileExists(path.join(config.vault.path, config.vault.subdir, '00 Home', 'Home.md'), 'vault home note');
   assertFileExists(path.join(config.vault.path, config.vault.subdir, '40 Reports', 'vault-manifest.json'), 'vault manifest');
