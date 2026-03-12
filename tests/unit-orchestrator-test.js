@@ -62,6 +62,31 @@ const run = async () => {
         value_score: 0.84,
         content_time: '2026-02-17',
       },
+      {
+        memory_id: 'm-6',
+        type: 'AGENT_IDENTITY',
+        content: 'Atlas is the coding agent for this workspace.',
+        scope: 'nimbusmain',
+        confidence: 0.94,
+        value_score: 0.84,
+      },
+      {
+        memory_id: 'm-7',
+        type: 'PREFERENCE',
+        content: 'Jordan prefers winter and associates it with calm focus.',
+        scope: 'nimbusmain',
+        confidence: 0.91,
+        value_score: 0.8,
+      },
+      {
+        memory_id: 'm-8',
+        type: 'DECISION',
+        content: 'In March 2026, Jordan completed the vault sync stabilization.',
+        scope: 'nimbusmain',
+        confidence: 0.9,
+        value_score: 0.72,
+        content_time: '2026-03-14',
+      },
     ]);
     ensureNativeStore(db);
     rebuildEntityMentions(db);
@@ -88,6 +113,26 @@ const run = async () => {
     assert.equal(entityRecall.results.every((row) => !String(row.content || '').includes('weight loss journey')), true, 'entity-locked recall should suppress unrelated high-value rows');
     assert.equal(String(entityRecall.results[0]?.content || '').toLowerCase().includes('memory-notes'), false, 'entity recall should not rank weak memory-note meta above direct relationship/profile facts');
 
+    const selfRecall = orchestrateRecall({
+      db,
+      config,
+      query: 'what do you know about yourself atlas',
+      scope: 'nimbusmain',
+    });
+    assert.equal(selfRecall.strategy, 'entity_brief', 'self-identity prompts should keep entity-brief routing even without a locked world-model entity');
+    assert.equal(selfRecall.usedWorldModel, false, 'self-identity fallback should still work without a synthesized world-model brief');
+    assert.equal(String(selfRecall.results[0]?.type || ''), 'AGENT_IDENTITY', 'self-identity prompts should prioritize AGENT_IDENTITY rows');
+    assert.equal(String(selfRecall.results[0]?.content || '').toLowerCase().includes('atlas is the coding agent'), true, 'self-identity prompts should surface the agent identity row');
+
+    const preferenceRecall = orchestrateRecall({
+      db,
+      config,
+      query: 'welche jahreszeit magst du',
+      scope: 'nimbusmain',
+    });
+    assert.equal(String(preferenceRecall.results[0]?.type || ''), 'PREFERENCE', 'short preference prompts should prioritize preference memories');
+    assert.equal(String(preferenceRecall.results[0]?.content || '').toLowerCase().includes('winter'), true, 'short preference prompts should recover the season preference row');
+
     const timelineRecall = orchestrateRecall({
       db,
       config,
@@ -104,6 +149,25 @@ const run = async () => {
     assert.equal(String(timelineRecall.results[0]?.content || '').toLowerCase().includes('tria'), true, 'timeline recall should keep the selected entity at the top of supporting rows');
     assert.equal(String(timelineRecall.results[0]?.content || '').toLowerCase().includes('weight loss'), false, 'timeline recall should not promote unrelated high-value rows');
     assert.equal(timelineRecall.results.every((row) => !String(row.content || '').toLowerCase().includes('austrian terminology')), true, 'timeline recall should not treat substring matches like tria/austrian as entity-linked evidence');
+
+    const monthOnlyTimelineRecall = orchestrateRecall({
+      db,
+      config,
+      query: 'What happened in March 2026?',
+      scope: 'nimbusmain',
+    });
+    assert.equal(monthOnlyTimelineRecall.strategy, 'timeline_brief', 'month-only prompts should keep timeline-brief routing even without a locked entity');
+    assert.equal(Boolean(monthOnlyTimelineRecall.temporalWindow), true, 'month-only prompts should preserve temporal windows');
+    assert.equal(String(monthOnlyTimelineRecall.results[0]?.content || '').toLowerCase().includes('march 2026'), true, 'month-only prompts should prioritize rows in the requested month');
+
+    const noisyEntityRecall = orchestrateRecall({
+      db,
+      config,
+      query: 'Conversation info (untrusted metadata):\n```json\n{"message_id":"480","sender":"PRINT"}\n```\n\nwho is Liz?',
+      scope: 'nimbusmain',
+    });
+    assert.equal(noisyEntityRecall.strategy, 'entity_brief', 'sanitized entity prompts should keep entity-brief routing after metadata stripping');
+    assert.equal(String(noisyEntityRecall.results[0]?.content || '').toLowerCase().includes('liz is chris partner'), true, 'sanitized entity prompts should still surface the right entity row');
 
     const verifyRecall = orchestrateRecall({
       db,

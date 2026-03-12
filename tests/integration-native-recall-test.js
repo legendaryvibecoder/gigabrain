@@ -127,6 +127,30 @@ const run = async () => {
       'in march 2026 jordan completed the vault sync stabilization',
       'h-march-timeline',
     );
+    db.prepare(`
+      INSERT INTO memory_current (
+        memory_id, type, content, normalized, normalized_hash, source, confidence, scope, status, value_score, value_label, created_at, updated_at
+      ) VALUES (
+        ?, 'AGENT_IDENTITY', ?, ?, ?, 'capture', 0.94, 'main', 'active', 0.84, 'core', datetime('now'), datetime('now')
+      )
+    `).run(
+      'm-atlas-identity',
+      'Atlas is the coding agent for this workspace.',
+      'atlas is the coding agent for this workspace',
+      'h-atlas-identity',
+    );
+    db.prepare(`
+      INSERT INTO memory_current (
+        memory_id, type, content, normalized, normalized_hash, source, confidence, scope, status, value_score, value_label, created_at, updated_at
+      ) VALUES (
+        ?, 'PREFERENCE', ?, ?, ?, 'capture', 0.91, 'main', 'active', 0.8, 'core', datetime('now'), datetime('now')
+      )
+    `).run(
+      'm-season-pref',
+      'Jordan prefers winter and associates it with calm focus.',
+      'jordan prefers winter and associates it with calm focus',
+      'h-season-pref',
+    );
     rebuildEntityMentions(db);
 
     const jan = recallForQuery({
@@ -199,6 +223,26 @@ const run = async () => {
     });
     assert.equal(String(noisyQuery.query || ''), 'who is novara?', 'query sanitation should strip exec and metadata wrappers before recall');
     assert.equal(String(noisyQuery.results[0]?.content || '').toLowerCase().includes('novara is jordan partner'), true, 'sanitized query should still resolve the intended entity');
+
+    const selfIdentity = recallForQuery({
+      db,
+      config,
+      query: 'what do you know about yourself atlas',
+      scope: 'main',
+    });
+    assert.equal(selfIdentity.results.length >= 1, true, 'self-identity recall should return at least one result');
+    assert.equal(String(selfIdentity.results[0]?.type || ''), 'AGENT_IDENTITY', 'self-identity recall should prioritize AGENT_IDENTITY rows');
+    assert.equal(String(selfIdentity.results[0]?.content || '').toLowerCase().includes('atlas is the coding agent'), true, 'self-identity recall should surface the direct identity fact');
+
+    const shortPreference = recallForQuery({
+      db,
+      config,
+      query: 'welche jahreszeit magst du',
+      scope: 'main',
+    });
+    assert.equal(shortPreference.results.length >= 1, true, 'short preference recall should return at least one result');
+    assert.equal(String(shortPreference.results[0]?.type || ''), 'PREFERENCE', 'short preference recall should prioritize preference rows');
+    assert.equal(String(shortPreference.results[0]?.content || '').toLowerCase().includes('winter'), true, 'short preference recall should surface the season preference');
 
     const tria = recallForQuery({
       db,
