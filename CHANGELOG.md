@@ -2,6 +2,15 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.5.2] — 2026-03-13
+
+### Fixed
+- Plugin startup no longer fails fast on transient SQLite contention: the OpenClaw entrypoint now uses the shared SQLite opener with `busy_timeout`, preventing intermittent `database is locked` failures during register/startup
+- `gigabrainctl nightly` now protects itself with an output-scoped lock, clears stale dead-owner locks, skips cleanly when another nightly run is already active, and verifies its execution artifact plus usage log before reporting success
+
+### Added
+- Integration coverage for the nightly CLI success, active-lock skip, and stale-lock recovery paths
+
 ## [0.5.1] — 2026-03-13
 
 ### Added

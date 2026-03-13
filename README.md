@@ -7,6 +7,7 @@ It is built for local-first production use: SQLite-backed recall, deterministic 
 Release references:
 
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)
+- `v0.5.2` release notes: [`release-notes/v0.5.2.md`](release-notes/v0.5.2.md)
 - `v0.5.1` release notes: [`release-notes/v0.5.1.md`](release-notes/v0.5.1.md)
 
 ## What it does
@@ -494,6 +495,8 @@ Important artifacts written by the run:
 - `output/vault-build-YYYY-MM-DD.md`
 - `output/memory-surface-summary.json`
 
+The `nightly` CLI now protects itself with an output-scoped lock, clears stale dead-owner locks, and verifies the execution artifact plus usage log before returning success. If another nightly run is already active, it returns a clean JSON skip instead of overlapping maintenance work.
+
 During nightly maintenance Gigabrain also refreshes the registry FTS5 table after `VACUUM`, so active-memory lexical recall stays aligned with the current SQLite projection.
 
 See [`openclaw.plugin.json`](openclaw.plugin.json) for the complete schema with all defaults.
@@ -693,7 +696,7 @@ npm run test:regression
 npm run test:performance
 ```
 
-The suite includes 20 executable tests covering config validation, policy rules, capture service, memory actions, orchestrator behavior, projection store FTS behavior, person service, world-model behavior, LLM routing, native-sync query handling, vault surface generation and pull, setup wizard behavior, audit maintenance, vault CLI, migration, bridge routes, native recall, regression behavior, and nightly performance.
+The suite includes 25 executable tests covering config validation, policy rules, capture service, memory actions, orchestrator behavior, projection store FTS behavior, person service, world-model behavior, LLM routing, native-sync query handling, vault surface generation and pull, setup wizard behavior, audit maintenance, vault CLI, migration, bridge routes, native recall, regression behavior, and nightly performance.
 
 ## Contributing
 

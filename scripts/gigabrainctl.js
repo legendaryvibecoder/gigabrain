@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +26,7 @@ import {
 
 const THIS_FILE = fileURLToPath(import.meta.url);
 const THIS_DIR = path.dirname(THIS_FILE);
+const NIGHTLY_LOCK_STALE_MS = 6 * 60 * 60 * 1000;
 
 const HELP = `Gigabrain v3 Control CLI
 
@@ -114,6 +117,186 @@ const loadConfigAndDbPath = () => {
   };
 };
 
+const ensureDir = (dirPath) => {
+  fs.mkdirSync(dirPath, { recursive: true });
+};
+
+const removeDirIfExists = (dirPath) => {
+  if (!dirPath) return;
+  fs.rmSync(dirPath, { recursive: true, force: true });
+};
+
+const isPidAlive = (pid) => {
+  const numericPid = Number(pid);
+  if (!Number.isInteger(numericPid) || numericPid <= 0) return false;
+  try {
+    process.kill(numericPid, 0);
+    return true;
+  } catch (err) {
+    return err?.code === 'EPERM';
+  }
+};
+
+const readJsonIfExists = (filePath) => {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+};
+
+const getNightlyLockPaths = (config) => {
+  const workspaceRoot = String(config?.runtime?.paths?.workspaceRoot || process.cwd());
+  const outputDir = String(config?.runtime?.paths?.outputDir || path.join(workspaceRoot, 'output'));
+  return {
+    outputDir,
+    lockDir: path.join(outputDir, 'gigabrain-nightly.lock.d'),
+    metadataPath: path.join(outputDir, 'gigabrain-nightly.lock.d', 'lock.json'),
+  };
+};
+
+const acquireNightlyLock = ({ config, configPath = '', runId = '' } = {}) => {
+  const { outputDir, lockDir, metadataPath } = getNightlyLockPaths(config);
+  ensureDir(outputDir);
+  const metadata = {
+    pid: process.pid,
+    hostname: os.hostname(),
+    startedAt: new Date().toISOString(),
+    runId: String(runId || ''),
+    configPath: String(configPath || ''),
+  };
+
+  const writeMetadata = () => {
+    fs.writeFileSync(metadataPath, `${JSON.stringify(metadata, null, 2)}
+`, 'utf8');
+  };
+
+  const inspectExistingLock = () => {
+    const existing = readJsonIfExists(metadataPath);
+    if (existing && isPidAlive(existing.pid)) {
+      return {
+        active: true,
+        existing,
+        reason: 'pid_alive',
+      };
+    }
+    const lockAgeMs = (() => {
+      try {
+        return Math.max(0, Date.now() - fs.statSync(lockDir).mtimeMs);
+      } catch {
+        return NIGHTLY_LOCK_STALE_MS;
+      }
+    })();
+    const startedAtMs = Date.parse(String(existing?.startedAt || ''));
+    const staleByAge = lockAgeMs >= NIGHTLY_LOCK_STALE_MS;
+    const staleByStartedAt = Number.isFinite(startedAtMs) && (Date.now() - startedAtMs) >= NIGHTLY_LOCK_STALE_MS;
+    if (existing && !isPidAlive(existing.pid)) {
+      return {
+        active: false,
+        existing,
+        reason: 'pid_missing',
+      };
+    }
+    if (!existing && staleByAge) {
+      return {
+        active: false,
+        existing: null,
+        reason: 'metadata_missing_timeout',
+      };
+    }
+    if (existing && staleByStartedAt) {
+      return {
+        active: false,
+        existing,
+        reason: 'started_at_timeout',
+      };
+    }
+    return {
+      active: true,
+      existing,
+      reason: existing ? 'unknown_owner' : 'metadata_missing_recent',
+    };
+  };
+
+  const attemptAcquire = () => {
+    fs.mkdirSync(lockDir);
+    writeMetadata();
+    return {
+      acquired: true,
+      skipped: false,
+      clearedStale: false,
+      staleReason: '',
+      lockDir,
+      metadataPath,
+      metadata,
+    };
+  };
+
+  try {
+    return attemptAcquire();
+  } catch (err) {
+    if (err?.code !== 'EEXIST') throw err;
+    const inspection = inspectExistingLock();
+    if (inspection.active) {
+      return {
+        acquired: false,
+        skipped: true,
+        clearedStale: false,
+        staleReason: '',
+        reason: 'nightly_already_running',
+        lockDir,
+        metadataPath,
+        existing: inspection.existing,
+        detail: inspection.reason,
+      };
+    }
+    removeDirIfExists(lockDir);
+    const acquired = attemptAcquire();
+    return {
+      ...acquired,
+      clearedStale: true,
+      staleReason: inspection.reason,
+      previous: inspection.existing,
+    };
+  }
+};
+
+const releaseNightlyLock = (lockState) => {
+  removeDirIfExists(lockState?.lockDir || '');
+};
+
+const verifyNightlyOutputs = ({ maintain, dryRun = false } = {}) => {
+  const artifactPath = String(maintain?.artifacts?.executionArtifactPath || '');
+  if (!artifactPath || !fs.existsSync(artifactPath)) {
+    throw new Error(`Nightly execution artifact missing: ${artifactPath || '(empty path)'}`);
+  }
+  const artifact = readJsonIfExists(artifactPath);
+  if (!artifact || typeof artifact !== 'object') {
+    throw new Error(`Nightly execution artifact is not valid JSON: ${artifactPath}`);
+  }
+  if (String(artifact.run_id || '') !== String(maintain?.runId || '')) {
+    throw new Error(`Nightly execution artifact run_id mismatch: expected ${maintain?.runId || '(empty)'}, got ${String(artifact.run_id || '(empty)')}`);
+  }
+  if (Boolean(artifact.dry_run) !== Boolean(dryRun)) {
+    throw new Error(`Nightly execution artifact dry_run mismatch for ${artifactPath}`);
+  }
+  const usageLogPath = String(maintain?.artifacts?.usageLogPath || '');
+  if (!usageLogPath || !fs.existsSync(usageLogPath)) {
+    throw new Error(`Nightly usage log missing: ${usageLogPath || '(empty path)'}`);
+  }
+  const usageLog = fs.readFileSync(usageLogPath, 'utf8');
+  if (!usageLog.includes(`- run_id: \`${String(maintain?.runId || '')}\``)) {
+    throw new Error(`Nightly usage log is missing run_id ${String(maintain?.runId || '')}`);
+  }
+  return {
+    ok: true,
+    artifactPath,
+    usageLogPath,
+    artifactVerified: true,
+    usageLogVerified: true,
+  };
+};
 const runNightlyHarmonize = ({
   configPath,
   dbPath,
@@ -354,60 +537,84 @@ const commandNightly = async () => {
   const dryRun = readBool('--dry-run', false);
   const runId = readFlag('--run-id', '');
   const reviewVersion = readFlag('--review-version', '');
-  const maintain = runMaintenance({
-    dbPath,
+  const lock = acquireNightlyLock({
     config,
     configPath,
-    dryRun,
-    reviewVersion,
     runId,
   });
-  const harmonize = runNightlyHarmonize({
-    configPath,
-    dbPath,
-    config,
-    dryRun,
-  });
-  if (harmonize.enabled && harmonize.ran && harmonize.ok !== true) {
-    const msg = [
-      'Nightly harmonize step failed.',
-      harmonize.stderr ? `stderr: ${harmonize.stderr}` : '',
-      harmonize.stdout ? `stdout: ${harmonize.stdout}` : '',
-    ].filter(Boolean).join(' ');
-    throw new Error(msg);
+  if (lock.skipped) {
+    console.log(JSON.stringify({
+      ok: true,
+      command: 'nightly',
+      skipped: true,
+      reason: lock.reason,
+      lock,
+    }, null, 2));
+    return;
   }
-  const audit = await runAudit({
-    dbPath,
-    config,
-    mode: dryRun ? 'shadow' : 'apply',
-    reviewVersion,
-    runId,
-    out: readFlag('--audit-out', ''),
-    summary: readFlag('--audit-summary', ''),
-    samples: readFlag('--audit-samples', ''),
-    llm: {
-      enabled: readBool('--llm-review', config.llm.review.enabled === true),
-      provider: readFlag('--llm-provider', config.llm.provider),
-      baseUrl: readFlag('--llm-base-url', config.llm.baseUrl),
-      model: readFlag('--llm-model', config.llm.model),
-      apiKey: readFlag('--llm-api-key', config.llm.apiKey),
-      timeoutMs: Number(readFlag('--llm-timeout-ms', String(config.llm.timeoutMs)) || config.llm.timeoutMs),
-      limit: Number(readFlag('--llm-review-limit', String(config.llm.review.limit)) || config.llm.review.limit),
-      minScore: Number(readFlag('--llm-review-min-score', String(config.llm.review.minScore)) || config.llm.review.minScore),
-      maxScore: Number(readFlag('--llm-review-max-score', String(config.llm.review.maxScore)) || config.llm.review.maxScore),
-      minConfidence: Number(readFlag('--llm-review-min-confidence', String(config.llm.review.minConfidence)) || config.llm.review.minConfidence),
-    },
-  });
-  console.log(JSON.stringify({
-    ok: true,
-    command: 'nightly',
-    runId: maintain.runId,
-    maintain,
-    harmonize,
-    audit,
-  }, null, 2));
+  try {
+    const maintain = runMaintenance({
+      dbPath,
+      config,
+      configPath,
+      dryRun,
+      reviewVersion,
+      runId,
+    });
+    const harmonize = runNightlyHarmonize({
+      configPath,
+      dbPath,
+      config,
+      dryRun,
+    });
+    if (harmonize.enabled && harmonize.ran && harmonize.ok !== true) {
+      const msg = [
+        'Nightly harmonize step failed.',
+        harmonize.stderr ? `stderr: ${harmonize.stderr}` : '',
+        harmonize.stdout ? `stdout: ${harmonize.stdout}` : '',
+      ].filter(Boolean).join(' ');
+      throw new Error(msg);
+    }
+    const audit = await runAudit({
+      dbPath,
+      config,
+      mode: dryRun ? 'shadow' : 'apply',
+      reviewVersion,
+      runId,
+      out: readFlag('--audit-out', ''),
+      summary: readFlag('--audit-summary', ''),
+      samples: readFlag('--audit-samples', ''),
+      llm: {
+        enabled: readBool('--llm-review', config.llm.review.enabled === true),
+        provider: readFlag('--llm-provider', config.llm.provider),
+        baseUrl: readFlag('--llm-base-url', config.llm.baseUrl),
+        model: readFlag('--llm-model', config.llm.model),
+        apiKey: readFlag('--llm-api-key', config.llm.apiKey),
+        timeoutMs: Number(readFlag('--llm-timeout-ms', String(config.llm.timeoutMs)) || config.llm.timeoutMs),
+        limit: Number(readFlag('--llm-review-limit', String(config.llm.review.limit)) || config.llm.review.limit),
+        minScore: Number(readFlag('--llm-review-min-score', String(config.llm.review.minScore)) || config.llm.review.minScore),
+        maxScore: Number(readFlag('--llm-review-max-score', String(config.llm.review.maxScore)) || config.llm.review.maxScore),
+        minConfidence: Number(readFlag('--llm-review-min-confidence', String(config.llm.review.minConfidence)) || config.llm.review.minConfidence),
+      },
+    });
+    const verification = verifyNightlyOutputs({
+      maintain,
+      dryRun,
+    });
+    console.log(JSON.stringify({
+      ok: true,
+      command: 'nightly',
+      runId: maintain.runId,
+      lock,
+      maintain,
+      harmonize,
+      audit,
+      verification,
+    }, null, 2));
+  } finally {
+    releaseNightlyLock(lock);
+  }
 };
-
 const commandInventory = async () => {
   const { dbPath } = loadConfigAndDbPath();
   const db = openDatabase(dbPath);

@@ -1,6 +1,6 @@
 {
     "name": "@legendaryvibecoder/gigabrain",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "type": "module",
     "description": "Hybrid memory stack for OpenClaw and Codex — capture, recall, dedupe, audit, native sync",
     "author": "Legendary Vibecoder",

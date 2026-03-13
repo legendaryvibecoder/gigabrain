@@ -12,6 +12,7 @@ import { ensureNativeStore, syncNativeMemory } from './lib/core/native-sync.js';
 import { promoteNativeChunks } from './lib/core/native-promotion.js';
 import { ensurePersonStore, rebuildEntityMentions } from './lib/core/person-service.js';
 import { ensureWorldModelReady, ensureWorldModelStore, getSynthesis, rebuildWorldModel } from './lib/core/world-model.js';
+import { openDatabase } from './lib/core/sqlite.js';
 
 type PluginApi = {
   config?: unknown;
@@ -246,7 +247,8 @@ const buildSessionPreludeInjection = (content: string): string => {
 };
 
 const withDb = <T,>(dbPath: string, config: PluginConfig, fn: (db: DatabaseSync) => T): T => {
-  const db = new DatabaseSync(dbPath);
+  // Reuse the shared SQLite opener so transient writer contention waits instead of failing fast.
+  const db = openDatabase(dbPath);
   try {
     ensureProjectionStore(db);
     ensureEventStore(db);
