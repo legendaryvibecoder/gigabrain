@@ -58,6 +58,19 @@ const run = async () => {
   assert.equal(config.remoteBridge.enabled, false, 'remote bridge should stay disabled by default');
   assert.equal(Object.keys(V3_CONFIG_SCHEMA.properties || {}).length <= 25, true, 'top-level config keys must stay lean');
 
+  const longSlugConfig = normalizeConfig({
+    runtime: {
+      paths: {
+        workspaceRoot: `/tmp/repo${'-'.repeat(5000)}name`,
+      },
+    },
+    remoteBridge: {
+      baseUrl: `https://example.com/api${'/'.repeat(5000)}`,
+    },
+  });
+  assert.equal(longSlugConfig.codex.projectScope.startsWith('project:repo-name:'), true, 'project scope slugging should stay stable for long hyphen-heavy workspace names');
+  assert.equal(longSlugConfig.remoteBridge.baseUrl, 'https://example.com/api', 'remote bridge URLs should trim trailing slashes without regex backtracking');
+
   const standaloneRaw = createStandaloneCodexConfig({
     projectRoot: '/tmp/demo-project',
   });
@@ -70,6 +83,11 @@ const run = async () => {
   assert.equal(standaloneLoaded.config.codex.defaultProjectScope, standaloneLoaded.config.codex.projectScope, 'standalone configs should use the repo scope as the default project scope');
   assert.equal(standaloneLoaded.config.codex.userProfilePath, path.join(os.homedir(), '.codex', 'gigabrain', 'profile'), 'standalone configs should default to a shared user store');
   assert.deepEqual(standaloneLoaded.config.codex.recallOrder, ['project', 'user', 'remote'], 'standalone configs should recall project memory before personal memory and remote sources');
+
+  const slugHeavyStandalone = createStandaloneCodexConfig({
+    projectRoot: `/tmp/repo${'-'.repeat(5000)}name`,
+  });
+  assert.equal(slugHeavyStandalone.codex.projectScope.startsWith('project:repo-name:'), true, 'standalone Codex setup should derive project scopes safely from long hyphen-heavy repo names');
 
   const standaloneLocal = createStandaloneCodexConfig({
     projectRoot: '/tmp/demo-project',
