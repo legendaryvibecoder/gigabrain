@@ -14,22 +14,52 @@ const TEST_FILES = [
   'unit-orchestrator-test.js',
   'unit-llm-router-test.js',
   'unit-native-sync-query-test.js',
+  'unit-codex-service-test.js',
   'unit-vault-mirror-test.js',
   'integration-audit-maintenance-test.js',
   'integration-setup-first-run-test.js',
+  'integration-codex-setup-test.js',
   'integration-vault-cli-test.js',
   'integration-migration-and-api-test.js',
   'integration-native-recall-test.js',
   'integration-bridge-contract-routes-test.js',
+  'integration-codex-mcp-test.js',
   'regression-memory-behavior-test.js',
   'performance-nightly-test.js',
 ];
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname));
+const args = process.argv.slice(2);
+
+const readFilters = () => {
+  const filters = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const value = String(args[index] || '');
+    if (value === '--filter' && args[index + 1]) {
+      filters.push(String(args[index + 1]));
+      index += 1;
+      continue;
+    }
+    if (value.startsWith('--filter=')) {
+      filters.push(value.split('=').slice(1).join('='));
+    }
+  }
+  return filters
+    .flatMap((item) => String(item || '').split(','))
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
 
 const run = async () => {
+  const filters = readFilters();
+  const selectedFiles = filters.length === 0
+    ? TEST_FILES
+    : TEST_FILES.filter((file) => filters.some((filter) => file.includes(filter)));
+  if (selectedFiles.length === 0) {
+    throw new Error(`No tests matched filter(s): ${filters.join(', ')}`);
+  }
   const results = [];
-  for (const file of TEST_FILES) {
+  for (const file of selectedFiles) {
     const modulePath = pathToFileURL(path.join(root, file)).href;
     const testModule = await import(modulePath);
     if (typeof testModule.run !== 'function') {
@@ -46,6 +76,7 @@ const run = async () => {
   console.log(JSON.stringify({
     ok: true,
     suite: 'gigabrain-v3',
+    filters,
     tests: results,
   }, null, 2));
 };

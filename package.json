@@ -1,8 +1,8 @@
 {
     "name": "@legendaryvibecoder/gigabrain",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "type": "module",
-    "description": "Standalone OpenClaw memory plugin — capture, recall, dedupe, audit, native sync",
+    "description": "Hybrid memory stack for OpenClaw and Codex — capture, recall, dedupe, audit, native sync",
     "author": "Legendary Vibecoder",
     "homepage": "https://github.com/legendaryvibecoder/gigabrain#readme",
     "bugs": {
@@ -18,6 +18,11 @@
     "license": "MIT",
     "scripts": {
         "setup": "node scripts/setup-first-run.js",
+        "codex:setup": "node scripts/gigabrain-codex-setup.js",
+        "codex:mcp": "node scripts/gigabrain-mcp.js",
+        "codex:checkpoint": "node scripts/gigabrain-codex-checkpoint.js --config \"$HOME/.codex/gigabrain/config.json\"",
+        "codex:doctor": "node scripts/gigabrainctl.js doctor --config \"$HOME/.codex/gigabrain/config.json\" --target both",
+        "codex:maintain": "node scripts/gigabrainctl.js maintain --config \"$HOME/.codex/gigabrain/config.json\"",
         "test": "node tests/run-all.js",
         "test:unit": "node tests/run-all.js --filter unit",
         "test:integration": "node tests/run-all.js --filter integration",
@@ -46,8 +51,16 @@
         "openclaw",
         "memory",
         "plugin",
-        "gigabrain"
+        "gigabrain",
+        "codex",
+        "mcp"
     ],
+    "bin": {
+        "gigabrainctl": "./scripts/gigabrainctl.js",
+        "gigabrain-codex-checkpoint": "./scripts/gigabrain-codex-checkpoint.js",
+        "gigabrain-mcp": "./scripts/gigabrain-mcp.js",
+        "gigabrain-codex-setup": "./scripts/gigabrain-codex-setup.js"
+    },
     "openclaw": {
         "extensions": [
             "./index.ts"
@@ -58,7 +71,7 @@
     },
     "peerDependenciesMeta": {
         "openclaw": {
-            "optional": false
+            "optional": true
         }
     },
     "files": [
@@ -67,7 +80,13 @@
         "scripts/",
         "eval/",
         "package.json",
+        "CHANGELOG.md",
+        "release-notes/",
         "openclaw.plugin.json",
         "README.md"
-    ]
+    ],
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.27.1",
+        "zod": "^4.3.6"
+    }
 }

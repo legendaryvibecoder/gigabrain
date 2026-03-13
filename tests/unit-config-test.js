@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
 
-import { normalizeConfig, V3_CONFIG_SCHEMA } from '../lib/core/config.js';
+import { normalizeConfig, V3_CONFIG_SCHEMA, loadResolvedConfig } from '../lib/core/config.js';
+import { createStandaloneCodexConfig } from '../lib/core/codex-project.js';
 
 const run = async () => {
   assert.throws(
@@ -46,7 +49,63 @@ const run = async () => {
   assert.equal(String(config.vault.homeNoteName), 'Home', 'vault home note should default to Home');
   assert.deepEqual(config.vault.manualFolders, ['Inbox', 'Manual'], 'vault manual folders should normalize');
   assert.equal(config.vault.views.enabled, true, 'vault views should be enabled by default');
+  assert.equal(config.codex.projectScope.startsWith('project:demo-workspace:'), true, 'codex config should derive a stable project scope from the workspace');
+  assert.equal(config.codex.defaultProjectScope, config.codex.projectScope, 'codex project scope should default to the derived repo scope');
+  assert.equal(config.codex.defaultUserScope, 'profile:user', 'codex user scope should default to profile:user');
+  assert.equal(config.codex.projectStorePath, path.join(os.homedir(), '.codex', 'gigabrain'), 'codex primary store should default to ~/.codex/gigabrain');
+  assert.equal(config.codex.userProfilePath, path.join(os.homedir(), '.codex', 'gigabrain', 'profile'), 'codex user store should default to ~/.codex/gigabrain/profile');
+  assert.deepEqual(config.codex.recallOrder, ['project', 'user', 'remote'], 'codex recall should include the personal store by default');
+  assert.equal(config.remoteBridge.enabled, false, 'remote bridge should stay disabled by default');
   assert.equal(Object.keys(V3_CONFIG_SCHEMA.properties || {}).length <= 25, true, 'top-level config keys must stay lean');
+
+  const standaloneRaw = createStandaloneCodexConfig({
+    projectRoot: '/tmp/demo-project',
+  });
+  const standaloneLoaded = loadResolvedConfig({
+    config: standaloneRaw,
+  });
+  assert.equal(standaloneLoaded.source, 'standalone', 'direct standalone configs should auto-detect');
+  assert.equal(standaloneLoaded.config.runtime.paths.workspaceRoot, path.join(os.homedir(), '.codex', 'gigabrain'), 'standalone configs should default to the shared Codex store');
+  assert.equal(standaloneLoaded.config.codex.projectScope.startsWith('project:demo-project:'), true, 'standalone configs should derive a stable repo scope');
+  assert.equal(standaloneLoaded.config.codex.defaultProjectScope, standaloneLoaded.config.codex.projectScope, 'standalone configs should use the repo scope as the default project scope');
+  assert.equal(standaloneLoaded.config.codex.userProfilePath, path.join(os.homedir(), '.codex', 'gigabrain', 'profile'), 'standalone configs should default to a shared user store');
+  assert.deepEqual(standaloneLoaded.config.codex.recallOrder, ['project', 'user', 'remote'], 'standalone configs should recall project memory before personal memory and remote sources');
+
+  const standaloneLocal = createStandaloneCodexConfig({
+    projectRoot: '/tmp/demo-project',
+    storeMode: 'project-local',
+  });
+  assert.equal(standaloneLocal.codex.storeMode, 'project_local', 'project-local mode should normalize');
+  assert.equal(standaloneLocal.runtime.paths.workspaceRoot, '/tmp/demo-project/.gigabrain', 'project-local mode should still support repo-local storage');
+  assert.equal(standaloneLocal.codex.userProfilePath, '/tmp/demo-project/.gigabrain/profile', 'project-local mode should keep the personal overlay inside the repo-local store');
+
+  const staleStandalone = normalizeConfig({
+    runtime: {
+      paths: {
+        workspaceRoot: '/tmp/demo-workspace',
+      },
+    },
+    codex: {
+      projectStorePath: path.join(os.homedir(), '.codex', 'gigabrain'),
+      userProfilePath: '',
+      recallOrder: ['project', 'remote'],
+    },
+  });
+  assert.equal(staleStandalone.codex.userProfilePath, '', 'explicitly empty legacy userProfilePath values should stay empty until setup migrates them');
+  assert.deepEqual(staleStandalone.codex.recallOrder, ['project', 'remote'], 'legacy recall order should keep the user store disabled until setup migrates the config');
+
+  const openclawLoaded = loadResolvedConfig({
+    config: {
+      plugins: {
+        entries: {
+          gigabrain: {
+            config: standaloneRaw,
+          },
+        },
+      },
+    },
+  });
+  assert.equal(openclawLoaded.source, 'openclaw', 'OpenClaw-wrapped Gigabrain configs should still resolve as plugin configs');
 };
 
 export { run };

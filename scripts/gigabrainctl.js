@@ -99,13 +99,16 @@ const duplicateGroups = (db) => {
 const loadConfigAndDbPath = () => {
   const configPath = readFlag('--config', '');
   const workspaceOverride = readFlag('--workspace', '');
+  const mode = readFlag('--mode', '');
   const loaded = loadResolvedConfig({
     configPath,
     workspaceRoot: workspaceOverride || undefined,
+    mode: mode || undefined,
   });
   const dbPath = path.resolve(readFlag('--db', loaded.config.runtime.paths.registryPath));
   return {
     configPath: loaded.configPath,
+    source: loaded.source,
     config: loaded.config,
     dbPath,
   };
@@ -427,7 +430,18 @@ const commandInventory = async () => {
 };
 
 const commandDoctor = async () => {
-  const { configPath, config, dbPath } = loadConfigAndDbPath();
+  const { configPath, source, config, dbPath } = loadConfigAndDbPath();
+  if (source === 'standalone' && config?.codex?.enabled !== false) {
+    const { runDoctor } = await import('../lib/core/codex-service.js');
+    const result = await runDoctor({
+      configPath,
+      target: readFlag('--target', 'both'),
+      workspaceRoot: readFlag('--workspace', ''),
+      mode: readFlag('--mode', source),
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
   const checks = [];
   checks.push({ name: 'config_loaded', ok: Boolean(config) });
   checks.push({ name: 'db_exists', ok: Boolean(dbPath) });

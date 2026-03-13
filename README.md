@@ -1,18 +1,19 @@
 # Gigabrain
 
-Gigabrain is the long-term memory layer for [OpenClaw](https://openclaw.ai) agents. It converts conversations and native notes into durable, queryable memory, then injects the right context before each prompt so agents stay consistent across sessions.
+Gigabrain is a local-first memory stack for [OpenClaw](https://openclaw.ai) agents and Codex workflows. It converts conversations and native notes into durable, queryable memory, then injects or serves the right context before each prompt so agents stay consistent across sessions.
 
 It is built for local-first production use: SQLite-backed recall, deterministic dedupe/audit flows, native markdown sync, and an optional FastAPI console for memory operations.
 
 Release references:
 
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)
-- `v0.5.0` release notes: [`release-notes/v0.5.0.md`](release-notes/v0.5.0.md)
+- `v0.5.1` release notes: [`release-notes/v0.5.1.md`](release-notes/v0.5.1.md)
 
 ## What it does
 
-- **Capture**: Uses a hybrid memory model where explicit remember intent can write concise native markdown and structured registry memories together
+- **Capture**: Uses a hybrid memory model where explicit remember intent writes durable memory and Codex App checkpoints write episodic native session logs
 - **Recall**: Before each prompt, the recall orchestrator chooses between quick context, entity briefs, timeline briefs, and verification-oriented recall
+- **Codex MCP**: Exposes explicit `gigabrain_recall`, `gigabrain_remember`, `gigabrain_checkpoint`, `gigabrain_provenance`, `gigabrain_recent`, and `gigabrain_doctor` tools for Codex App and Codex CLI
 - **Dedupe**: Exact and hybrid semantic deduplication catches duplicates, paraphrases, and malformed near-duplicates with type-aware thresholds
 - **Native sync**: Indexes your workspace `MEMORY.md` and daily notes alongside the registry for unified recall
 - **World model**: Projects atomic memories into entities, beliefs, episodes, open loops, contradictions, and syntheses that can power better recall and review
@@ -25,10 +26,10 @@ Release references:
 ## Prerequisites
 
 - **Node.js** >= 22.x (uses `node:sqlite` experimental API)
-- **OpenClaw** >= 2026.2.15 (gateway + plugin loader)
+- **OpenClaw** >= 2026.2.15 (gateway + plugin loader, only required for the OpenClaw plugin path)
 - **Python** >= 3.10 (only for the optional web console)
 - **Ollama** (optional, for local LLM-based extraction review and semantic search)
-- **Obsidian** (recommended for the `v0.5` memory surface; core capture/recall still works without it)
+- **Obsidian** (recommended for the `v0.5.x` memory surface; core capture/recall still works without it)
 
 ## Installation
 
@@ -53,7 +54,7 @@ What the setup wizard does:
 
 - Ensures `plugins.entries.gigabrain` exists in `~/.openclaw/openclaw.json`
 - Sets plugin path and runtime paths (`workspaceRoot`, `memoryRoot`, `outputDir`, `registryPath`)
-- Enables the `v0.5` hybrid memory defaults for explicit remember intent, native promotion, and world-model-aware surfaces
+- Enables the `v0.5.1` hybrid memory defaults for explicit remember intent, native promotion, and world-model-aware surfaces
 - Bootstraps the DB and indexes native memory files
 - Enables the Obsidian memory surface by default and builds the first vault unless `--skip-vault`
 - Adds or refreshes the AGENTS memory protocol block (unless `--skip-agents`)
@@ -122,9 +123,94 @@ openclaw gateway restart
 node scripts/migrate-v3.js --apply --config ~/.openclaw/openclaw.json
 ```
 
+### Option C: Codex App + Codex CLI (standalone, no OpenClaw required)
+
+Install Gigabrain into your repo or workspace:
+
+```bash
+npm install @legendaryvibecoder/gigabrain
+```
+
+Bootstrap Codex wiring for the current repo. By default this creates a shared repo store under `~/.codex/gigabrain/`, a shared personal user store under `~/.codex/gigabrain/profile/`, and a stable repo-specific scope for the current workspace:
+
+```bash
+npx gigabrain-codex-setup --project-root /path/to/repo
+```
+
+What the Codex setup does:
+
+- Creates `~/.codex/gigabrain/config.json` for the shared standalone store by default
+- Bootstraps both `~/.codex/gigabrain/` and `~/.codex/gigabrain/profile/`, including `MEMORY.md`, `memory/registry.sqlite`, and output folders
+- Adds a Codex-specific `AGENTS.md` block that prefers Gigabrain MCP tools over ad-hoc file grepping
+- Creates repo-local `.codex/setup.sh` plus `.codex/actions/` helper scripts for install, verify, maintenance, and manual session checkpointing
+- Teaches the current repo a stable repo scope so its continuity stays separated inside the shared store by default
+- Migrates older Codex configs that still have an empty `codex.userProfilePath`, legacy `codex:global` project scope defaults, or a recall order that skips the user store
+- Prints the exact `codex mcp add gigabrain ...` command for this workspace
+
+Then register the MCP server in Codex:
+
+```bash
+codex mcp add gigabrain -- /absolute/path/to/node /absolute/path/to/node_modules/@legendaryvibecoder/gigabrain/scripts/gigabrain-mcp.js --config ~/.codex/gigabrain/config.json
+```
+
+Useful Codex commands after setup:
+
+```bash
+npx gigabrain-codex-setup --project-root /path/to/repo
+npx gigabrain-codex-checkpoint --config ~/.codex/gigabrain/config.json --summary "Implemented the MCP server"
+npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target both
+npx gigabrainctl maintain --config ~/.codex/gigabrain/config.json
+```
+
+Standalone Codex defaults in `v0.5.1`:
+
+- `llm.provider = "none"`
+- `llm.review.enabled = false`
+- `vault.enabled = false`
+- `codex.projectStorePath = ~/.codex/gigabrain`
+- `codex.userProfilePath = ~/.codex/gigabrain/profile`
+- `codex.defaultProjectScope = project:<repo>:<hash>`
+- `codex.recallOrder = ["project", "user", "remote"]`
+
+Codex App behavior in `v0.5.1`:
+
+- Codex App works through MCP, not through undocumented internal Codex state.
+- `gigabrain_remember` with `target=user` is for stable personal preferences and facts that should follow you across repos.
+- `gigabrain_remember` with `target=project` is for repo-specific decisions, conventions, and active project context.
+- `gigabrain_checkpoint` is for task-end session capture into `~/.codex/gigabrain/memory/YYYY-MM-DD.md` by default.
+- `gigabrain_checkpoint` remains repo-scoped by default and uses the derived `project:<repo>:<hash>` scope for the current workspace.
+- `gigabrainctl maintain` is a manual consolidation step when you want promotion and cleanup.
+- There is no hidden Nimbus-style background logging in Codex App mode.
+
+Recommended Codex install and verify flow:
+
+1. Run `npx gigabrain-codex-setup --project-root /path/to/repo`.
+2. Run the printed `codex mcp add gigabrain ...` command, or use `.codex/actions/install-gigabrain-mcp.sh`.
+3. Run `.codex/actions/verify-gigabrain.sh` or `npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target both`.
+4. In Codex, use `gigabrain_doctor` if you want to confirm that both the repo store and the personal user store are healthy from the MCP side as well.
+
+Upgrading older Codex installs:
+
+- Re-run `npx gigabrain-codex-setup --project-root /path/to/repo`.
+- The setup rerun preserves existing project memory but migrates stale Codex defaults so the user store is configured, repo scope becomes the default project scope, and recall order becomes `project,user,remote`.
+
+If you prefer strict per-repo storage, you can opt in explicitly:
+
+```bash
+npx gigabrain-codex-setup --project-root /path/to/repo --store-mode project-local
+```
+
+That keeps the store under `/path/to/repo/.gigabrain/`, places the personal user store under `/path/to/repo/.gigabrain/profile/`, and adds `.gigabrain/` to the repo `.gitignore`.
+
+Troubleshooting:
+
+- If `gigabrain_doctor` or `gigabrain_remember target=user` reports `target store 'user' is not configured`, re-run `npx gigabrain-codex-setup --project-root /path/to/repo` so the standalone config is migrated to the current defaults.
+- If you want to inspect only the user store, run `npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target user`.
+- If you want to inspect only the repo store, run `npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target project`.
+
 ## Configuration
 
-All config lives under `plugins.entries.gigabrain.config` in `openclaw.json`. The full schema is defined in [`openclaw.plugin.json`](openclaw.plugin.json). Key sections:
+OpenClaw mode keeps config under `plugins.entries.gigabrain.config` in `openclaw.json`. Codex standalone mode stores the same schema in `~/.codex/gigabrain/config.json` by default, or in `<repo>/.gigabrain/config.json` when you opt into `--store-mode project-local`. The full OpenClaw plugin schema is defined in [`openclaw.plugin.json`](openclaw.plugin.json). Key sections:
 
 ### Runtime
 
@@ -168,10 +254,12 @@ All config lives under `plugins.entries.gigabrain.config` in `openclaw.json`. Th
 - `minConfidence` — minimum confidence score to store a memory (0.0–1.0)
 - `rememberIntent` — lets the agent treat natural phrases like `remember that` as an explicit memory-save instruction without exposing the internal `<memory_note>` protocol to the user
 
-Hybrid capture behavior in `v0.5.0`:
+Hybrid capture behavior in `v0.5.1`:
 
 - Explicit durable remember intent writes a concise native note and a matching registry memory when the model emits `<memory_note>`
 - Explicit ephemeral remember intent writes to the daily note and stays out of the durable registry by default
+- Codex App checkpoints write native-only session summaries, decisions, open loops, touched files, and durable candidates into the daily log of the shared Codex store by default
+- Codex App checkpoints are not background capture; they are intentional task-end summaries that later feed native sync and optional promotion
 - If the user clearly asked to remember something but the model forgets the internal tag, Gigabrain now queues a review row instead of silently losing the request
 
 ### Recall
@@ -337,9 +425,9 @@ Native promotion turns durable native bullets back into structured registry memo
 }
 ```
 
-Gigabrain does not require Obsidian for core capture/recall, but you do need Obsidian if you want the visual memory surface introduced in `v0.5`.
+Gigabrain does not require Obsidian for core capture/recall, but you do need Obsidian if you want the visual memory surface introduced in `v0.5.x`.
 
-The default `v0.5` surface is intentionally curated. When enabled, Gigabrain builds a read-only Obsidian memory surface under `<vault.path>/<vault.subdir>` with:
+The default `v0.5.x` surface is intentionally curated. When enabled, Gigabrain builds a read-only Obsidian memory surface under `<vault.path>/<vault.subdir>` with:
 
 - `00 Home/Home.md`
 - `30 Views/Current State.md`
@@ -359,7 +447,7 @@ Large diagnostic exports, raw review queues, and broad entity dumps are not part
 - `60 Reports/` deeper synthesis reports such as contradiction/open-loop summaries
 - `40 Reports/` manifest, freshness, latest nightly/native-sync summaries, and the latest vault build summary
 
-`Inbox/` and `Manual/` are reserved human-written folders inside the generated subdir and are never cleaned. The surface is intentionally read-only from Obsidian in `v0.5.0`: the runtime workspace remains the source of truth, and local sync is a one-way pull.
+`Inbox/` and `Manual/` are reserved human-written folders inside the generated subdir and are never cleaned. The surface is intentionally read-only from Obsidian in `v0.5.1`: the runtime workspace remains the source of truth, and local sync is a one-way pull.
 
 Quickstart:
 
@@ -458,6 +546,11 @@ Gigabrain uses a hybrid memory model.
 
 - Native markdown (`MEMORY.md` and `memory/YYYY-MM-DD.md`) is the human-readable layer.
 - The Gigabrain registry is the structured recall layer built on top.
+- In Codex App, the shared store usually lives under `~/.codex/gigabrain/`.
+- Use `gigabrain_recall` first for continuity in Codex App sessions, usually with the repo-specific scope your setup generated for this workspace.
+- Use `gigabrain_remember` only for explicit durable saves.
+- Use `gigabrain_checkpoint` at task end after substantial implementation, debugging, planning, or compaction-style summaries.
+- Do not grep Gigabrain store files directly unless the MCP server is unavailable.
 
 ### Memory Note Protocol
 Gigabrain is native-memory-first. For users, the important behavior is:
@@ -465,6 +558,7 @@ Gigabrain is native-memory-first. For users, the important behavior is:
 - `MEMORY.md` is the curated durable layer
 - `memory/YYYY-MM-DD.md` is the daily native layer
 - explicit "remember that" moments project into native memory and the structured registry
+- Codex App task-end checkpoints project to the daily native layer only
 - the user never needs to know the internal XML protocol
 
 Internally, explicit remembers still use `<memory_note>` tags for compatibility and structured capture.

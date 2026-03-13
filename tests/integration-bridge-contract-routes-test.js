@@ -80,6 +80,27 @@ const run = async () => {
     assert.equal(Number(top.score) > 0, true, 'score must map from internal _score and be positive here');
     assert.equal(['vector', 'hybrid'].includes(String(top.rank_source)), true, 'rank_source must be present and valid');
 
+    const longBearerPadding = '  '.repeat(2048);
+    const bearerRecallRes = await fetch(`${baseUrl}/gb/recall`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${longBearerPadding}gb-token`,
+      },
+      body: JSON.stringify({ query: 'Wer ist Sam?', topK: 3 }),
+    });
+    assert.equal(bearerRecallRes.ok, true, 'bearer token auth should stay valid with long whitespace padding');
+
+    const malformedBearerRes = await fetch(`${baseUrl}/gb/recall`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${longBearerPadding}`,
+      },
+      body: JSON.stringify({ query: 'Wer ist Sam?', topK: 3 }),
+    });
+    assert.equal(malformedBearerRes.status, 401, 'malformed long bearer headers must fail closed');
+
     const badSuggestions = await fetch(`${baseUrl}/gb/suggestions`, {
       method: 'POST',
       headers: {

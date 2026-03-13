@@ -37,6 +37,13 @@ const run = async () => {
       'working_reference',
       'contact facts should not enter default durable recall tiers',
     );
+    assert.equal(
+      resolveMemoryTier({
+        row: { type: 'USER_FACT', content: 'The repo codename is Atlas Beacon.' },
+      }),
+      'durable_project',
+      'stable project identity facts like repo codenames should stay recallable',
+    );
 
     const empty = rebuildWorldModel({ db, config, now: '2026-03-08T11:00:00.000Z' });
     assert.equal(empty.cleared, true, 'empty world rebuild should stay empty instead of generating ghost syntheses');

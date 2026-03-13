@@ -2,6 +2,27 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.5.1] — 2026-03-13
+
+### Added
+- Codex App-first standalone support with a stable SDK-based MCP server and explicit tools for `gigabrain_recall`, `gigabrain_remember`, `gigabrain_checkpoint`, `gigabrain_provenance`, `gigabrain_recent`, and `gigabrain_doctor`
+- Native-only Codex session checkpoint capture that writes task-end summaries into the shared `~/.codex/gigabrain/memory/YYYY-MM-DD.md` store by default
+- Codex setup outputs now include a manual checkpoint helper action alongside install, verify, and maintenance helpers
+- Codex-oriented tests for checkpoint capture, setup outputs, and MCP integration
+
+### Changed
+- Codex standalone now defaults to a shared repo store under `~/.codex/gigabrain`, a shared personal user store under `~/.codex/gigabrain/profile`, and a repo-derived default project scope so continuity stays separated by workspace
+- Codex standalone docs now describe `target=user` vs `target=project`, the Codex-aware verify path, migration of older broken configs, and manual consolidation instead of hidden background logging
+- Stable project-identity facts such as repo codenames now remain recallable as `durable_project` memories in the standalone Codex path
+
+### Fixed
+- Native-memory provenance lookups now resolve `native:*` ids returned by Codex recall results
+- Codex MCP startup now uses the official MCP SDK transport instead of the earlier hand-rolled server
+- Codex setup now bootstraps both project and user stores, migrates legacy empty-user-store configs on rerun, and exposes both paths in its setup summary
+- Codex doctor paths now validate both standalone stores honestly, including hard failures for explicit `target=user` checks when the personal store is not configured
+- The test runner now honors `--filter`, so Codex install and migration smokes can run directly in CI and release validation
+- Published package scripts and release metadata are aligned for the standalone Codex install path
+
 ## [0.5.0] — 2026-03-11
 
 ### Added
