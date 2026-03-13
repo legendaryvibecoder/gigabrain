@@ -1,6 +1,6 @@
 # Gigabrain
 
-Gigabrain is a local-first memory stack for [OpenClaw](https://openclaw.ai) agents and Codex workflows. It converts conversations and native notes into durable, queryable memory, then injects or serves the right context before each prompt so agents stay consistent across sessions.
+Gigabrain is a local-first memory stack for [OpenClaw](https://openclaw.ai) agents, Codex App, and Codex CLI workflows. It converts conversations and native notes into durable, queryable memory, then injects or serves the right context before each prompt so agents stay consistent across sessions.
 
 It is built for local-first production use: SQLite-backed recall, deterministic dedupe/audit flows, native markdown sync, and an optional FastAPI console for memory operations.
 
@@ -9,6 +9,13 @@ Release references:
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)
 - `v0.5.2` release notes: [`release-notes/v0.5.2.md`](release-notes/v0.5.2.md)
 - `v0.5.1` release notes: [`release-notes/v0.5.1.md`](release-notes/v0.5.1.md)
+
+## Choose your path
+
+- **Codex App / Codex CLI**: Use Gigabrain as a standalone MCP-backed memory layer with shared project and user stores. Start with [Option C: Codex App + Codex CLI (standalone, no OpenClaw required)](#option-c-codex-app--codex-cli-standalone-no-openclaw-required).
+- **OpenClaw**: Use Gigabrain as the gateway-integrated memory plugin and active memory-slot provider. Start with [Option A: OpenClaw npm install + setup wizard](#option-a-openclaw-npm-install--setup-wizard-recommended-for-openclaw).
+
+Both paths use the same core memory engine, registry, dedupe logic, audit flows, and recall model. The difference is the host integration layer: OpenClaw plugin hooks on one side, Codex MCP tools on the other.
 
 ## What it does
 
@@ -34,7 +41,9 @@ Release references:
 
 ## Installation
 
-### Option A: npm install + setup wizard (recommended)
+If you are here for Codex App, skip the OpenClaw setup and jump straight to Option C. OpenClaw is only required for the plugin path.
+
+### Option A: OpenClaw npm install + setup wizard (recommended for OpenClaw)
 
 Install:
 
@@ -81,7 +90,7 @@ npm run setup -- --workspace /path/to/workspace --vault-path ~/Documents/gigabra
 npm run setup -- --workspace /path/to/workspace --skip-vault
 ```
 
-### Option B: Manual setup (custom environments)
+### Option B: OpenClaw manual setup (custom environments)
 
 1. Install from source:
 
