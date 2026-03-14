@@ -48,10 +48,8 @@ If you are here for Codex App, skip the OpenClaw setup and jump straight to Opti
 Install:
 
 ```bash
-mkdir -p ~/.openclaw/plugins
-cd ~/.openclaw/plugins
-npm install @legendaryvibecoder/gigabrain
-cd node_modules/@legendaryvibecoder/gigabrain
+openclaw plugins install @legendaryvibecoder/gigabrain
+cd ~/.openclaw/extensions/gigabrain
 ```
 
 Run the one-command setup wizard:
@@ -63,7 +61,7 @@ npm run setup -- --workspace /path/to/your-openclaw-workspace
 What the setup wizard does:
 
 - Ensures `plugins.entries.gigabrain` exists in `~/.openclaw/openclaw.json`
-- Sets plugin path and runtime paths (`workspaceRoot`, `memoryRoot`, `outputDir`, `registryPath`)
+- Sets runtime paths (`workspaceRoot`, `memoryRoot`, `outputDir`, `registryPath`)
 - Enables the `v0.5.1` hybrid memory defaults for explicit remember intent, native promotion, and world-model-aware surfaces
 - Bootstraps the DB and indexes native memory files
 - Enables the Obsidian memory surface by default and builds the first vault unless `--skip-vault`
@@ -95,8 +93,8 @@ npm run setup -- --workspace /path/to/workspace --skip-vault
 1. Install from source:
 
 ```bash
-cd ~/.openclaw/plugins
 git clone https://github.com/legendaryvibecoder/gigabrain.git
+openclaw plugins install -l /absolute/path/to/gigabrain
 ```
 
 2. Register plugin in `~/.openclaw/openclaw.json`:
@@ -109,7 +107,6 @@ git clone https://github.com/legendaryvibecoder/gigabrain.git
     },
     "entries": {
       "gigabrain": {
-        "path": "~/.openclaw/plugins/gigabrain",
         "config": {
           "enabled": true
         }
@@ -120,6 +117,11 @@ git clone https://github.com/legendaryvibecoder/gigabrain.git
 ```
 
 `plugins.slots.memory = "gigabrain"` is the important part that tells OpenClaw to use Gigabrain as the active memory-slot provider.
+
+Notes:
+
+- Recent OpenClaw builds discover third-party plugins from `~/.openclaw/extensions` (or linked paths in `plugins.load.paths`), not from `~/.openclaw/plugins/node_modules`.
+- Do not add `plugins.entries.gigabrain.path` manually unless your OpenClaw build explicitly documents that key; current builds validate plugin ids by discovery and may reject the extra field.
 
 3. Restart gateway:
 
