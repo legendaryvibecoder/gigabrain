@@ -6,6 +6,13 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
+import {
+  DEFAULT_GLOBAL_STANDALONE_STORE,
+  PORTABLE_STANDALONE_CONFIG_PATH,
+  defaultStandaloneConfigPathForStore,
+  resolveAbsolutePath,
+} from '../lib/core/standalone-client.js';
+
 const THIS_FILE = fileURLToPath(import.meta.url);
 const PACKAGE_ROOT = path.resolve(path.dirname(THIS_FILE), '..');
 const PACKAGE_JSON = JSON.parse(fs.readFileSync(path.join(PACKAGE_ROOT, 'package.json'), 'utf8'));
@@ -20,6 +27,9 @@ Usage:
 
 Flags:
   --out-dir <path>        Output directory for the built .dxt bundle
+  --config-default <path> Default standalone config path exposed in the extension manifest
+  --portable              Build a portable release bundle with a home-relative config default
+  --bundle-mode <mode>    local (default) or portable
   --help                  Print this help
 `;
 
@@ -39,6 +49,12 @@ const expandHome = (value = '') => {
   return raw;
 };
 
+const readBundleMode = () => {
+  if (args.includes('--portable')) return 'portable';
+  const raw = String(readFlag('--bundle-mode', 'local') || '').trim().toLowerCase();
+  return raw === 'portable' || raw === 'release' ? 'portable' : 'local';
+};
+
 const copyTree = (source, target) => {
   fs.cpSync(source, target, {
     recursive: true,
@@ -46,14 +62,14 @@ const copyTree = (source, target) => {
   });
 };
 
-const resolveDependencyPackageRoot = (dependencyName) => {
+const resolveDependencyPackageRoot = (dependencyName, resolver = packageRequire) => {
   const candidates = [
     `${dependencyName}/package.json`,
     dependencyName,
   ];
   for (const candidate of candidates) {
     try {
-      const resolved = packageRequire.resolve(candidate);
+      const resolved = resolver.resolve(candidate);
       let cursor = path.dirname(resolved);
       while (cursor && cursor !== path.dirname(cursor)) {
         const packageJsonPath = path.join(cursor, 'package.json');
@@ -76,46 +92,38 @@ const resolveDependencyPackageRoot = (dependencyName) => {
   return null;
 };
 
-const collectRuntimeDependencyNames = () => {
-  const result = spawnSync('npm', ['ls', '--omit=dev', '--all', '--json'], {
-    cwd: PACKAGE_ROOT,
-    encoding: 'utf8',
-  });
-  ensureSuccess(result, 'npm ls runtime dependencies');
-  const payload = JSON.parse(String(result.stdout || '{}'));
-  const names = new Set();
-  const walk = (node) => {
-    if (!node || typeof node !== 'object') return;
-    const deps = node.dependencies && typeof node.dependencies === 'object' ? node.dependencies : {};
-    for (const [name, child] of Object.entries(deps)) {
-      names.add(name);
-      walk(child);
-    }
-  };
-  walk(payload);
-  return [...names];
-};
-
 const copyRuntimeDependencies = (stagingRoot) => {
   const targetNodeModules = path.join(stagingRoot, 'node_modules');
   fs.mkdirSync(targetNodeModules, { recursive: true });
-  const queue = collectRuntimeDependencyNames();
+  const queue = Object.keys(PACKAGE_JSON.dependencies || {}).map((dependencyName) => ({
+    dependencyName,
+    resolver: packageRequire,
+  }));
   const seen = new Set();
   while (queue.length > 0) {
-    const dependencyName = queue.shift();
+    const { dependencyName, resolver } = queue.shift();
     if (!dependencyName || seen.has(dependencyName)) continue;
-    const resolvedDependency = resolveDependencyPackageRoot(dependencyName);
-    if (!resolvedDependency) continue;
+    const resolvedDependency = resolveDependencyPackageRoot(dependencyName, resolver);
+    if (!resolvedDependency) {
+      throw new Error(`Unable to resolve runtime dependency: ${dependencyName}`);
+    }
     const {
       packageRoot,
+      packageJsonPath,
       packageJson: dependencyPackage,
     } = resolvedDependency;
     const targetRoot = path.join(targetNodeModules, dependencyName);
     fs.mkdirSync(path.dirname(targetRoot), { recursive: true });
     copyTree(packageRoot, targetRoot);
     seen.add(dependencyName);
+    const dependencyRequire = createRequire(packageJsonPath);
     for (const childName of Object.keys(dependencyPackage.dependencies || {})) {
-      if (!seen.has(childName)) queue.push(childName);
+      if (!seen.has(childName)) {
+        queue.push({
+          dependencyName: childName,
+          resolver: dependencyRequire,
+        });
+      }
     }
   }
 };
@@ -137,6 +145,13 @@ const main = () => {
   }
 
   const outDir = path.resolve(expandHome(readFlag('--out-dir', path.join(PACKAGE_ROOT, 'dist', 'claude-desktop'))));
+  const bundleMode = readBundleMode();
+  const defaultConfigPath = (() => {
+    const explicit = readFlag('--config-default', '');
+    if (explicit) return explicit;
+    if (bundleMode === 'portable') return PORTABLE_STANDALONE_CONFIG_PATH;
+    return resolveAbsolutePath(defaultStandaloneConfigPathForStore(DEFAULT_GLOBAL_STANDALONE_STORE));
+  })();
   const bundleName = `gigabrain-claude-desktop-${PACKAGE_JSON.version}.dxt`;
   const bundlePath = path.join(outDir, bundleName);
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'gigabrain-claude-desktop-'));
@@ -199,7 +214,7 @@ const main = () => {
         type: 'string',
         title: 'Gigabrain config path',
         description: 'Path to the shared standalone Gigabrain config created by gigabrain-claude-setup or gigabrain-codex-setup.',
-        default: '${HOME}/.codex/gigabrain/config.json',
+        default: defaultConfigPath,
         required: true,
       },
     },
@@ -227,8 +242,10 @@ const main = () => {
 
   console.log(JSON.stringify({
     ok: true,
+    bundleMode,
     outDir,
     bundlePath,
+    defaultConfigPath,
     manifestPath: path.join(stagingRoot, 'manifest.json'),
   }, null, 2));
 };

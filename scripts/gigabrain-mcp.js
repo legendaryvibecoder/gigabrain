@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { startMcpServer } from '../lib/core/codex-mcp.js';
+import { resolveRuntimeStandaloneConfigPath } from '../lib/core/standalone-client.js';
 
 const HELP = `Gigabrain MCP server
 
@@ -28,10 +29,25 @@ if (args.includes('--help') || args.includes('-h')) {
   process.exit(0);
 }
 
+const rawConfigPath = readFlag('--config', '');
+const rawMode = readFlag('--mode', '');
+const runtimeConfig = resolveRuntimeStandaloneConfigPath(rawConfigPath);
+if (rawConfigPath && !runtimeConfig.attemptedPath) {
+  console.error('Gigabrain MCP requires a valid standalone config path. Run gigabrain-codex-setup or gigabrain-claude-setup first.');
+  process.exit(1);
+}
+if (rawConfigPath && runtimeConfig.fallbackKind === 'missing') {
+  console.error([
+    `Gigabrain MCP could not find a standalone config at ${runtimeConfig.attemptedPath}.`,
+    'Run gigabrain-codex-setup or gigabrain-claude-setup first, or point --config at an existing standalone config.',
+  ].join('\n'));
+  process.exit(1);
+}
+
 const defaults = {
-  configPath: readFlag('--config', ''),
+  configPath: runtimeConfig.resolvedPath,
   workspaceRoot: readFlag('--workspace-root', ''),
-  mode: readFlag('--mode', ''),
+  mode: rawMode || (rawConfigPath ? 'standalone' : ''),
 };
 
 let activeServer = null;

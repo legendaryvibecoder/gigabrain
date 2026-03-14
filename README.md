@@ -11,30 +11,69 @@ Release references:
 - `v0.5.2` release notes: [`release-notes/v0.5.2.md`](release-notes/v0.5.2.md)
 - `v0.5.1` release notes: [`release-notes/v0.5.1.md`](release-notes/v0.5.1.md)
 
-## At a glance
+## Supported clients
 
-| Host surface | Setup path | What Gigabrain owns | What the host owns |
+| Host surface | Best starting point | What Gigabrain owns | What the host owns |
 | --- | --- | --- | --- |
 | OpenClaw | `openclaw plugins install @legendaryvibecoder/gigabrain` + `npm run setup -- --workspace ...` | Local registry, native sync, recall orchestration, audit/nightly flows, memory-slot provider | Gateway runtime, channels, agent execution, plugin loading |
 | Codex App / Codex CLI | `npx gigabrain-codex-setup --project-root ...` | Shared local project/user memory store, MCP tools, explicit checkpoints, maintenance/doctor flows | App/CLI UX, MCP client wiring, session execution |
 | Claude Code | `npx gigabrain-claude-setup --project-root ...` | Shared local project/user memory store, MCP tools, explicit checkpoints, managed `.mcp.json` wiring | `CLAUDE.md` loading, project instructions, Claude Code runtime behavior |
-| Claude Desktop | `npm run claude:desktop:bundle` + install `.dxt` | Same local MCP-backed memory store and tools as Claude Code | Desktop extension hosting, native app/chat UX, Claude account memory |
+| Claude Desktop | `npm run claude:desktop:bundle` for local testing, `npm run claude:desktop:bundle:release` for portable release assets | Same local MCP-backed memory store and tools as Claude Code | Desktop extension hosting, native app/chat UX, Claude account memory |
 | Claude Desktop Cowork | Compatibility-audited via the same repo/store | Same local memory layer when pointed at the same repo/config | Cowork orchestration and app control, with no documented memory across sessions |
 
-## Choose your path
+## Quickstart
 
-- **Codex App / Codex CLI**: Use Gigabrain as a standalone MCP-backed memory layer with shared project and user stores. Start with [Option C: Codex App + Codex CLI (standalone, no OpenClaw required)](#option-c-codex-app--codex-cli-standalone-no-openclaw-required).
-- **Claude Code / Claude Desktop**: Use Gigabrain as the same standalone memory layer with project `.mcp.json`, `CLAUDE.md`, and an optional Claude Desktop local extension bundle. Start with [Option D: Claude Code + Claude Desktop (standalone, no OpenClaw required)](#option-d-claude-code--claude-desktop-standalone-no-openclaw-required).
-- **OpenClaw**: Use Gigabrain as the gateway-integrated memory plugin and active memory-slot provider. Start with [Option A: OpenClaw npm install + setup wizard](#option-a-openclaw-npm-install--setup-wizard-recommended-for-openclaw).
+### I use OpenClaw
 
-All paths use the same core memory engine, registry, dedupe logic, audit flows, and recall model. The difference is the host integration layer: OpenClaw plugin hooks on one side, Codex MCP tools on another, and Claude MCP plus desktop-extension wiring on the Claude side.
+```bash
+openclaw plugins install @legendaryvibecoder/gigabrain
+cd ~/.openclaw/extensions/gigabrain
+npm run setup -- --workspace /path/to/your-openclaw-workspace
+npx gigabrainctl doctor --config ~/.openclaw/openclaw.json
+```
 
-If you are choosing between hosts:
+Sharing by default: OpenClaw is its own plugin path and does not silently share standalone Codex/Claude memory.
 
-- Pick **OpenClaw** when you want Gigabrain to be the active memory provider inside the gateway.
-- Pick **Codex** when you want explicit MCP-backed repo/user memory for coding workflows.
-- Pick **Claude Code / Claude Desktop** when you want the same local memory layer but inside Anthropic surfaces.
-- Pick **Cowork** only as a compatibility surface for now; `v0.5.3` does not add a native Cowork memory integration.
+### I use Codex
+
+```bash
+npm install @legendaryvibecoder/gigabrain
+npx gigabrain-codex-setup --project-root /path/to/repo
+.codex/actions/verify-gigabrain.sh
+```
+
+Sharing by default: Codex uses the shared standalone store at `~/.gigabrain/config.json` on fresh installs and shares memory with Claude only when both point at the same config.
+
+### I use Claude Code / Claude Desktop
+
+```bash
+npm install @legendaryvibecoder/gigabrain
+npx gigabrain-claude-setup --project-root /path/to/repo
+.claude/actions/verify-gigabrain.sh
+```
+
+Optional Claude Desktop step:
+
+```bash
+npm run claude:desktop:bundle
+```
+
+Sharing by default: Claude uses the same shared standalone store as Codex only when both point at the same config. Cowork is compatibility-audited only.
+
+If you need more detail, jump to:
+
+- [Option A: OpenClaw npm install + setup wizard](#option-a-openclaw-npm-install--setup-wizard-recommended-for-openclaw)
+- [Option C: Codex App + Codex CLI](#option-c-codex-app--codex-cli-standalone-no-openclaw-required)
+- [Option D: Claude Code + Claude Desktop](#option-d-claude-code--claude-desktop-standalone-no-openclaw-required)
+
+## How sharing works
+
+| Mode | Default path | What is shared | What stays isolated |
+| --- | --- | --- | --- |
+| OpenClaw plugin | `~/.openclaw/openclaw.json` + plugin-managed paths | Nothing automatically with standalone hosts | OpenClaw plugin runtime and memory config |
+| Codex shared standalone | `~/.gigabrain/config.json` | Shared standalone registry + shared user store with Claude when they point at the same config | Repo memory stays separated by `project:<repo>:<hash>` scope |
+| Claude shared standalone | `~/.gigabrain/config.json` | Same standalone registry + same user store with Codex when they point at the same config | Repo memory stays separated by `project:<repo>:<hash>` scope |
+| Project-local standalone | `<repo>/.gigabrain/config.json` | Nothing outside the repo unless you explicitly reuse that config elsewhere | Repo store and user overlay stay local to that repo |
 
 ## What it does
 
@@ -179,7 +218,7 @@ Install Gigabrain into your repo or workspace:
 npm install @legendaryvibecoder/gigabrain
 ```
 
-Bootstrap Codex wiring for the current repo. By default this creates a shared repo store under `~/.codex/gigabrain/`, a shared personal user store under `~/.codex/gigabrain/profile/`, and a stable repo-specific scope for the current workspace:
+Bootstrap Codex wiring for the current repo. Fresh installs use the host-neutral shared standalone store under `~/.gigabrain/`, keep the shared personal user store under `~/.gigabrain/profile/`, and derive a stable repo-specific scope for the current workspace. If you already have a supported legacy install under `~/.codex/gigabrain/`, setup reuses it in place for `0.5.3`:
 
 ```bash
 npx gigabrain-codex-setup --project-root /path/to/repo
@@ -189,27 +228,34 @@ The Codex setup is safe to rerun and is the recommended repair path for stale st
 
 What the Codex setup does:
 
-- Creates `~/.codex/gigabrain/config.json` for the shared standalone store by default
-- Bootstraps both `~/.codex/gigabrain/` and `~/.codex/gigabrain/profile/`, including `MEMORY.md`, `memory/registry.sqlite`, and output folders
+- Creates `~/.gigabrain/config.json` for the shared standalone store by default, or reuses `~/.codex/gigabrain/config.json` when a legacy standalone install already exists
+- Bootstraps both the shared standalone store and its shared user store (`~/.gigabrain/profile/` on fresh installs), including `MEMORY.md`, `memory/registry.sqlite`, and output folders
 - Adds a Codex-specific `AGENTS.md` block that prefers Gigabrain MCP tools over ad-hoc file grepping
 - Creates repo-local `.codex/setup.sh` plus `.codex/actions/` helper scripts for install, verify, maintenance, and manual session checkpointing
-- Teaches the current repo a stable repo scope so its continuity stays separated inside the shared store by default
+- Teaches the current repo a stable repo scope so its continuity stays separated inside the shared standalone store by default
 - Migrates older Codex configs that still have an empty `codex.userProfilePath`, legacy `codex:global` project scope defaults, or a recall order that skips the user store
-- Prints the exact `codex mcp add gigabrain ...` command for this workspace
+- Prints the resolved config path, store root, sharing mode, and whether the path is canonical or legacy-supported
+
+What gets shared by default:
+
+- Codex and Claude share the same standalone registry only when they point at the same config path.
+- Repo memory still stays repo-scoped by default through `project:<repo>:<hash>`.
+- Personal memory is shared through the user store.
+- Use `--store-mode project-local` if you want this repo isolated.
 
 Then register the MCP server in Codex:
 
 ```bash
-codex mcp add gigabrain -- /absolute/path/to/node /absolute/path/to/node_modules/@legendaryvibecoder/gigabrain/scripts/gigabrain-mcp.js --config ~/.codex/gigabrain/config.json
+codex mcp add gigabrain -- /absolute/path/to/node /absolute/path/to/node_modules/@legendaryvibecoder/gigabrain/scripts/gigabrain-mcp.js --config ~/.gigabrain/config.json
 ```
 
 Useful Codex commands after setup:
 
 ```bash
 npx gigabrain-codex-setup --project-root /path/to/repo
-npx gigabrain-codex-checkpoint --config ~/.codex/gigabrain/config.json --summary "Implemented the MCP server"
-npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target both
-npx gigabrainctl maintain --config ~/.codex/gigabrain/config.json
+npx gigabrain-codex-checkpoint --config ~/.gigabrain/config.json --summary "Implemented the MCP server"
+npx gigabrainctl doctor --config ~/.gigabrain/config.json --target both
+npx gigabrainctl maintain --config ~/.gigabrain/config.json
 ```
 
 Standalone Codex defaults in `v0.5.1`:
@@ -217,8 +263,8 @@ Standalone Codex defaults in `v0.5.1`:
 - `llm.provider = "none"`
 - `llm.review.enabled = false`
 - `vault.enabled = false`
-- `codex.projectStorePath = ~/.codex/gigabrain`
-- `codex.userProfilePath = ~/.codex/gigabrain/profile`
+- `codex.projectStorePath = ~/.gigabrain`
+- `codex.userProfilePath = ~/.gigabrain/profile`
 - `codex.defaultProjectScope = project:<repo>:<hash>`
 - `codex.recallOrder = ["project", "user", "remote"]`
 
@@ -227,7 +273,7 @@ Codex App behavior in `v0.5.1`:
 - Codex App works through MCP, not through undocumented internal Codex state.
 - `gigabrain_remember` with `target=user` is for stable personal preferences and facts that should follow you across repos.
 - `gigabrain_remember` with `target=project` is for repo-specific decisions, conventions, and active project context.
-- `gigabrain_checkpoint` is for task-end session capture into `~/.codex/gigabrain/memory/YYYY-MM-DD.md` by default.
+- `gigabrain_checkpoint` is for task-end session capture into `~/.gigabrain/memory/YYYY-MM-DD.md` by default on fresh standalone installs.
 - `gigabrain_checkpoint` remains repo-scoped by default and uses the derived `project:<repo>:<hash>` scope for the current workspace.
 - `gigabrainctl maintain` is a manual consolidation step when you want promotion and cleanup.
 - There is no hidden Nimbus-style background logging in Codex App mode.
@@ -236,13 +282,13 @@ Recommended Codex install and verify flow:
 
 1. Run `npx gigabrain-codex-setup --project-root /path/to/repo`.
 2. Run the printed `codex mcp add gigabrain ...` command, or use `.codex/actions/install-gigabrain-mcp.sh`.
-3. Run `.codex/actions/verify-gigabrain.sh` or `npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target both`.
+3. Run `.codex/actions/verify-gigabrain.sh` first. Absolute fallback: `npx gigabrainctl doctor --config ~/.gigabrain/config.json --target both`.
 4. In Codex, use `gigabrain_doctor` if you want to confirm that both the repo store and the personal user store are healthy from the MCP side as well.
 
 Upgrading older Codex installs:
 
 - Re-run `npx gigabrain-codex-setup --project-root /path/to/repo`.
-- The setup rerun preserves existing project memory but migrates stale Codex defaults so the user store is configured, repo scope becomes the default project scope, and recall order becomes `project,user,remote`.
+- The setup rerun preserves existing project memory but migrates stale standalone defaults so the user store is configured, repo scope becomes the default project scope, and recall order becomes `project,user,remote`.
 
 If you prefer strict per-repo storage, you can opt in explicitly:
 
@@ -255,8 +301,9 @@ That keeps the store under `/path/to/repo/.gigabrain/`, places the personal user
 Troubleshooting:
 
 - If `gigabrain_doctor` or `gigabrain_remember target=user` reports `target store 'user' is not configured`, re-run `npx gigabrain-codex-setup --project-root /path/to/repo` so the standalone config is migrated to the current defaults.
-- If you want to inspect only the user store, run `npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target user`.
-- If you want to inspect only the repo store, run `npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target project`.
+- Prefer `.codex/actions/verify-gigabrain.sh` over memorizing raw paths; it already targets the resolved config for this repo.
+- If you want to inspect only the user store, run `npx gigabrainctl doctor --config ~/.gigabrain/config.json --target user`.
+- If you want to inspect only the repo store, run `npx gigabrainctl doctor --config ~/.gigabrain/config.json --target project`.
 
 ### Option D: Claude Code + Claude Desktop (standalone, no OpenClaw required)
 
@@ -266,7 +313,7 @@ Install Gigabrain into your repo or workspace:
 npm install @legendaryvibecoder/gigabrain
 ```
 
-Bootstrap Claude wiring for the current repo. By default this uses the same shared standalone store as the Codex path under `~/.codex/gigabrain/`, keeps the shared personal user store under `~/.codex/gigabrain/profile/`, and derives the same stable repo-specific scope:
+Bootstrap Claude wiring for the current repo. Fresh installs use the same shared standalone store as Codex under `~/.gigabrain/`, keep the shared personal user store under `~/.gigabrain/profile/`, and derive the same stable repo-specific scope. If you already have a supported legacy install under `~/.codex/gigabrain/`, setup reuses it in place for `0.5.3`:
 
 ```bash
 npx gigabrain-claude-setup --project-root /path/to/repo
@@ -276,20 +323,28 @@ The Claude setup is safe to rerun. If `CLAUDE.md`, `.mcp.json`, or the shared st
 
 What the Claude setup does:
 
-- Reuses the shared standalone Gigabrain config at `~/.codex/gigabrain/config.json` by default
-- Bootstraps both `~/.codex/gigabrain/` and `~/.codex/gigabrain/profile/`, including `MEMORY.md`, `memory/registry.sqlite`, and output folders
+- Uses `~/.gigabrain/config.json` as the canonical shared standalone config for fresh installs, or reuses `~/.codex/gigabrain/config.json` when a legacy standalone install already exists
+- Bootstraps both the shared standalone store and its shared user store (`~/.gigabrain/profile/` on fresh installs), including `MEMORY.md`, `memory/registry.sqlite`, and output folders
 - Adds or refreshes a managed Gigabrain memory block inside `CLAUDE.md`
 - Adds or refreshes a `gigabrain` server entry inside project `.mcp.json`
 - Creates repo-local `.claude/setup.sh` plus `.claude/actions/` helper scripts for verify, maintenance, and manual session checkpointing
 - Preserves existing `CLAUDE.md` content and unrelated `.mcp.json` server entries on rerun
+- Prints the resolved config path, store root, sharing mode, and whether the path is canonical or legacy-supported
+
+What gets shared by default:
+
+- Claude and Codex share the same standalone registry only when they point at the same config path.
+- Repo memory still stays repo-scoped by default through `project:<repo>:<hash>`.
+- Personal memory is shared through the user store.
+- Use `--store-mode project-local` if you want this repo isolated.
 
 Useful Claude commands after setup:
 
 ```bash
 npx gigabrain-claude-setup --project-root /path/to/repo
-npx gigabrain-codex-checkpoint --config ~/.codex/gigabrain/config.json --summary "Implemented the Claude workflow"
-npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target both
-npx gigabrainctl maintain --config ~/.codex/gigabrain/config.json
+npx gigabrain-codex-checkpoint --config ~/.gigabrain/config.json --summary "Implemented the Claude workflow"
+npx gigabrainctl doctor --config ~/.gigabrain/config.json --target both
+npx gigabrainctl maintain --config ~/.gigabrain/config.json
 npm run claude:desktop:bundle
 ```
 
@@ -302,9 +357,10 @@ Claude Code behavior:
 
 Claude Desktop behavior:
 
-- `npm run claude:desktop:bundle` builds a local `.dxt` extension bundle under `dist/claude-desktop/`
+- `npm run claude:desktop:bundle` builds a local test `.dxt` bundle under `dist/claude-desktop/` with an absolute config default for the current machine
+- `npm run claude:desktop:bundle:release` builds a portable release `.dxt` bundle with `~/.gigabrain/config.json` as the default config path
 - The bundle wraps the same Gigabrain stdio MCP server used by Claude Code
-- The desktop extension defaults to the same standalone config path (`~/.codex/gigabrain/config.json`), so Claude Desktop and Claude Code can share memory
+- The desktop extension uses the same Gigabrain MCP server and standalone config contract as Claude Code
 
 ### Claude memory surfaces vs Gigabrain
 
@@ -325,10 +381,10 @@ Recommended Claude install and verify flow:
 
 1. Run `npx gigabrain-claude-setup --project-root /path/to/repo`.
 2. Review `CLAUDE.md` and `.mcp.json` in the repo.
-3. Run `.claude/actions/verify-gigabrain.sh` or `npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target both`.
-4. Build the desktop bundle with `npm run claude:desktop:bundle`.
+3. Run `.claude/actions/verify-gigabrain.sh` first. Absolute fallback: `npx gigabrainctl doctor --config ~/.gigabrain/config.json --target both`.
+4. Build the desktop bundle with `npm run claude:desktop:bundle` for local testing, or `npm run claude:desktop:bundle:release` for a portable release asset.
 5. In Claude Desktop on macOS, open Settings > Extensions > Advanced settings > Install Extension and import the generated `.dxt` file.
-6. Confirm the extension uses `~/.codex/gigabrain/config.json` unless you intentionally configured a different standalone path.
+6. If Claude asks for a config path, use the resolved path from setup. On fresh installs that is usually `~/.gigabrain/config.json`; legacy standalone installs may still use `~/.codex/gigabrain/config.json`.
 7. Use `.claude/actions/checkpoint-gigabrain-session.sh --summary "..."` after meaningful work if you want episodic session capture.
 
 Cowork note:
@@ -339,7 +395,7 @@ Cowork note:
 ## Upgrade / existing users
 
 - **OpenClaw users from older Gigabrain docs**: move to `openclaw plugins install @legendaryvibecoder/gigabrain`, rerun `npm run setup -- --workspace ...`, then run `npx gigabrainctl doctor --config ~/.openclaw/openclaw.json`.
-- **Codex `0.5.1` / `0.5.2` users**: rerun `npx gigabrain-codex-setup --project-root /path/to/repo` to refresh the shared store defaults, verify helper scripts, and doctor path.
+- **Codex `0.5.1` / `0.5.2` users**: rerun `npx gigabrain-codex-setup --project-root /path/to/repo` to refresh the shared standalone defaults, verify helper scripts, and doctor path. Existing `~/.codex/gigabrain` installs remain supported in place for `0.5.3`.
 - **Claude adopters**: run `npx gigabrain-claude-setup --project-root /path/to/repo`, review `CLAUDE.md` and `.mcp.json`, then run doctor before building the desktop extension.
 
 Across all hosts, the expected upgrade order is:
@@ -350,7 +406,7 @@ Across all hosts, the expected upgrade order is:
 
 ## Configuration
 
-OpenClaw mode keeps config under `plugins.entries.gigabrain.config` in `openclaw.json`. Codex and Claude standalone modes store the same schema in `~/.codex/gigabrain/config.json` by default, or in `<repo>/.gigabrain/config.json` when you opt into `--store-mode project-local`. The full OpenClaw plugin schema is defined in [`openclaw.plugin.json`](openclaw.plugin.json). Key sections:
+OpenClaw mode keeps config under `plugins.entries.gigabrain.config` in `openclaw.json`. Codex and Claude standalone modes store the same schema in `~/.gigabrain/config.json` by default for fresh installs, reuse `~/.codex/gigabrain/config.json` when a supported legacy standalone install already exists, or use `<repo>/.gigabrain/config.json` when you opt into `--store-mode project-local`. The full OpenClaw plugin schema is defined in [`openclaw.plugin.json`](openclaw.plugin.json). Key sections:
 
 ### Runtime
 
@@ -398,7 +454,7 @@ Hybrid capture behavior in `v0.5.1`:
 
 - Explicit durable remember intent writes a concise native note and a matching registry memory when the model emits `<memory_note>`
 - Explicit ephemeral remember intent writes to the daily note and stays out of the durable registry by default
-- Codex App checkpoints write native-only session summaries, decisions, open loops, touched files, and durable candidates into the daily log of the shared Codex store by default
+- Codex App checkpoints write native-only session summaries, decisions, open loops, touched files, and durable candidates into the daily log of the shared standalone store by default
 - Codex App checkpoints are not background capture; they are intentional task-end summaries that later feed native sync and optional promotion
 - If the user clearly asked to remember something but the model forgets the internal tag, Gigabrain now queues a review row instead of silently losing the request
 
@@ -688,7 +744,7 @@ Gigabrain uses a hybrid memory model.
 
 - Native markdown (`MEMORY.md` and `memory/YYYY-MM-DD.md`) is the human-readable layer.
 - The Gigabrain registry is the structured recall layer built on top.
-- In Codex App, the shared store usually lives under `~/.codex/gigabrain/`.
+- In Codex App and Claude standalone mode, the shared store usually lives under `~/.gigabrain/` on fresh installs, while `~/.codex/gigabrain/` remains supported for legacy setups.
 - Use `gigabrain_recall` first for continuity in Codex App sessions, usually with the repo-specific scope your setup generated for this workspace.
 - Use `gigabrain_remember` only for explicit durable saves.
 - Use `gigabrain_checkpoint` at task end after substantial implementation, debugging, planning, or compaction-style summaries.

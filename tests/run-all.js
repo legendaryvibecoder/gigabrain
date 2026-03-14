@@ -22,6 +22,7 @@ const TEST_FILES = [
   'integration-setup-first-run-test.js',
   'integration-codex-setup-test.js',
   'integration-claude-setup-test.js',
+  'integration-standalone-path-resolution-test.js',
   'integration-packaged-codex-setup-test.js',
   'integration-packaged-claude-setup-test.js',
   'integration-claude-desktop-bundle-test.js',

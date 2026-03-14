@@ -16,8 +16,10 @@ import {
   writeCodexSupportFiles,
 } from '../lib/core/codex-project.js';
 import {
+  describeStandaloneConfigPath,
   expandHome,
   readJson,
+  resolveStandaloneConfigPath,
   writeJsonPretty,
 } from '../lib/core/standalone-client.js';
 
@@ -33,7 +35,7 @@ Usage:
 
 Flags:
   --project-root <path>      Repo root to wire for Codex (default: cwd)
-  --config <path>            Standalone Gigabrain config path (default: ~/.codex/gigabrain/config.json)
+  --config <path>            Standalone Gigabrain config path (default: ~/.gigabrain/config.json, legacy ~/.codex/gigabrain/config.json reused if present)
   --store-mode <mode>        Store mode: global (default) or project-local
   --agents-path <path>       Project AGENTS.md path (default: <project>/AGENTS.md)
   --user-overlay-path <path> Optional personal user-store path (default: <store>/profile)
@@ -136,12 +138,14 @@ const main = async () => {
 
   const projectRoot = path.resolve(expandHome(readFlag('--project-root', process.cwd())));
   const storeMode = normalizeStoreMode(readFlag('--store-mode', 'global'));
-  const defaultConfigPath = storeMode === 'project_local'
-    ? path.join(projectRoot, '.gigabrain', 'config.json')
-    : path.join(process.env.HOME || '', '.codex', 'gigabrain', 'config.json');
-  const configPath = path.resolve(expandHome(readFlag('--config', defaultConfigPath)));
+  const resolvedPath = resolveStandaloneConfigPath({
+    explicitConfigPath: readFlag('--config', ''),
+    projectRoot,
+    storeMode,
+  });
+  const configPath = resolvedPath.configPath;
   const agentsPath = path.resolve(expandHome(readFlag('--agents-path', path.join(projectRoot, 'AGENTS.md'))));
-  const storeRoot = path.dirname(configPath);
+  const storeRoot = resolvedPath.storeRoot;
   const userOverlayFlag = readFlag('--user-overlay-path', '');
   const userOverlayPath = userOverlayFlag ? path.resolve(expandHome(userOverlayFlag)) : '';
   const projectScope = deriveProjectScope(projectRoot);
@@ -176,6 +180,11 @@ const main = async () => {
   const bootstrap = bootstrapStandaloneStore({
     configPath,
   });
+  const standalonePath = describeStandaloneConfigPath({
+    configPath,
+    projectRoot,
+    storeMode,
+  });
   const mcpCommand = buildCodexMcpAddCommand({
     packageRoot: PACKAGE_ROOT,
     configPath,
@@ -201,6 +210,12 @@ const main = async () => {
     storeRoot,
     projectStorePath: mergedConfig.codex.projectStorePath,
     storeMode,
+    sharingMode: standalonePath.sharingMode,
+    standalonePathKind: standalonePath.pathKind,
+    standaloneConfigPath: configPath,
+    standaloneStoreRoot: storeRoot,
+    legacyStandalonePath: standalonePath.legacyConfigPath,
+    canonicalStandalonePath: standalonePath.canonicalConfigPath,
     projectScope,
     defaultProjectScope: mergedConfig.codex.defaultProjectScope,
     userOverlayPath: mergedConfig.codex.userProfilePath,
@@ -212,10 +227,12 @@ const main = async () => {
     mcpCommand,
     mcpInstall,
     nextSteps: [
-      `Run ${mcpCommand}`,
-      `Use gigabrain_recall for continuity, gigabrain_remember for explicit durable saves, and gigabrain_checkpoint at task end in Codex App.`,
+      `Shared standalone mode is ${standalonePath.sharingMode}; Codex and Claude will share ${storeRoot} only when they point at the same config.`,
+      `Repo memory stays separated by scope (${projectScope}); personal memory is shared through ${mergedConfig.codex.userProfilePath}.`,
+      `Use --store-mode project-local if you want this repo isolated from other Codex/Claude workspaces.`,
+      `Run ${path.join(projectRoot, '.codex', 'actions', 'install-gigabrain-mcp.sh')} or ${mcpCommand}.`,
+      `Run ${path.join(projectRoot, '.codex', 'actions', 'verify-gigabrain.sh')} before hand-editing config. Absolute fallback: npx gigabrainctl doctor --config ${configPath} --target both.`,
       `Run npx gigabrain-codex-checkpoint --config ${configPath} --summary "Completed ..." after meaningful work if you want episodic session capture.`,
-      `Run npx gigabrainctl doctor --config ${configPath} --target both to verify the repo store and personal user store.`,
       `Run npx gigabrainctl maintain --config ${configPath} when you want manual consolidation in Codex mode.`,
     ],
   }, null, 2));

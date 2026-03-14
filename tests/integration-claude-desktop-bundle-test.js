@@ -27,6 +27,8 @@ const run = async () => {
   assert.equal(summary.ok, true, 'bundle build should succeed');
   assert.equal(fs.existsSync(summary.bundlePath), true, 'bundle build should create a .dxt artifact');
   assert.equal(path.extname(summary.bundlePath), '.dxt', 'bundle output should use the .dxt extension');
+  assert.equal(summary.bundleMode, 'local', 'default bundle build should stay in local mode');
+  assert.equal(summary.defaultConfigPath, path.join(os.homedir(), '.gigabrain', 'config.json'), 'bundle build should expose the canonical absolute standalone config path');
 
   const inspect = spawnSync('python3', [
     '-c',
@@ -60,7 +62,46 @@ const run = async () => {
   assert.equal(parsed.manifest.server.entry_point, 'scripts/gigabrain-mcp.js', 'bundle manifest should point to the bundled Gigabrain MCP entrypoint');
   assert.equal(parsed.manifest.server.mcp_config.command, 'node', 'bundle manifest should run the server with node');
   assert.equal(parsed.manifest.server.mcp_config.args.includes('${user_config.config_path}'), true, 'bundle manifest should expose a configurable shared Gigabrain config path');
+  assert.equal(parsed.manifest.user_config.config_path.default, path.join(os.homedir(), '.gigabrain', 'config.json'), 'bundle manifest should default to the canonical absolute standalone config path');
+  assert.equal(String(parsed.manifest.user_config.config_path.default).includes('${HOME}'), false, 'bundle manifest should no longer show a raw HOME placeholder');
   assert.equal(parsed.manifest.compatibility.platforms.includes('darwin'), true, 'bundle manifest should target macOS Claude Desktop');
+
+  const portableOutDir = path.join(root, 'dist-portable');
+  const portableResult = spawnSync('node', [
+    'scripts/build-claude-desktop-bundle.js',
+    '--out-dir', portableOutDir,
+    '--portable',
+  ], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: process.env,
+  });
+  if (portableResult.status !== 0) {
+    throw new Error(`claude desktop portable bundle build failed:\n${portableResult.stderr || portableResult.stdout}`);
+  }
+  const portableSummary = JSON.parse(String(portableResult.stdout || '{}'));
+  assert.equal(portableSummary.ok, true, 'portable bundle build should succeed');
+  assert.equal(portableSummary.bundleMode, 'portable', 'portable bundle build should report portable mode');
+  assert.equal(portableSummary.defaultConfigPath, '~/.gigabrain/config.json', 'portable bundle build should use the portable standalone config default');
+  const portableInspect = spawnSync('python3', [
+    '-c',
+    [
+      'import json, sys, zipfile',
+      'bundle = sys.argv[1]',
+      'with zipfile.ZipFile(bundle, "r") as zf:',
+      '    manifest = json.loads(zf.read("manifest.json").decode("utf-8"))',
+      'print(manifest["user_config"]["config_path"]["default"])',
+    ].join('\n'),
+    portableSummary.bundlePath,
+  ], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: process.env,
+  });
+  if (portableInspect.status !== 0) {
+    throw new Error(`claude desktop portable bundle inspect failed:\n${portableInspect.stderr || portableInspect.stdout}`);
+  }
+  assert.equal(String(portableInspect.stdout || '').trim(), '~/.gigabrain/config.json', 'portable bundle manifest should avoid embedding a builder-specific absolute path');
 
   const installedRoot = path.join(root, 'installed');
   fs.mkdirSync(installedRoot, { recursive: true });

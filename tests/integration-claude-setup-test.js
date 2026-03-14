@@ -49,12 +49,15 @@ const run = async () => {
   }
 
   const summary = JSON.parse(String(result.stdout || '{}'));
-  const sharedStoreRoot = path.join(homeRoot, '.codex', 'gigabrain');
+  const sharedStoreRoot = path.join(homeRoot, '.gigabrain');
   const sharedUserStore = path.join(sharedStoreRoot, 'profile');
   assert.equal(summary.ok, true, 'claude setup should succeed');
-  assert.equal(summary.storeMode, 'global', 'claude setup should default to the shared global store');
+  assert.equal(summary.storeMode, 'global', 'claude setup should default to the shared global standalone store');
+  assert.equal(summary.sharingMode, 'shared-standalone', 'claude setup should report shared standalone mode');
+  assert.equal(summary.standalonePathKind, 'canonical', 'fresh Claude setup should use the canonical standalone path');
   assert.equal(summary.projectStorePath, sharedStoreRoot, 'claude setup should report the shared project store');
   assert.equal(summary.userStorePath, sharedUserStore, 'claude setup should report the shared personal store');
+  assert.equal(summary.standaloneConfigPath, path.join(sharedStoreRoot, 'config.json'), 'claude setup should report the canonical standalone config');
   assert.equal(fs.existsSync(path.join(projectRoot, 'CLAUDE.md')), true, 'claude setup should create CLAUDE.md');
   assert.equal(fs.existsSync(path.join(projectRoot, '.mcp.json')), true, 'claude setup should create .mcp.json');
   assert.equal(fs.existsSync(path.join(projectRoot, '.claude', 'setup.sh')), true, 'claude setup should create .claude/setup.sh');
@@ -95,6 +98,7 @@ const run = async () => {
   const verifyResult = JSON.parse(String(verify.stdout || '{}'));
   assert.equal(verifyResult.ok, true, 'claude verify action should report both stores healthy');
   assert.equal(verifyResult.stores.length, 2, 'claude verify action should report both stores');
+  assert.equal(verifyResult.standalone_path_kind, 'canonical', 'claude doctor should report the canonical standalone path');
 
   const checkpoint = spawnSync(path.join(projectRoot, '.claude', 'actions', 'checkpoint-gigabrain-session.sh'), [
     '--summary', 'Implemented Claude Desktop MCP support.',
@@ -152,6 +156,7 @@ const run = async () => {
   if (codexThenClaude.status !== 0) throw new Error(`claude after codex failed:\n${codexThenClaude.stderr || codexThenClaude.stdout}`);
   const codexThenClaudeSummary = JSON.parse(String(codexThenClaude.stdout || '{}'));
   assert.equal(codexThenClaudeSummary.projectScope, codexFirstSummary.projectScope, 'codex then claude should preserve the same project scope');
+  assert.equal(codexThenClaudeSummary.standaloneConfigPath, path.join(sharedStoreRoot, 'config.json'), 'codex then claude should continue using the same shared standalone config');
   assert.equal(readJson(path.join(codexFirstProject, '.mcp.json')).mcpServers.gigabrain.command, 'node', 'codex then claude should leave Claude MCP wiring installed');
   assert.equal(fs.existsSync(path.join(codexFirstProject, '.codex', 'actions', 'verify-gigabrain.sh')), true, 'codex then claude should preserve Codex actions');
 
@@ -162,6 +167,7 @@ const run = async () => {
   if (claudeThenCodex.status !== 0) throw new Error(`codex after claude failed:\n${claudeThenCodex.stderr || claudeThenCodex.stdout}`);
   const claudeThenCodexSummary = JSON.parse(String(claudeThenCodex.stdout || '{}'));
   assert.equal(claudeThenCodexSummary.projectScope, claudeFirstSummary.projectScope, 'claude then codex should preserve the same project scope');
+  assert.equal(claudeThenCodexSummary.standaloneConfigPath, path.join(sharedStoreRoot, 'config.json'), 'claude then codex should continue using the same shared standalone config');
   assert.equal(fs.existsSync(path.join(claudeFirstProject, 'CLAUDE.md')), true, 'claude then codex should preserve CLAUDE.md');
   assert.equal(fs.existsSync(path.join(claudeFirstProject, '.codex', 'actions', 'verify-gigabrain.sh')), true, 'claude then codex should add Codex actions');
 };

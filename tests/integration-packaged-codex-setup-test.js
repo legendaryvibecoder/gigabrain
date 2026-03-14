@@ -46,10 +46,12 @@ const run = async () => {
   });
 
   const summary = JSON.parse(String(result.stdout || '{}'));
-  const sharedStoreRoot = path.join(homeRoot, '.codex', 'gigabrain');
+  const sharedStoreRoot = path.join(homeRoot, '.gigabrain');
   const sharedUserStore = path.join(sharedStoreRoot, 'profile');
   const installedPackageRoot = fs.realpathSync(packageRoot);
   assert.equal(summary.ok, true, 'packaged codex setup should succeed');
+  assert.equal(summary.sharingMode, 'shared-standalone', 'packaged codex setup should report shared standalone mode');
+  assert.equal(summary.standalonePathKind, 'canonical', 'packaged codex setup should use the canonical standalone path');
   assert.equal(summary.projectStorePath, sharedStoreRoot, 'packaged codex setup should report the shared project store');
   assert.equal(summary.userStorePath, sharedUserStore, 'packaged codex setup should report the shared user store');
   assert.equal(fs.existsSync(path.join(sharedStoreRoot, 'config.json')), true, 'packaged codex setup should create config.json');
@@ -68,6 +70,7 @@ const run = async () => {
   const verifyResult = JSON.parse(String(verify.stdout || '{}'));
   assert.equal(verifyResult.ok, true, 'packaged codex verify action should succeed');
   assert.equal(verifyResult.stores.some((store) => store.target === 'user' && store.ok === true), true, 'packaged codex verify should include the user store');
+  assert.equal(verifyResult.standalone_path_kind, 'canonical', 'packaged codex verify should report the canonical standalone path');
 
   const mcpCommand = String(summary.mcpCommand || '');
   assert.equal(mcpCommand.includes(path.join(installedPackageRoot, 'scripts', 'gigabrain-mcp.js')), true, 'packaged codex setup should print an MCP command that points at the installed package');

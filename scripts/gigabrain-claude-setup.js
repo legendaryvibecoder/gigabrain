@@ -15,8 +15,10 @@ import {
   writeClaudeSupportFiles,
 } from '../lib/core/claude-project.js';
 import {
+  describeStandaloneConfigPath,
   expandHome,
   readJson,
+  resolveStandaloneConfigPath,
   writeJsonPretty,
 } from '../lib/core/standalone-client.js';
 
@@ -31,7 +33,7 @@ Usage:
 
 Flags:
   --project-root <path>      Repo root to wire for Claude Code/Desktop (default: cwd)
-  --config <path>            Standalone Gigabrain config path (default: ~/.codex/gigabrain/config.json)
+  --config <path>            Standalone Gigabrain config path (default: ~/.gigabrain/config.json, legacy ~/.codex/gigabrain/config.json reused if present)
   --store-mode <mode>        Store mode: global (default) or project-local
   --claude-md-path <path>    Claude instructions file (default: <project>/CLAUDE.md)
   --mcp-path <path>          Claude MCP config file (default: <project>/.mcp.json)
@@ -122,13 +124,15 @@ const main = async () => {
 
   const projectRoot = path.resolve(expandHome(readFlag('--project-root', process.cwd())));
   const storeMode = normalizeStoreMode(readFlag('--store-mode', 'global'));
-  const defaultConfigPath = storeMode === 'project_local'
-    ? path.join(projectRoot, '.gigabrain', 'config.json')
-    : path.join(process.env.HOME || '', '.codex', 'gigabrain', 'config.json');
-  const configPath = path.resolve(expandHome(readFlag('--config', defaultConfigPath)));
+  const resolvedPath = resolveStandaloneConfigPath({
+    explicitConfigPath: readFlag('--config', ''),
+    projectRoot,
+    storeMode,
+  });
+  const configPath = resolvedPath.configPath;
   const claudePath = path.resolve(expandHome(readFlag('--claude-md-path', path.join(projectRoot, 'CLAUDE.md'))));
   const mcpPath = path.resolve(expandHome(readFlag('--mcp-path', path.join(projectRoot, '.mcp.json'))));
-  const storeRoot = path.dirname(configPath);
+  const storeRoot = resolvedPath.storeRoot;
   const userOverlayFlag = readFlag('--user-overlay-path', '');
   const userOverlayPath = userOverlayFlag ? path.resolve(expandHome(userOverlayFlag)) : '';
   const projectScope = deriveProjectScope(projectRoot);
@@ -170,6 +174,11 @@ const main = async () => {
   const bootstrap = bootstrapStandaloneStore({
     configPath,
   });
+  const standalonePath = describeStandaloneConfigPath({
+    configPath,
+    projectRoot,
+    storeMode,
+  });
 
   console.log(JSON.stringify({
     ok: true,
@@ -178,6 +187,12 @@ const main = async () => {
     storeRoot,
     projectStorePath: mergedConfig.codex.projectStorePath,
     storeMode,
+    sharingMode: standalonePath.sharingMode,
+    standalonePathKind: standalonePath.pathKind,
+    standaloneConfigPath: configPath,
+    standaloneStoreRoot: storeRoot,
+    legacyStandalonePath: standalonePath.legacyConfigPath,
+    canonicalStandalonePath: standalonePath.canonicalConfigPath,
     projectScope,
     defaultProjectScope: mergedConfig.codex.defaultProjectScope,
     userOverlayPath: mergedConfig.codex.userProfilePath,
@@ -188,9 +203,12 @@ const main = async () => {
     mcp,
     claudeFiles,
     nextSteps: [
+      `Shared standalone mode is ${standalonePath.sharingMode}; Claude and Codex will share ${storeRoot} only when they point at the same config.`,
+      `Repo memory stays separated by scope (${projectScope}); personal memory is shared through ${mergedConfig.codex.userProfilePath}.`,
+      `Use --store-mode project-local if you want this repo isolated from other Claude/Codex workspaces.`,
       `Open ${claudePath} to review the Gigabrain Claude memory block.`,
       `Open ${mcpPath} to confirm the local Gigabrain MCP entry for Claude Code.`,
-      `Run .claude/actions/verify-gigabrain.sh or npx gigabrainctl doctor --config ${configPath} --target both to verify the repo store and personal user store.`,
+      `Run ${path.join(projectRoot, '.claude', 'actions', 'verify-gigabrain.sh')} before hand-editing config. Absolute fallback: npx gigabrainctl doctor --config ${configPath} --target both.`,
       `Run .claude/actions/checkpoint-gigabrain-session.sh --summary "Completed ..." after meaningful work if you want episodic session capture.`,
       `Run npm run claude:desktop:bundle to build the local Claude Desktop extension bundle.`,
     ],

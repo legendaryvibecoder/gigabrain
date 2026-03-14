@@ -36,6 +36,7 @@ const run = async () => {
   const codexHome = path.join(homeRoot, '.codex');
   fs.mkdirSync(projectRoot, { recursive: true });
   fs.mkdirSync(homeRoot, { recursive: true });
+  fs.mkdirSync(codexHome, { recursive: true });
   fs.writeFileSync(path.join(projectRoot, 'package.json'), '{"name":"release-codex","private":true}\n', 'utf8');
 
   runCommand({

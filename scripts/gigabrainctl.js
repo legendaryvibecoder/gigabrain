@@ -679,6 +679,7 @@ const commandDoctor = async () => {
   }
   console.log(JSON.stringify({
     ok: checks.every((check) => check.ok),
+    configKind: source,
     configPath,
     dbPath,
     checks,

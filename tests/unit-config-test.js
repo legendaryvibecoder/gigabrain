@@ -1,9 +1,18 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 import { normalizeConfig, V3_CONFIG_SCHEMA, loadResolvedConfig } from '../lib/core/config.js';
 import { createStandaloneCodexConfig } from '../lib/core/codex-project.js';
+import {
+  DEFAULT_GLOBAL_STANDALONE_STORE,
+  DEFAULT_LEGACY_CODEX_STORE,
+  describeStandaloneConfigPath,
+  expandHome,
+  resolveStandaloneConfigPath,
+  resolveRuntimeStandaloneConfigPath,
+} from '../lib/core/standalone-client.js';
 
 const run = async () => {
   assert.throws(
@@ -52,8 +61,8 @@ const run = async () => {
   assert.equal(config.codex.projectScope.startsWith('project:demo-workspace:'), true, 'codex config should derive a stable project scope from the workspace');
   assert.equal(config.codex.defaultProjectScope, config.codex.projectScope, 'codex project scope should default to the derived repo scope');
   assert.equal(config.codex.defaultUserScope, 'profile:user', 'codex user scope should default to profile:user');
-  assert.equal(config.codex.projectStorePath, path.join(os.homedir(), '.codex', 'gigabrain'), 'codex primary store should default to ~/.codex/gigabrain');
-  assert.equal(config.codex.userProfilePath, path.join(os.homedir(), '.codex', 'gigabrain', 'profile'), 'codex user store should default to ~/.codex/gigabrain/profile');
+  assert.equal(config.codex.projectStorePath, path.join(os.homedir(), '.gigabrain'), 'shared standalone store should default to ~/.gigabrain');
+  assert.equal(config.codex.userProfilePath, path.join(os.homedir(), '.gigabrain', 'profile'), 'shared standalone user store should default to ~/.gigabrain/profile');
   assert.deepEqual(config.codex.recallOrder, ['project', 'user', 'remote'], 'codex recall should include the personal store by default');
   assert.equal(config.remoteBridge.enabled, false, 'remote bridge should stay disabled by default');
   assert.equal(Object.keys(V3_CONFIG_SCHEMA.properties || {}).length <= 25, true, 'top-level config keys must stay lean');
@@ -78,10 +87,10 @@ const run = async () => {
     config: standaloneRaw,
   });
   assert.equal(standaloneLoaded.source, 'standalone', 'direct standalone configs should auto-detect');
-  assert.equal(standaloneLoaded.config.runtime.paths.workspaceRoot, path.join(os.homedir(), '.codex', 'gigabrain'), 'standalone configs should default to the shared Codex store');
+  assert.equal(standaloneLoaded.config.runtime.paths.workspaceRoot, path.join(os.homedir(), '.gigabrain'), 'standalone configs should default to the shared standalone store');
   assert.equal(standaloneLoaded.config.codex.projectScope.startsWith('project:demo-project:'), true, 'standalone configs should derive a stable repo scope');
   assert.equal(standaloneLoaded.config.codex.defaultProjectScope, standaloneLoaded.config.codex.projectScope, 'standalone configs should use the repo scope as the default project scope');
-  assert.equal(standaloneLoaded.config.codex.userProfilePath, path.join(os.homedir(), '.codex', 'gigabrain', 'profile'), 'standalone configs should default to a shared user store');
+  assert.equal(standaloneLoaded.config.codex.userProfilePath, path.join(os.homedir(), '.gigabrain', 'profile'), 'standalone configs should default to a shared user store');
   assert.deepEqual(standaloneLoaded.config.codex.recallOrder, ['project', 'user', 'remote'], 'standalone configs should recall project memory before personal memory and remote sources');
 
   const slugHeavyStandalone = createStandaloneCodexConfig({
@@ -124,6 +133,58 @@ const run = async () => {
     },
   });
   assert.equal(openclawLoaded.source, 'openclaw', 'OpenClaw-wrapped Gigabrain configs should still resolve as plugin configs');
+
+  const describedCanonical = describeStandaloneConfigPath({
+    configPath: path.join(os.homedir(), '.gigabrain', 'config.json'),
+    projectRoot: '/tmp/demo-project',
+    storeMode: 'global',
+  });
+  assert.equal(describedCanonical.pathKind, 'canonical', 'canonical standalone config should be identified');
+  assert.equal(describedCanonical.sharingMode, 'shared-standalone', 'global standalone mode should be reported as shared');
+
+  const describedLegacy = describeStandaloneConfigPath({
+    configPath: path.join(os.homedir(), '.codex', 'gigabrain', 'config.json'),
+    projectRoot: '/tmp/demo-project',
+    storeMode: 'global',
+  });
+  assert.equal(describedLegacy.pathKind, 'legacy_supported', 'legacy standalone config should be identified');
+  assert.equal(describedLegacy.legacyConfigPath, path.join(os.homedir(), '.codex', 'gigabrain', 'config.json'), 'legacy config path should be stable');
+
+  const describedProjectLocal = describeStandaloneConfigPath({
+    configPath: '/tmp/demo-project/.gigabrain/config.json',
+    projectRoot: '/tmp/demo-project',
+    storeMode: 'project-local',
+  });
+  assert.equal(describedProjectLocal.pathKind, 'project_local', 'project-local standalone config should be identified');
+  assert.equal(describedProjectLocal.sharingMode, 'project-local', 'project-local mode should be reported as isolated');
+
+  const resolvedExplicit = resolveStandaloneConfigPath({
+    explicitConfigPath: '/tmp/custom/config.json',
+    projectRoot: '/tmp/demo-project',
+    storeMode: 'global',
+  });
+  assert.equal(resolvedExplicit.configPath, '/tmp/custom/config.json', 'explicit standalone config path should always win');
+
+  const canonicalDefault = resolveStandaloneConfigPath({
+    projectRoot: '/tmp/demo-project',
+    storeMode: 'global',
+  });
+  assert.equal(canonicalDefault.canonicalConfigPath, path.join(DEFAULT_GLOBAL_STANDALONE_STORE, 'config.json'), 'canonical standalone config path should be rooted under ~/.gigabrain');
+  assert.equal(canonicalDefault.legacyConfigPath, path.join(DEFAULT_LEGACY_CODEX_STORE, 'config.json'), 'legacy standalone config path should stay discoverable');
+
+  assert.equal(expandHome('${HOME}/.gigabrain/config.json'), path.join(os.homedir(), '.gigabrain', 'config.json'), 'standalone helpers should expand ${HOME} config paths');
+  assert.equal(expandHome('$HOME/.gigabrain/config.json'), path.join(os.homedir(), '.gigabrain', 'config.json'), 'standalone helpers should expand $HOME config paths');
+  assert.equal(expandHome('~/.gigabrain/config.json'), path.join(os.homedir(), '.gigabrain', 'config.json'), 'standalone helpers should expand ~ config paths');
+
+  const runtimeCanonical = resolveRuntimeStandaloneConfigPath('~/.gigabrain/config.json');
+  const runtimeExpectedPath = fs.existsSync(path.join(os.homedir(), '.gigabrain', 'config.json'))
+    ? path.join(os.homedir(), '.gigabrain', 'config.json')
+    : (fs.existsSync(path.join(os.homedir(), '.codex', 'gigabrain', 'config.json'))
+      ? path.join(os.homedir(), '.codex', 'gigabrain', 'config.json')
+      : path.join(os.homedir(), '.gigabrain', 'config.json'));
+  assert.equal(runtimeCanonical.resolvedPath, runtimeExpectedPath, 'runtime standalone resolution should expand portable canonical paths and respect canonical-then-legacy fallback');
+  const runtimeLegacy = resolveRuntimeStandaloneConfigPath('${HOME}/.codex/gigabrain/config.json');
+  assert.equal(runtimeLegacy.resolvedPath, path.join(os.homedir(), '.codex', 'gigabrain', 'config.json'), 'runtime standalone resolution should expand portable legacy paths');
 };
 
 export { run };

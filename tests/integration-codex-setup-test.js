@@ -36,12 +36,15 @@ const run = async () => {
   }
 
   const summary = JSON.parse(String(result.stdout || '{}'));
-  const sharedStoreRoot = path.join(homeRoot, '.codex', 'gigabrain');
+  const sharedStoreRoot = path.join(homeRoot, '.gigabrain');
   const sharedUserStore = path.join(sharedStoreRoot, 'profile');
   assert.equal(summary.ok, true, 'setup should succeed');
-  assert.equal(summary.storeMode, 'global', 'setup should default to the shared global Codex store');
+  assert.equal(summary.storeMode, 'global', 'setup should default to the shared standalone store');
+  assert.equal(summary.sharingMode, 'shared-standalone', 'setup should report shared standalone mode');
+  assert.equal(summary.standalonePathKind, 'canonical', 'fresh setup should use the canonical standalone path');
   assert.equal(summary.projectStorePath, sharedStoreRoot, 'setup summary should report the shared project store');
   assert.equal(summary.userStorePath, sharedUserStore, 'setup summary should report the shared personal store');
+  assert.equal(summary.standaloneConfigPath, path.join(sharedStoreRoot, 'config.json'), 'setup summary should report the canonical config path');
   assert.equal(fs.existsSync(path.join(sharedStoreRoot, 'config.json')), true, 'setup should create the shared standalone config');
   assert.equal(fs.existsSync(path.join(sharedStoreRoot, 'MEMORY.md')), true, 'setup should bootstrap the shared MEMORY.md');
   assert.equal(fs.existsSync(path.join(sharedUserStore, 'MEMORY.md')), true, 'setup should bootstrap the shared personal MEMORY.md');
@@ -53,7 +56,7 @@ const run = async () => {
   assert.equal(String(summary.mcpCommand).includes('codex'), true, 'setup should print the exact codex mcp add command');
 
   const config = JSON.parse(fs.readFileSync(path.join(sharedStoreRoot, 'config.json'), 'utf8'));
-  assert.equal(config.runtime.paths.workspaceRoot, sharedStoreRoot, 'standalone workspace root should default to the shared Codex store');
+  assert.equal(config.runtime.paths.workspaceRoot, sharedStoreRoot, 'standalone workspace root should default to the shared standalone store');
   assert.equal(config.llm.provider, 'none', 'codex defaults should keep llm.provider at none');
   assert.equal(config.vault.enabled, false, 'codex defaults should keep the vault disabled');
   assert.equal(config.codex.userProfilePath, sharedUserStore, 'setup should enable the shared personal store by default');
@@ -86,6 +89,8 @@ const run = async () => {
   assert.equal(Array.isArray(verifyResult.stores), true, 'verify action should include store health');
   assert.equal(verifyResult.stores.length, 2, 'verify action should report both project and user stores');
   assert.equal(verifyResult.stores.some((store) => store.target === 'user' && store.ok === true), true, 'verify action should report the personal store as healthy');
+  assert.equal(verifyResult.standalone_path_kind, 'canonical', 'doctor should report the canonical standalone path');
+  assert.equal(verifyResult.sharing_mode, 'shared-standalone', 'doctor should explain the standalone sharing mode');
 
   const checkpoint = spawnSync(path.join(projectRoot, '.codex', 'actions', 'checkpoint-gigabrain-session.sh'), [
     '--summary', 'Implemented the Codex App checkpoint workflow.',
@@ -128,6 +133,7 @@ const run = async () => {
   assert.equal(migratedConfig.codex.defaultProjectScope, rerunSummary.projectScope, 'setup rerun should migrate the project default scope to the repo scope');
   assert.deepEqual(migratedConfig.codex.recallOrder, ['project', 'user', 'remote'], 'setup rerun should migrate recall order to include the personal store');
   assert.equal(fs.existsSync(checkpointResult.source_path), true, 'setup rerun should preserve previously written native project memory');
+  assert.equal(rerunSummary.standalonePathKind, 'canonical', 'setup rerun should keep using the canonical standalone path');
 };
 
 export { run };

@@ -30,7 +30,7 @@ const withTimeout = (promise, label, timeoutMs = 10_000) => {
   ]);
 };
 
-const connectClient = async ({ configPath, stderrChunks }) => {
+const connectClient = async ({ configPath, stderrChunks, env = process.env }) => {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [
@@ -39,7 +39,7 @@ const connectClient = async ({ configPath, stderrChunks }) => {
       configPath,
     ],
     cwd: repoRoot,
-    env: process.env,
+    env,
     stderr: 'pipe',
   });
   transport.stderr?.on('data', (chunk) => {
@@ -220,6 +220,39 @@ const run = async () => {
     );
   } finally {
     await client.close().catch(() => {});
+  }
+
+  const portableHomeRoot = path.join(root, 'portable-home');
+  const portableStoreRoot = path.join(portableHomeRoot, '.gigabrain');
+  const portableConfigPath = path.join(portableStoreRoot, 'config.json');
+  fs.mkdirSync(portableHomeRoot, { recursive: true });
+  writeJsonPretty(portableConfigPath, createStandaloneCodexConfig({
+    projectRoot,
+    projectStorePath: portableStoreRoot,
+    userProfilePath: path.join(portableStoreRoot, 'profile'),
+  }));
+  bootstrapStandaloneStore({ configPath: portableConfigPath });
+  const portableStderrChunks = [];
+  const { client: portableClient } = await connectClient({
+    configPath: '~/.gigabrain/config.json',
+    stderrChunks: portableStderrChunks,
+    env: {
+      ...process.env,
+      HOME: portableHomeRoot,
+    },
+  });
+  try {
+    const portableDoctor = await withTimeout(portableClient.callTool({
+      name: 'gigabrain_doctor',
+      arguments: {
+        target: 'both',
+      },
+    }), 'gigabrain_doctor_portable_path');
+    assert.notEqual(portableDoctor.isError, true, `MCP doctor with portable config path should succeed: ${portableStderrChunks.join('')}`);
+    assert.equal(portableDoctor.structuredContent?.ok, true, 'MCP doctor should work with a home-relative standalone config path');
+    assert.equal(portableDoctor.structuredContent?.config_path, portableConfigPath, 'MCP doctor should resolve the portable config path to the actual standalone config');
+  } finally {
+    await portableClient.close().catch(() => {});
   }
 
   const brokenConfigPath = path.join(root, 'broken-config.json');
