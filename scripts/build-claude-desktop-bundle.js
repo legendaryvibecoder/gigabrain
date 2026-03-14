@@ -46,17 +46,70 @@ const copyTree = (source, target) => {
   });
 };
 
+const resolveDependencyPackageRoot = (dependencyName) => {
+  const candidates = [
+    `${dependencyName}/package.json`,
+    dependencyName,
+  ];
+  for (const candidate of candidates) {
+    try {
+      const resolved = packageRequire.resolve(candidate);
+      let cursor = path.dirname(resolved);
+      while (cursor && cursor !== path.dirname(cursor)) {
+        const packageJsonPath = path.join(cursor, 'package.json');
+        if (fs.existsSync(packageJsonPath)) {
+          const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+          if (pkg?.name === dependencyName) {
+            return {
+              packageRoot: cursor,
+              packageJsonPath,
+              packageJson: pkg,
+            };
+          }
+        }
+        cursor = path.dirname(cursor);
+      }
+    } catch {
+      // Try the next candidate.
+    }
+  }
+  return null;
+};
+
+const collectRuntimeDependencyNames = () => {
+  const result = spawnSync('npm', ['ls', '--omit=dev', '--all', '--json'], {
+    cwd: PACKAGE_ROOT,
+    encoding: 'utf8',
+  });
+  ensureSuccess(result, 'npm ls runtime dependencies');
+  const payload = JSON.parse(String(result.stdout || '{}'));
+  const names = new Set();
+  const walk = (node) => {
+    if (!node || typeof node !== 'object') return;
+    const deps = node.dependencies && typeof node.dependencies === 'object' ? node.dependencies : {};
+    for (const [name, child] of Object.entries(deps)) {
+      names.add(name);
+      walk(child);
+    }
+  };
+  walk(payload);
+  return [...names];
+};
+
 const copyRuntimeDependencies = (stagingRoot) => {
   const targetNodeModules = path.join(stagingRoot, 'node_modules');
   fs.mkdirSync(targetNodeModules, { recursive: true });
-  const queue = Object.keys(PACKAGE_JSON.dependencies || {});
+  const queue = collectRuntimeDependencyNames();
   const seen = new Set();
   while (queue.length > 0) {
     const dependencyName = queue.shift();
     if (!dependencyName || seen.has(dependencyName)) continue;
-    const packageJsonPath = packageRequire.resolve(`${dependencyName}/package.json`);
-    const packageRoot = path.dirname(packageJsonPath);
-    const dependencyPackage = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    const resolvedDependency = resolveDependencyPackageRoot(dependencyName);
+    if (!resolvedDependency) continue;
+    const {
+      packageRoot,
+      packageJson: dependencyPackage,
+    } = resolvedDependency;
     const targetRoot = path.join(targetNodeModules, dependencyName);
     fs.mkdirSync(path.dirname(targetRoot), { recursive: true });
     copyTree(packageRoot, targetRoot);
