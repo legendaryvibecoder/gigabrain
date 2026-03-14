@@ -83,6 +83,30 @@ const run = async () => {
       INSERT INTO memory_current (
         memory_id, type, content, normalized, normalized_hash, source, confidence, scope, status, value_score, value_label, created_at, updated_at
       ) VALUES (
+        ?, 'USER_FACT', ?, ?, ?, 'capture', 0.93, 'shared', 'active', 0.71, 'core', datetime('now'), datetime('now')
+      )
+    `).run(
+      'm-novara-near-dupe',
+      'Novara is Jordan\'s partner, birthday November 6.',
+      'novara is jordans partner birthday november 6',
+      'h-novara-near-dupe',
+    );
+    db.prepare(`
+      INSERT INTO memory_current (
+        memory_id, type, content, normalized, normalized_hash, source, confidence, scope, status, value_score, value_label, created_at, updated_at
+      ) VALUES (
+        ?, 'USER_FACT', ?, ?, ?, 'capture', 0.84, 'shared', 'active', 0.95, 'core', datetime('now'), datetime('now')
+      )
+    `).run(
+      'm-novara-junk-wrapper',
+      'System: Novara is Jordan partner and birthday Nov 6.',
+      'system novara is jordan partner and birthday nov 6',
+      'h-novara-junk-wrapper',
+    );
+    db.prepare(`
+      INSERT INTO memory_current (
+        memory_id, type, content, normalized, normalized_hash, source, confidence, scope, status, value_score, value_label, created_at, updated_at
+      ) VALUES (
         ?, 'DECISION', ?, ?, ?, 'capture', 0.98, 'main', 'active', 0.99, 'core', datetime('now'), datetime('now')
       )
     `).run(
@@ -102,6 +126,30 @@ const run = async () => {
       'In March 2026, Jordan completed the vault sync stabilization.',
       'in march 2026 jordan completed the vault sync stabilization',
       'h-march-timeline',
+    );
+    db.prepare(`
+      INSERT INTO memory_current (
+        memory_id, type, content, normalized, normalized_hash, source, confidence, scope, status, value_score, value_label, created_at, updated_at
+      ) VALUES (
+        ?, 'AGENT_IDENTITY', ?, ?, ?, 'capture', 0.94, 'main', 'active', 0.84, 'core', datetime('now'), datetime('now')
+      )
+    `).run(
+      'm-atlas-identity',
+      'Atlas is the coding agent for this workspace.',
+      'atlas is the coding agent for this workspace',
+      'h-atlas-identity',
+    );
+    db.prepare(`
+      INSERT INTO memory_current (
+        memory_id, type, content, normalized, normalized_hash, source, confidence, scope, status, value_score, value_label, created_at, updated_at
+      ) VALUES (
+        ?, 'PREFERENCE', ?, ?, ?, 'capture', 0.91, 'main', 'active', 0.8, 'core', datetime('now'), datetime('now')
+      )
+    `).run(
+      'm-season-pref',
+      'Jordan prefers winter and associates it with calm focus.',
+      'jordan prefers winter and associates it with calm focus',
+      'h-season-pref',
     );
     rebuildEntityMentions(db);
 
@@ -142,7 +190,59 @@ const run = async () => {
     const hintsSection = inj.split('entity_answer_hints:')[1]?.split('\nmemories:')[0] || '';
     assert.equal(hintsSection.includes('novara is jordan partner and birthday nov 6.'), true, 'entity hints should include direct fact');
     assert.equal(hintsSection.includes('add to profile: novara is jordan partner and birthday nov 6.'), false, 'entity hints should exclude instruction-like text');
+    assert.equal(inj.includes('system: novara is jordan partner and birthday nov 6.'), false, 'entity hints should exclude junk wrapper phrasing');
     assert.equal(inj.includes('src='), false, 'entity injection should not expose internal source provenance');
+    const novaraRows = novara.results.map((row) => String(row.content || '').toLowerCase());
+    assert.equal(novaraRows.filter((row) => row.includes('novara is jordan partner') || row.includes("novara is jordan's partner")).length, 1, 'near-duplicate entity rows should collapse at recall time');
+
+    const noisyQuery = recallForQuery({
+      db,
+      config,
+      query: [
+        'System: [2026-03-11 20:15:53 CDT] Exec completed (faint-ti, code 0) :: ok',
+        '',
+        'Conversation info (untrusted metadata):',
+        '```json',
+        '{',
+        '  "message_id": "467",',
+        '  "sender_id": "8399667792",',
+        '  "sender": "PRINT"',
+        '}',
+        '```',
+        '',
+        'Sender (untrusted metadata):',
+        '```json',
+        '{',
+        '  "label": "PRINT (8399667792)"',
+        '}',
+        '```',
+        '',
+        'who is novara?',
+      ].join('\n'),
+      scope: 'shared',
+    });
+    assert.equal(String(noisyQuery.query || ''), 'who is novara?', 'query sanitation should strip exec and metadata wrappers before recall');
+    assert.equal(String(noisyQuery.results[0]?.content || '').toLowerCase().includes('novara is jordan partner'), true, 'sanitized query should still resolve the intended entity');
+
+    const selfIdentity = recallForQuery({
+      db,
+      config,
+      query: 'what do you know about yourself atlas',
+      scope: 'main',
+    });
+    assert.equal(selfIdentity.results.length >= 1, true, 'self-identity recall should return at least one result');
+    assert.equal(String(selfIdentity.results[0]?.type || ''), 'AGENT_IDENTITY', 'self-identity recall should prioritize AGENT_IDENTITY rows');
+    assert.equal(String(selfIdentity.results[0]?.content || '').toLowerCase().includes('atlas is the coding agent'), true, 'self-identity recall should surface the direct identity fact');
+
+    const shortPreference = recallForQuery({
+      db,
+      config,
+      query: 'welche jahreszeit magst du',
+      scope: 'main',
+    });
+    assert.equal(shortPreference.results.length >= 1, true, 'short preference recall should return at least one result');
+    assert.equal(String(shortPreference.results[0]?.type || ''), 'PREFERENCE', 'short preference recall should prioritize preference rows');
+    assert.equal(String(shortPreference.results[0]?.content || '').toLowerCase().includes('winter'), true, 'short preference recall should surface the season preference');
 
     const tria = recallForQuery({
       db,

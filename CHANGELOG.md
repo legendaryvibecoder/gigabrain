@@ -2,6 +2,27 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.5.3] — 2026-03-13
+
+### Added
+- First-class Claude Code standalone setup via `gigabrain-claude-setup`, including managed `CLAUDE.md` memory instructions, project `.mcp.json` Gigabrain MCP wiring, and repo-local `.claude/` helper scripts
+- Claude Desktop local extension bundle packaging via `npm run claude:desktop:bundle`, producing a `.dxt` artifact that wraps the same Gigabrain stdio MCP server used by Claude Code
+- Packaged-install smoke tests for the Codex and Claude standalone setup flows
+- Release-only validation scripts for live Codex CLI registration, live OpenClaw install/setup, and deep recall evaluation
+- README guidance for Claude native memory, Claude Desktop Cowork compatibility, and host-by-host setup ownership
+
+### Changed
+- Standalone setup/file-generation helpers are now shared between Codex and Claude flows so both clients reuse the same store model, project scope derivation, and MCP server entrypoint
+- Claude Desktop install docs now follow the current custom extension flow, including explicit import into the Desktop app and confirmation of the shared standalone config path
+- Published package contents now keep the recall eval runner and summary docs without shipping bulky generated eval JSON by default
+- Top-level docs now frame Gigabrain as a local-first memory layer with host integrations, plus explicit verify/doctor guidance for OpenClaw, Codex, and Claude
+
+### Fixed
+- OpenClaw onboarding now uses the current plugin discovery flow based on `openclaw plugins install`, and the setup wizard no longer writes the stale `plugins.entries.gigabrain.path` key
+- The OpenClaw setup wizard now activates `plugins.slots.memory = "gigabrain"` so fresh installs actually select Gigabrain as the active memory provider
+- Recall routing now better handles identity and preference prompts, noisy metadata-heavy queries, month-only temporal prompts, and near-duplicate recall rows
+- Orchestrated entity-brief routes now keep a truthful ranking-mode contract even when the answer is backed only by world-model context
+
 ## [0.5.2] — 2026-03-13
 
 ### Fixed

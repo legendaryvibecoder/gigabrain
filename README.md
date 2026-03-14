@@ -1,27 +1,46 @@
 # Gigabrain
 
-Gigabrain is a local-first memory stack for [OpenClaw](https://openclaw.ai) agents, Codex App, and Codex CLI workflows. It converts conversations and native notes into durable, queryable memory, then injects or serves the right context before each prompt so agents stay consistent across sessions.
+Gigabrain is a local-first memory stack for [OpenClaw](https://openclaw.ai) agents, Codex App, Codex CLI, Claude Code, and Claude Desktop workflows. It converts conversations and native notes into durable, queryable memory, then injects or serves the right context before each prompt so agents stay consistent across sessions.
 
 It is built for local-first production use: SQLite-backed recall, deterministic dedupe/audit flows, native markdown sync, and an optional FastAPI console for memory operations.
 
 Release references:
 
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)
+- `v0.5.3` release notes: [`release-notes/v0.5.3.md`](release-notes/v0.5.3.md)
 - `v0.5.2` release notes: [`release-notes/v0.5.2.md`](release-notes/v0.5.2.md)
 - `v0.5.1` release notes: [`release-notes/v0.5.1.md`](release-notes/v0.5.1.md)
+
+## At a glance
+
+| Host surface | Setup path | What Gigabrain owns | What the host owns |
+| --- | --- | --- | --- |
+| OpenClaw | `openclaw plugins install @legendaryvibecoder/gigabrain` + `npm run setup -- --workspace ...` | Local registry, native sync, recall orchestration, audit/nightly flows, memory-slot provider | Gateway runtime, channels, agent execution, plugin loading |
+| Codex App / Codex CLI | `npx gigabrain-codex-setup --project-root ...` | Shared local project/user memory store, MCP tools, explicit checkpoints, maintenance/doctor flows | App/CLI UX, MCP client wiring, session execution |
+| Claude Code | `npx gigabrain-claude-setup --project-root ...` | Shared local project/user memory store, MCP tools, explicit checkpoints, managed `.mcp.json` wiring | `CLAUDE.md` loading, project instructions, Claude Code runtime behavior |
+| Claude Desktop | `npm run claude:desktop:bundle` + install `.dxt` | Same local MCP-backed memory store and tools as Claude Code | Desktop extension hosting, native app/chat UX, Claude account memory |
+| Claude Desktop Cowork | Compatibility-audited via the same repo/store | Same local memory layer when pointed at the same repo/config | Cowork orchestration and app control, with no documented memory across sessions |
 
 ## Choose your path
 
 - **Codex App / Codex CLI**: Use Gigabrain as a standalone MCP-backed memory layer with shared project and user stores. Start with [Option C: Codex App + Codex CLI (standalone, no OpenClaw required)](#option-c-codex-app--codex-cli-standalone-no-openclaw-required).
+- **Claude Code / Claude Desktop**: Use Gigabrain as the same standalone memory layer with project `.mcp.json`, `CLAUDE.md`, and an optional Claude Desktop local extension bundle. Start with [Option D: Claude Code + Claude Desktop (standalone, no OpenClaw required)](#option-d-claude-code--claude-desktop-standalone-no-openclaw-required).
 - **OpenClaw**: Use Gigabrain as the gateway-integrated memory plugin and active memory-slot provider. Start with [Option A: OpenClaw npm install + setup wizard](#option-a-openclaw-npm-install--setup-wizard-recommended-for-openclaw).
 
-Both paths use the same core memory engine, registry, dedupe logic, audit flows, and recall model. The difference is the host integration layer: OpenClaw plugin hooks on one side, Codex MCP tools on the other.
+All paths use the same core memory engine, registry, dedupe logic, audit flows, and recall model. The difference is the host integration layer: OpenClaw plugin hooks on one side, Codex MCP tools on another, and Claude MCP plus desktop-extension wiring on the Claude side.
+
+If you are choosing between hosts:
+
+- Pick **OpenClaw** when you want Gigabrain to be the active memory provider inside the gateway.
+- Pick **Codex** when you want explicit MCP-backed repo/user memory for coding workflows.
+- Pick **Claude Code / Claude Desktop** when you want the same local memory layer but inside Anthropic surfaces.
+- Pick **Cowork** only as a compatibility surface for now; `v0.5.3` does not add a native Cowork memory integration.
 
 ## What it does
 
 - **Capture**: Uses a hybrid memory model where explicit remember intent writes durable memory and Codex App checkpoints write episodic native session logs
 - **Recall**: Before each prompt, the recall orchestrator chooses between quick context, entity briefs, timeline briefs, and verification-oriented recall
-- **Codex MCP**: Exposes explicit `gigabrain_recall`, `gigabrain_remember`, `gigabrain_checkpoint`, `gigabrain_provenance`, `gigabrain_recent`, and `gigabrain_doctor` tools for Codex App and Codex CLI
+- **Standalone MCP**: Exposes explicit `gigabrain_recall`, `gigabrain_remember`, `gigabrain_checkpoint`, `gigabrain_provenance`, `gigabrain_recent`, and `gigabrain_doctor` tools for Codex App, Codex CLI, Claude Code, and Claude Desktop
 - **Dedupe**: Exact and hybrid semantic deduplication catches duplicates, paraphrases, and malformed near-duplicates with type-aware thresholds
 - **Native sync**: Indexes your workspace `MEMORY.md` and daily notes alongside the registry for unified recall
 - **World model**: Projects atomic memories into entities, beliefs, episodes, open loops, contradictions, and syntheses that can power better recall and review
@@ -41,17 +60,15 @@ Both paths use the same core memory engine, registry, dedupe logic, audit flows,
 
 ## Installation
 
-If you are here for Codex App, skip the OpenClaw setup and jump straight to Option C. OpenClaw is only required for the plugin path.
+If you are here for Codex App, Codex CLI, Claude Code, or Claude Desktop, skip the OpenClaw setup and jump straight to the standalone options below. OpenClaw is only required for the plugin path.
 
 ### Option A: OpenClaw npm install + setup wizard (recommended for OpenClaw)
 
 Install:
 
 ```bash
-mkdir -p ~/.openclaw/plugins
-cd ~/.openclaw/plugins
-npm install @legendaryvibecoder/gigabrain
-cd node_modules/@legendaryvibecoder/gigabrain
+openclaw plugins install @legendaryvibecoder/gigabrain
+cd ~/.openclaw/extensions/gigabrain
 ```
 
 Run the one-command setup wizard:
@@ -60,10 +77,13 @@ Run the one-command setup wizard:
 npm run setup -- --workspace /path/to/your-openclaw-workspace
 ```
 
+The wizard is safe to rerun. If your OpenClaw config is stale, partial, or comes from older Gigabrain docs, rerun the wizard first and use doctor immediately after.
+
 What the setup wizard does:
 
 - Ensures `plugins.entries.gigabrain` exists in `~/.openclaw/openclaw.json`
-- Sets plugin path and runtime paths (`workspaceRoot`, `memoryRoot`, `outputDir`, `registryPath`)
+- Sets `plugins.slots.memory = "gigabrain"` so OpenClaw uses Gigabrain as the active memory provider
+- Sets runtime paths (`workspaceRoot`, `memoryRoot`, `outputDir`, `registryPath`)
 - Enables the `v0.5.1` hybrid memory defaults for explicit remember intent, native promotion, and world-model-aware surfaces
 - Bootstraps the DB and indexes native memory files
 - Enables the Obsidian memory surface by default and builds the first vault unless `--skip-vault`
@@ -76,6 +96,12 @@ Recommended follow-up after setup:
 2. Open `<workspace>/obsidian-vault/Gigabrain`.
 3. Start at `00 Home/Home.md`.
 4. If the vault looks sparse at first, that is normal: Gigabrain only shows memories that already exist in native notes or the registry.
+
+Verify the install:
+
+```bash
+npx gigabrainctl doctor --config ~/.openclaw/openclaw.json
+```
 
 Wizard help:
 
@@ -90,13 +116,15 @@ npm run setup -- --workspace /path/to/workspace --vault-path ~/Documents/gigabra
 npm run setup -- --workspace /path/to/workspace --skip-vault
 ```
 
+If doctor reports config drift or stale paths, rerun the setup wizard before editing `openclaw.json` manually.
+
 ### Option B: OpenClaw manual setup (custom environments)
 
 1. Install from source:
 
 ```bash
-cd ~/.openclaw/plugins
 git clone https://github.com/legendaryvibecoder/gigabrain.git
+openclaw plugins install -l /absolute/path/to/gigabrain
 ```
 
 2. Register plugin in `~/.openclaw/openclaw.json`:
@@ -109,7 +137,6 @@ git clone https://github.com/legendaryvibecoder/gigabrain.git
     },
     "entries": {
       "gigabrain": {
-        "path": "~/.openclaw/plugins/gigabrain",
         "config": {
           "enabled": true
         }
@@ -121,6 +148,11 @@ git clone https://github.com/legendaryvibecoder/gigabrain.git
 
 `plugins.slots.memory = "gigabrain"` is the important part that tells OpenClaw to use Gigabrain as the active memory-slot provider.
 
+Notes:
+
+- Recent OpenClaw builds discover third-party plugins from `~/.openclaw/extensions` or linked paths in `plugins.load.paths`, not from `~/.openclaw/plugins/node_modules`.
+- Do not add `plugins.entries.gigabrain.path` manually unless your OpenClaw build explicitly documents that key.
+
 3. Restart gateway:
 
 ```bash
@@ -131,6 +163,12 @@ openclaw gateway restart
 
 ```bash
 node scripts/migrate-v3.js --apply --config ~/.openclaw/openclaw.json
+```
+
+5. Verify the resulting config:
+
+```bash
+npx gigabrainctl doctor --config ~/.openclaw/openclaw.json
 ```
 
 ### Option C: Codex App + Codex CLI (standalone, no OpenClaw required)
@@ -146,6 +184,8 @@ Bootstrap Codex wiring for the current repo. By default this creates a shared re
 ```bash
 npx gigabrain-codex-setup --project-root /path/to/repo
 ```
+
+The Codex setup is safe to rerun and is the recommended repair path for stale standalone configs.
 
 What the Codex setup does:
 
@@ -218,9 +258,99 @@ Troubleshooting:
 - If you want to inspect only the user store, run `npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target user`.
 - If you want to inspect only the repo store, run `npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target project`.
 
+### Option D: Claude Code + Claude Desktop (standalone, no OpenClaw required)
+
+Install Gigabrain into your repo or workspace:
+
+```bash
+npm install @legendaryvibecoder/gigabrain
+```
+
+Bootstrap Claude wiring for the current repo. By default this uses the same shared standalone store as the Codex path under `~/.codex/gigabrain/`, keeps the shared personal user store under `~/.codex/gigabrain/profile/`, and derives the same stable repo-specific scope:
+
+```bash
+npx gigabrain-claude-setup --project-root /path/to/repo
+```
+
+The Claude setup is safe to rerun. If `CLAUDE.md`, `.mcp.json`, or the shared standalone config drift over time, rerun setup first and then run doctor.
+
+What the Claude setup does:
+
+- Reuses the shared standalone Gigabrain config at `~/.codex/gigabrain/config.json` by default
+- Bootstraps both `~/.codex/gigabrain/` and `~/.codex/gigabrain/profile/`, including `MEMORY.md`, `memory/registry.sqlite`, and output folders
+- Adds or refreshes a managed Gigabrain memory block inside `CLAUDE.md`
+- Adds or refreshes a `gigabrain` server entry inside project `.mcp.json`
+- Creates repo-local `.claude/setup.sh` plus `.claude/actions/` helper scripts for verify, maintenance, and manual session checkpointing
+- Preserves existing `CLAUDE.md` content and unrelated `.mcp.json` server entries on rerun
+
+Useful Claude commands after setup:
+
+```bash
+npx gigabrain-claude-setup --project-root /path/to/repo
+npx gigabrain-codex-checkpoint --config ~/.codex/gigabrain/config.json --summary "Implemented the Claude workflow"
+npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target both
+npx gigabrainctl maintain --config ~/.codex/gigabrain/config.json
+npm run claude:desktop:bundle
+```
+
+Claude Code behavior:
+
+- Claude Code reads the local Gigabrain MCP server from `.mcp.json`
+- `CLAUDE.md` teaches Claude how to use `gigabrain_recall`, `gigabrain_remember`, `gigabrain_checkpoint`, and `gigabrain_provenance`
+- The Claude path uses the same shared project/user memory model as the Codex standalone path
+- There is still no hidden background capture; checkpoints stay explicit and task-end driven
+
+Claude Desktop behavior:
+
+- `npm run claude:desktop:bundle` builds a local `.dxt` extension bundle under `dist/claude-desktop/`
+- The bundle wraps the same Gigabrain stdio MCP server used by Claude Code
+- The desktop extension defaults to the same standalone config path (`~/.codex/gigabrain/config.json`), so Claude Desktop and Claude Code can share memory
+
+### Claude memory surfaces vs Gigabrain
+
+Claude now has multiple memory/instruction surfaces, and `v0.5.3` treats them as complementary rather than interchangeable:
+
+- **Claude Desktop account/chat memory**: Anthropic’s own memory for supported plans and clients. Gigabrain does not read, import, or synchronize those memories.
+- **Claude Code memory**: Claude Code loads `CLAUDE.md` and related local instruction files. Gigabrain integrates with that by managing a Gigabrain block and exposing MCP tools, but it does not replace Claude Code’s own instruction loading.
+- **Claude Desktop Cowork**: Anthropic currently documents no memory across Cowork sessions. Gigabrain can still be used as the local memory layer if Cowork is operating in the same repo/config environment, but Cowork itself is not a first-class Gigabrain-native integration in `v0.5.3`.
+- **Gigabrain**: explicit, local-first project/user memory across hosts, with checkpoints, provenance, recall orchestration, maintenance, and a shared local store.
+
+Recommended stance:
+
+- Leave Claude native memory on if you want Claude’s own account-level personalization.
+- Use Gigabrain for durable repo/project continuity, explicit remembered facts, checkpoints, provenance, and shared local stores across Codex/Claude/OpenClaw surfaces.
+- Do not assume Claude’s native memory and Gigabrain are deduplicated or synchronized with each other.
+
+Recommended Claude install and verify flow:
+
+1. Run `npx gigabrain-claude-setup --project-root /path/to/repo`.
+2. Review `CLAUDE.md` and `.mcp.json` in the repo.
+3. Run `.claude/actions/verify-gigabrain.sh` or `npx gigabrainctl doctor --config ~/.codex/gigabrain/config.json --target both`.
+4. Build the desktop bundle with `npm run claude:desktop:bundle`.
+5. In Claude Desktop on macOS, open Settings > Extensions > Advanced settings > Install Extension and import the generated `.dxt` file.
+6. Confirm the extension uses `~/.codex/gigabrain/config.json` unless you intentionally configured a different standalone path.
+7. Use `.claude/actions/checkpoint-gigabrain-session.sh --summary "..."` after meaningful work if you want episodic session capture.
+
+Cowork note:
+
+- Cowork is compatibility-audited for the same repo/config path, but `v0.5.3` does not claim a dedicated Cowork memory integration.
+- If you use Cowork and want durable continuity, keep Gigabrain configured in the same repo and rely on the shared local store rather than expecting Cowork session memory.
+
+## Upgrade / existing users
+
+- **OpenClaw users from older Gigabrain docs**: move to `openclaw plugins install @legendaryvibecoder/gigabrain`, rerun `npm run setup -- --workspace ...`, then run `npx gigabrainctl doctor --config ~/.openclaw/openclaw.json`.
+- **Codex `0.5.1` / `0.5.2` users**: rerun `npx gigabrain-codex-setup --project-root /path/to/repo` to refresh the shared store defaults, verify helper scripts, and doctor path.
+- **Claude adopters**: run `npx gigabrain-claude-setup --project-root /path/to/repo`, review `CLAUDE.md` and `.mcp.json`, then run doctor before building the desktop extension.
+
+Across all hosts, the expected upgrade order is:
+
+1. Re-run setup for the host surface you use.
+2. Run doctor or the generated verify script.
+3. Only then troubleshoot custom config by hand if something still looks wrong.
+
 ## Configuration
 
-OpenClaw mode keeps config under `plugins.entries.gigabrain.config` in `openclaw.json`. Codex standalone mode stores the same schema in `~/.codex/gigabrain/config.json` by default, or in `<repo>/.gigabrain/config.json` when you opt into `--store-mode project-local`. The full OpenClaw plugin schema is defined in [`openclaw.plugin.json`](openclaw.plugin.json). Key sections:
+OpenClaw mode keeps config under `plugins.entries.gigabrain.config` in `openclaw.json`. Codex and Claude standalone modes store the same schema in `~/.codex/gigabrain/config.json` by default, or in `<repo>/.gigabrain/config.json` when you opt into `--store-mode project-local`. The full OpenClaw plugin schema is defined in [`openclaw.plugin.json`](openclaw.plugin.json). Key sections:
 
 ### Runtime
 
@@ -705,7 +835,12 @@ npm run test:regression
 npm run test:performance
 ```
 
-The suite includes 25 executable tests covering config validation, policy rules, capture service, memory actions, orchestrator behavior, projection store FTS behavior, person service, world-model behavior, LLM routing, native-sync query handling, vault surface generation and pull, setup wizard behavior, audit maintenance, vault CLI, migration, bridge routes, native recall, regression behavior, and nightly performance.
+The default suite includes 29 executable tests covering config validation, policy rules, capture service, memory actions, orchestrator behavior, projection store FTS behavior, person service, world-model behavior, LLM routing, native-sync query handling, vault surface generation and pull, OpenClaw setup wizard behavior, Codex and Claude standalone setup flows, packaged-install setup smokes, Claude Desktop bundle packaging, audit maintenance, vault CLI, migration, bridge routes, native recall, regression behavior, and nightly performance.
+
+Release validation can go further with:
+
+- `npm run test:release-live` for live Codex CLI registration and live OpenClaw install/setup checks on a machine that has both CLIs installed
+- `npm run eval:deep-recall` for the expanded recall-routing evaluation used when the core recall stack changes
 
 ## Contributing
 

@@ -20,7 +20,6 @@ const run = async () => {
     'scripts/setup-first-run.js',
     '--config', ws.configPath,
     '--workspace', ws.workspace,
-    '--plugin-path', repoRoot,
     '--agents-path', agentsPath,
     '--vault-path', vaultRoot,
     '--skip-restart',
@@ -45,6 +44,8 @@ const run = async () => {
   assert.equal(summary.nextSteps.some((step) => step.includes('Obsidian')), true, 'setup should guide users to Obsidian');
 
   const config = JSON.parse(fs.readFileSync(ws.configPath, 'utf8'));
+  assert.equal(config.plugins.slots.memory, 'gigabrain', 'setup should activate Gigabrain as the OpenClaw memory slot');
+  assert.equal('path' in config.plugins.entries.gigabrain, false, 'setup should not write plugin path into config');
   const gb = config.plugins.entries.gigabrain.config;
   assert.equal(gb.runtime.paths.workspaceRoot, ws.workspace, 'setup should store workspace root');
   assert.equal(gb.runtime.paths.memoryRoot, 'memory', 'setup should store memoryRoot');

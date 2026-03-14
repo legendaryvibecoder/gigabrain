@@ -21,7 +21,6 @@ Usage:
 Flags:
   --config <path>       Path to openclaw.json (default: ~/.openclaw/openclaw.json or $OPENCLAW_CONFIG)
   --workspace <path>    Workspace root for Gigabrain runtime paths
-  --plugin-path <path>  Gigabrain plugin path (default: current directory)
   --agents-path <path>  AGENTS.md path (default: <workspace>/AGENTS.md)
   --vault-path <path>   Vault root for the generated Obsidian surface
   --vault-subdir <name> Subdirectory inside the vault root (default: Gigabrain)
@@ -213,7 +212,6 @@ const main = () => {
   }
 
   const configPath = resolveAbsolute(readFlag('--config', defaultOpenclawConfigPath()));
-  const pluginPath = resolveAbsolute(readFlag('--plugin-path', process.cwd()));
   const requestedWorkspace = readFlag('--workspace', '');
   const requestedVaultPathRaw = readFlag('--vault-path', '');
   const requestedVaultPath = requestedVaultPathRaw ? resolveAbsolute(requestedVaultPathRaw) : '';
@@ -228,6 +226,7 @@ const main = () => {
   }
 
   const plugins = ensureObject(openclawConfig, 'plugins');
+  const slots = ensureObject(plugins, 'slots');
   const memory = ensureObject(openclawConfig, 'memory');
   const entries = ensureObject(plugins, 'entries');
   const gigabrain = ensureObject(entries, 'gigabrain');
@@ -264,8 +263,8 @@ const main = () => {
     ? outputDirRaw
     : path.join(workspaceRoot, outputDirRaw);
 
-  gigabrain.path = pluginPath;
   gigabrain.enabled = true;
+  slots.memory = 'gigabrain';
   gigabrainConfig.enabled = true;
   runtimePaths.workspaceRoot = workspaceRoot;
   runtimePaths.memoryRoot = memoryRootRaw;
@@ -432,7 +431,6 @@ const main = () => {
   const summary = {
     ok: true,
     configPath,
-    pluginPath,
     workspaceRoot,
     registryPath: bootstrap.dbPath,
     bootstrap,

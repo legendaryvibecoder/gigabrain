@@ -1,0 +1,79 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+import {
+  installTarballIntoTempApp,
+  packRepo,
+  readJson,
+  runCommand,
+} from './packaged-install-helpers.js';
+
+const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+
+const run = async () => {
+  const { tarballPath } = packRepo({
+    repoRoot,
+    prefix: 'gb-packaged-codex-pack-',
+  });
+  const { packageRoot } = installTarballIntoTempApp({
+    tarballPath,
+    prefix: 'gb-packaged-codex-app-',
+  });
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-packaged-codex-'));
+  const projectRoot = path.join(root, 'project');
+  const homeRoot = path.join(root, 'home');
+  fs.mkdirSync(projectRoot, { recursive: true });
+  fs.mkdirSync(homeRoot, { recursive: true });
+  fs.writeFileSync(path.join(projectRoot, 'package.json'), '{"name":"packaged-codex","private":true}\n', 'utf8');
+
+  const result = runCommand({
+    cmd: 'node',
+    args: [
+      path.join(packageRoot, 'scripts', 'gigabrain-codex-setup.js'),
+      '--project-root',
+      projectRoot,
+    ],
+    cwd: packageRoot,
+    env: {
+      ...process.env,
+      HOME: homeRoot,
+      CODEX_HOME: path.join(homeRoot, '.codex'),
+    },
+    label: 'packaged codex setup',
+  });
+
+  const summary = JSON.parse(String(result.stdout || '{}'));
+  const sharedStoreRoot = path.join(homeRoot, '.codex', 'gigabrain');
+  const sharedUserStore = path.join(sharedStoreRoot, 'profile');
+  const installedPackageRoot = fs.realpathSync(packageRoot);
+  assert.equal(summary.ok, true, 'packaged codex setup should succeed');
+  assert.equal(summary.projectStorePath, sharedStoreRoot, 'packaged codex setup should report the shared project store');
+  assert.equal(summary.userStorePath, sharedUserStore, 'packaged codex setup should report the shared user store');
+  assert.equal(fs.existsSync(path.join(sharedStoreRoot, 'config.json')), true, 'packaged codex setup should create config.json');
+  assert.equal(fs.existsSync(path.join(projectRoot, '.codex', 'actions', 'verify-gigabrain.sh')), true, 'packaged codex setup should create verify action');
+
+  const verify = runCommand({
+    cmd: path.join(projectRoot, '.codex', 'actions', 'verify-gigabrain.sh'),
+    cwd: projectRoot,
+    env: {
+      ...process.env,
+      HOME: homeRoot,
+      CODEX_HOME: path.join(homeRoot, '.codex'),
+    },
+    label: 'packaged codex verify action',
+  });
+  const verifyResult = JSON.parse(String(verify.stdout || '{}'));
+  assert.equal(verifyResult.ok, true, 'packaged codex verify action should succeed');
+  assert.equal(verifyResult.stores.some((store) => store.target === 'user' && store.ok === true), true, 'packaged codex verify should include the user store');
+
+  const mcpCommand = String(summary.mcpCommand || '');
+  assert.equal(mcpCommand.includes(path.join(installedPackageRoot, 'scripts', 'gigabrain-mcp.js')), true, 'packaged codex setup should print an MCP command that points at the installed package');
+
+  const config = readJson(path.join(sharedStoreRoot, 'config.json'));
+  assert.equal(config.codex.userProfilePath, sharedUserStore, 'packaged codex setup should keep the shared user store configured');
+};
+
+export { run };

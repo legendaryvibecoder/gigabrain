@@ -1,8 +1,8 @@
 {
     "name": "@legendaryvibecoder/gigabrain",
-    "version": "0.5.2",
+    "version": "0.5.3",
     "type": "module",
-    "description": "Hybrid memory stack for OpenClaw and Codex — capture, recall, dedupe, audit, native sync",
+    "description": "Hybrid memory stack for OpenClaw, Codex, and Claude — capture, recall, dedupe, audit, native sync",
     "author": "Legendary Vibecoder",
     "homepage": "https://github.com/legendaryvibecoder/gigabrain#readme",
     "bugs": {
@@ -23,11 +23,19 @@
         "codex:checkpoint": "node scripts/gigabrain-codex-checkpoint.js --config \"$HOME/.codex/gigabrain/config.json\"",
         "codex:doctor": "node scripts/gigabrainctl.js doctor --config \"$HOME/.codex/gigabrain/config.json\" --target both",
         "codex:maintain": "node scripts/gigabrainctl.js maintain --config \"$HOME/.codex/gigabrain/config.json\"",
+        "claude:setup": "node scripts/gigabrain-claude-setup.js",
+        "claude:checkpoint": "node scripts/gigabrain-codex-checkpoint.js --config \"$HOME/.codex/gigabrain/config.json\"",
+        "claude:doctor": "node scripts/gigabrainctl.js doctor --config \"$HOME/.codex/gigabrain/config.json\" --target both",
+        "claude:maintain": "node scripts/gigabrainctl.js maintain --config \"$HOME/.codex/gigabrain/config.json\"",
+        "claude:desktop:bundle": "node scripts/build-claude-desktop-bundle.js",
+        "eval:deep-recall": "node eval/run-deep-recall-eval.js",
         "test": "node tests/run-all.js",
         "test:unit": "node tests/run-all.js --filter unit",
         "test:integration": "node tests/run-all.js --filter integration",
         "test:regression": "node tests/run-all.js --filter regression",
         "test:performance": "node tests/run-all.js --filter performance",
+        "test:release-live": "RELEASE_LIVE_SMOKE=1 node tests/release-live-codex-cli-test.js && RELEASE_LIVE_SMOKE=1 node tests/release-live-openclaw-install-test.js",
+        "test:release": "node tests/run-all.js && npm run test:release-live && npm run eval:deep-recall",
         "gigabrainctl": "node scripts/gigabrainctl.js",
         "nightly": "node scripts/gigabrainctl.js nightly",
         "maintain": "node scripts/gigabrainctl.js maintain",
@@ -53,13 +61,15 @@
         "plugin",
         "gigabrain",
         "codex",
+        "claude",
         "mcp"
     ],
     "bin": {
         "gigabrainctl": "./scripts/gigabrainctl.js",
         "gigabrain-codex-checkpoint": "./scripts/gigabrain-codex-checkpoint.js",
         "gigabrain-mcp": "./scripts/gigabrain-mcp.js",
-        "gigabrain-codex-setup": "./scripts/gigabrain-codex-setup.js"
+        "gigabrain-codex-setup": "./scripts/gigabrain-codex-setup.js",
+        "gigabrain-claude-setup": "./scripts/gigabrain-claude-setup.js"
     },
     "openclaw": {
         "extensions": [
@@ -78,7 +88,9 @@
         "index.ts",
         "lib/",
         "scripts/",
-        "eval/",
+        "eval/*.js",
+        "eval/deep-recall-summary-2026-03-11.md",
+        "eval/cases.jsonl",
         "package.json",
         "CHANGELOG.md",
         "release-notes/",

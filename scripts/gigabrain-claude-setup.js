@@ -1,20 +1,19 @@
 #!/usr/bin/env node
-import fs from 'node:fs';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { bootstrapStandaloneStore } from '../lib/core/codex-service.js';
 import {
-  buildCodexMcpAddCommand,
-  buildMcpLaunchArgs,
   createStandaloneCodexConfig,
   deriveProjectScope,
   ensureGitIgnoreEntry,
   normalizeStoreMode,
-  upsertCodexAgentsBlock,
-  writeCodexSupportFiles,
 } from '../lib/core/codex-project.js';
+import {
+  upsertClaudeMarkdownBlock,
+  upsertClaudeMcpConfig,
+  writeClaudeSupportFiles,
+} from '../lib/core/claude-project.js';
 import {
   expandHome,
   readJson,
@@ -24,21 +23,20 @@ import {
 const THIS_FILE = fileURLToPath(import.meta.url);
 const PACKAGE_ROOT = path.resolve(path.dirname(THIS_FILE), '..');
 
-const HELP = `Gigabrain Codex setup
+const HELP = `Gigabrain Claude setup
 
 Usage:
-  node scripts/gigabrain-codex-setup.js
-  node scripts/gigabrain-codex-setup.js --project-root /path/to/repo
-  node scripts/gigabrain-codex-setup.js --install-mcp
+  node scripts/gigabrain-claude-setup.js
+  node scripts/gigabrain-claude-setup.js --project-root /path/to/repo
 
 Flags:
-  --project-root <path>      Repo root to wire for Codex (default: cwd)
+  --project-root <path>      Repo root to wire for Claude Code/Desktop (default: cwd)
   --config <path>            Standalone Gigabrain config path (default: ~/.codex/gigabrain/config.json)
   --store-mode <mode>        Store mode: global (default) or project-local
-  --agents-path <path>       Project AGENTS.md path (default: <project>/AGENTS.md)
+  --claude-md-path <path>    Claude instructions file (default: <project>/CLAUDE.md)
+  --mcp-path <path>          Claude MCP config file (default: <project>/.mcp.json)
   --user-overlay-path <path> Optional personal user-store path (default: <store>/profile)
-  --install-mcp             Run 'codex mcp add gigabrain ...' after setup
-  --help                    Print this help
+  --help                     Print this help
 `;
 
 const args = process.argv.slice(2);
@@ -116,18 +114,6 @@ const mergeSetupConfig = ({
   };
 };
 
-const runMcpInstall = (configPath) => {
-  const launchArgs = buildMcpLaunchArgs({
-    packageRoot: PACKAGE_ROOT,
-    configPath,
-  });
-  return spawnSync('codex', ['mcp', 'add', 'gigabrain', '--', ...launchArgs], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-    env: process.env,
-  });
-};
-
 const main = async () => {
   if (hasFlag('--help') || hasFlag('-h')) {
     console.log(HELP.trim());
@@ -140,7 +126,8 @@ const main = async () => {
     ? path.join(projectRoot, '.gigabrain', 'config.json')
     : path.join(process.env.HOME || '', '.codex', 'gigabrain', 'config.json');
   const configPath = path.resolve(expandHome(readFlag('--config', defaultConfigPath)));
-  const agentsPath = path.resolve(expandHome(readFlag('--agents-path', path.join(projectRoot, 'AGENTS.md'))));
+  const claudePath = path.resolve(expandHome(readFlag('--claude-md-path', path.join(projectRoot, 'CLAUDE.md'))));
+  const mcpPath = path.resolve(expandHome(readFlag('--mcp-path', path.join(projectRoot, '.mcp.json'))));
   const storeRoot = path.dirname(configPath);
   const userOverlayFlag = readFlag('--user-overlay-path', '');
   const userOverlayPath = userOverlayFlag ? path.resolve(expandHome(userOverlayFlag)) : '';
@@ -159,40 +146,30 @@ const main = async () => {
   const gitignore = storeMode === 'project_local'
     ? ensureGitIgnoreEntry(projectRoot)
     : { changed: false, path: path.join(projectRoot, '.gitignore') };
-  const agents = upsertCodexAgentsBlock(agentsPath, {
+  const claude = upsertClaudeMarkdownBlock(claudePath, {
     projectScope,
     storeMode,
     storePath: storeRoot,
     userStorePath: mergedConfig.codex.userProfilePath,
   });
-  const codexFiles = writeCodexSupportFiles({
+  const mcp = upsertClaudeMcpConfig({
+    mcpPath,
+    packageRoot: PACKAGE_ROOT,
+    configPath,
+  });
+  const claudeFiles = writeClaudeSupportFiles({
     projectRoot,
     packageRoot: PACKAGE_ROOT,
     configPath,
     storeMode,
     projectScope,
     userStorePath: mergedConfig.codex.userProfilePath,
+    claudePath,
+    mcpPath,
   });
   const bootstrap = bootstrapStandaloneStore({
     configPath,
   });
-  const mcpCommand = buildCodexMcpAddCommand({
-    packageRoot: PACKAGE_ROOT,
-    configPath,
-  });
-
-  let mcpInstall = {
-    status: 'skipped',
-  };
-  if (hasFlag('--install-mcp')) {
-    const install = runMcpInstall(configPath);
-    mcpInstall = {
-      status: install.status === 0 ? 'installed' : 'failed',
-      exitCode: Number(install.status ?? 1),
-      stdout: String(install.stdout || '').trim(),
-      stderr: String(install.stderr || '').trim(),
-    };
-  }
 
   console.log(JSON.stringify({
     ok: true,
@@ -207,16 +184,15 @@ const main = async () => {
     userStorePath: mergedConfig.codex.userProfilePath,
     bootstrap,
     gitignore,
-    agents,
-    codex: codexFiles,
-    mcpCommand,
-    mcpInstall,
+    claude,
+    mcp,
+    claudeFiles,
     nextSteps: [
-      `Run ${mcpCommand}`,
-      `Use gigabrain_recall for continuity, gigabrain_remember for explicit durable saves, and gigabrain_checkpoint at task end in Codex App.`,
-      `Run npx gigabrain-codex-checkpoint --config ${configPath} --summary "Completed ..." after meaningful work if you want episodic session capture.`,
-      `Run npx gigabrainctl doctor --config ${configPath} --target both to verify the repo store and personal user store.`,
-      `Run npx gigabrainctl maintain --config ${configPath} when you want manual consolidation in Codex mode.`,
+      `Open ${claudePath} to review the Gigabrain Claude memory block.`,
+      `Open ${mcpPath} to confirm the local Gigabrain MCP entry for Claude Code.`,
+      `Run .claude/actions/verify-gigabrain.sh or npx gigabrainctl doctor --config ${configPath} --target both to verify the repo store and personal user store.`,
+      `Run .claude/actions/checkpoint-gigabrain-session.sh --summary "Completed ..." after meaningful work if you want episodic session capture.`,
+      `Run npm run claude:desktop:bundle to build the local Claude Desktop extension bundle.`,
     ],
   }, null, 2));
 };
