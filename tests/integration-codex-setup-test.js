@@ -74,6 +74,8 @@ const run = async () => {
   assert.equal(agents.includes(summary.projectScope), true, 'AGENTS block should teach the repo-specific scope');
   assert.equal(agents.includes('target: "user"'), true, 'AGENTS block should teach personal-memory targeting');
   assert.equal(agents.includes('target: "project"'), true, 'AGENTS block should teach repo-memory targeting');
+  assert.equal(agents.includes('Prefer Gigabrain MCP tools over direct CLI writes whenever the MCP server is available.'), true, 'AGENTS block should explicitly prefer MCP over raw CLI writes');
+  assert.equal(agents.includes('node ~/.npm/_npx/.../scripts/gigabrainctl.js'), true, 'AGENTS block should explicitly forbid ephemeral npx cache paths');
 
   const verify = spawnSync(path.join(projectRoot, '.codex', 'actions', 'verify-gigabrain.sh'), [], {
     cwd: projectRoot,
@@ -97,6 +99,11 @@ const run = async () => {
   const verifyScript = fs.readFileSync(path.join(projectRoot, '.codex', 'actions', 'verify-gigabrain.sh'), 'utf8');
   assert.equal(verifyScript.includes('node_modules/.bin/$tool'), true, 'verify action should prefer repo-local binaries through the shared helper resolver');
   assert.equal(verifyScript.includes('npx --no-install "$tool"'), true, 'verify action should fall back to npx without reinstalling');
+  assert.equal(verifyScript.includes('npx --yes --package "$PACKAGE_SPEC" "$tool"'), true, 'verify action should include a durable package-spec npx fallback');
+
+  assert.equal(Array.isArray(summary.nextSteps), true, 'setup should print next steps');
+  assert.equal(summary.nextSteps.some((step) => String(step).includes('Use Gigabrain through MCP first once it is registered in Codex.')), true, 'setup next steps should explicitly prefer MCP first');
+  assert.equal(summary.nextSteps.some((step) => String(step).includes('node ~/.npm/_npx/.../scripts/gigabrainctl.js')), true, 'setup next steps should explicitly warn against ephemeral npx cache paths');
 
   const checkpoint = spawnSync(path.join(projectRoot, '.codex', 'actions', 'checkpoint-gigabrain-session.sh'), [
     '--summary', 'Implemented the Codex App checkpoint workflow.',

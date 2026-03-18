@@ -207,6 +207,7 @@ const main = async () => {
       `Use --store-mode project-local if you want this repo isolated from other Claude/Codex workspaces.`,
       `Open ${claudePath} to review the Gigabrain Claude memory block.`,
       `Open ${mcpPath} to confirm the local Gigabrain MCP entry for Claude Code.`,
+      'Use Gigabrain through MCP first once Claude is reading the local launcher. Do not hardcode node ~/.npm/_npx/.../scripts/gigabrainctl.js cache paths.',
       `Run ${path.join(projectRoot, '.claude', 'actions', 'verify-gigabrain.sh')} before hand-editing config. Absolute fallback: npx gigabrainctl doctor --config ${configPath} --target both.`,
       `Run .claude/actions/checkpoint-gigabrain-session.sh --summary "Completed ..." after meaningful work if you want episodic session capture.`,
       `Run npm run claude:desktop:bundle to build the local Claude Desktop extension bundle.`,
