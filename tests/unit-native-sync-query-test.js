@@ -12,6 +12,36 @@ const run = async () => {
   const config = normalizeConfig(makeConfigObject(ws.workspace).plugins.entries.gigabrain.config);
   const db = openDb(ws.dbPath);
   try {
+    const legacyDbPath = path.join(ws.workspace, 'legacy-native.sqlite');
+    const legacyDb = openDb(legacyDbPath);
+    try {
+      legacyDb.exec(`
+        CREATE TABLE memory_native_chunks (
+          chunk_id TEXT PRIMARY KEY,
+          source_path TEXT NOT NULL,
+          source_kind TEXT NOT NULL,
+          source_date TEXT,
+          section TEXT,
+          line_start INTEGER,
+          line_end INTEGER,
+          content TEXT NOT NULL,
+          normalized TEXT NOT NULL,
+          hash TEXT NOT NULL,
+          first_seen_at TEXT NOT NULL,
+          last_seen_at TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active'
+        );
+      `);
+      ensureNativeStore(legacyDb);
+      const legacyColumns = legacyDb.prepare('PRAGMA table_info(memory_native_chunks)').all().map((row) => String(row.name || ''));
+      assert.equal(legacyColumns.includes('scope'), true, 'native store bootstrap should upgrade legacy chunk tables before adding scope indexes');
+      assert.equal(legacyColumns.includes('linked_memory_id'), true, 'native store bootstrap should add linked_memory_id for legacy chunk tables');
+      const scopeIndex = legacyDb.prepare("PRAGMA index_list('memory_native_chunks')").all().find((row) => String(row.name || '') === 'idx_memory_native_chunks_scope');
+      assert.equal(Boolean(scopeIndex), true, 'native store bootstrap should recreate the scope index after upgrading the schema');
+    } finally {
+      legacyDb.close();
+    }
+
     ensureNativeStore(db);
     const insert = db.prepare(`
       INSERT INTO memory_native_chunks (
