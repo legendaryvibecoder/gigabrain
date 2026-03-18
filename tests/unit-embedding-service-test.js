@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { once } from 'node:events';
-import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 import { ensureProjectionStore } from '../lib/core/projection-store.js';
 import {
@@ -14,48 +14,29 @@ import {
 } from '../lib/core/embedding-service.js';
 import { makeTempWorkspace, openDb, seedMemoryCurrent } from './helpers.js';
 
-const EMBEDDING_SERVER_SCRIPT = `
-  import http from 'node:http';
-  const server = http.createServer((req, res) => {
-    if (req.url !== '/v1/embeddings' || req.method !== 'POST') {
-      res.writeHead(404);
-      res.end();
-      return;
-    }
-    let raw = '';
-    req.on('data', (chunk) => { raw += String(chunk); });
-    req.on('end', () => {
-      const body = JSON.parse(raw || '{}');
-      const input = String(body.input || '').toLowerCase();
-      const vector = input.includes('winter') ? [1, 0] : [0.5, 0.5, 0.5];
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ data: [{ embedding: vector }] }));
-    });
-  });
-  server.listen(0, '127.0.0.1', () => {
-    const address = server.address();
-    process.stdout.write(String(address.port));
-  });
+const FAKE_CURL_SCRIPT = `#!/usr/bin/env node
+const args = process.argv.slice(2);
+const bodyIdx = args.indexOf('-d');
+const raw = bodyIdx !== -1 ? String(args[bodyIdx + 1] || '{}') : '{}';
+const body = JSON.parse(raw);
+const input = String(body.input || '').toLowerCase();
+const vector = input.includes('winter') ? [1, 0] : [0.5, 0.5, 0.5];
+process.stdout.write(JSON.stringify({ data: [{ embedding: vector }] }));
 `;
 
-const withEmbeddingServer = async (fn) => {
-  const child = spawn(process.execPath, ['-e', EMBEDDING_SERVER_SCRIPT], {
-    stdio: ['ignore', 'pipe', 'inherit'],
-  });
-  let portText = '';
-  child.stdout.setEncoding('utf8');
-  child.stdout.on('data', (chunk) => {
-    portText += chunk;
-  });
-  await once(child.stdout, 'data');
-  const port = Number(portText.trim());
-  if (!Number.isFinite(port)) throw new Error(`failed to start embedding server: ${portText}`);
-  const baseUrl = `http://127.0.0.1:${port}`;
+const withFakeCurl = async (fn) => {
+  const ws = makeTempWorkspace('gb-v6-embedding-curl-');
+  const binDir = path.join(ws.root, 'bin');
+  const curlPath = path.join(binDir, 'curl');
+  fs.mkdirSync(binDir, { recursive: true });
+  fs.writeFileSync(curlPath, FAKE_CURL_SCRIPT, 'utf8');
+  fs.chmodSync(curlPath, 0o755);
+  const previousPath = process.env.PATH || '';
+  process.env.PATH = `${binDir}:${previousPath}`;
   try {
-    await fn(baseUrl);
+    await fn();
   } finally {
-    child.kill('SIGTERM');
-    await once(child, 'exit').catch(() => {});
+    process.env.PATH = previousPath;
   }
 };
 
@@ -70,21 +51,22 @@ const run = async () => {
     'semantic rerank should be a no-op when disabled',
   );
 
-  assert.equal(isSafeEmbeddingBaseUrl('http://127.0.0.1:11434'), true, 'http Ollama endpoints should be accepted');
-  assert.equal(isSafeEmbeddingBaseUrl('http://localhost:11434/'), true, 'localhost Ollama endpoints should be accepted');
-  assert.equal(isSafeEmbeddingBaseUrl('http://[::1]:11434'), true, 'IPv6 loopback Ollama endpoints should be accepted');
+  assert.equal(isSafeEmbeddingBaseUrl('http://127.0.0.1:11434'), true, 'default loopback Ollama endpoint should be accepted');
+  assert.equal(isSafeEmbeddingBaseUrl('http://localhost:11434/'), true, 'localhost alias on the default Ollama port should be accepted');
+  assert.equal(isSafeEmbeddingBaseUrl('http://[::1]:11434'), true, 'IPv6 loopback alias on the default Ollama port should be accepted');
+  assert.equal(isSafeEmbeddingBaseUrl('http://127.0.0.1:9999'), false, 'non-default local ports must be rejected');
   assert.equal(isSafeEmbeddingBaseUrl('https://example.com/ollama'), false, 'remote embedding endpoints must be rejected');
   assert.equal(isSafeEmbeddingBaseUrl('-o/tmp/pwned'), false, 'flag-like base URLs must be rejected');
   assert.equal(isSafeEmbeddingBaseUrl('not-a-url'), false, 'non-URL base values must be rejected');
   assert.equal(
     buildEmbeddingEndpoint('http://127.0.0.1:11434///')?.toString(),
     'http://127.0.0.1:11434/v1/embeddings',
-    'embedding endpoint should normalize trailing slashes without regex ambiguity',
+    'embedding endpoint should normalize to the fixed local Ollama route',
   );
   assert.equal(
     buildEmbeddingEndpoint('http://127.0.0.1:11434/ollama/')?.toString(),
-    'http://127.0.0.1:11434/ollama/v1/embeddings',
-    'embedding endpoint should preserve explicit local path prefixes',
+    'http://127.0.0.1:11434/v1/embeddings',
+    'embedding endpoint should ignore custom paths and use the fixed Ollama route',
   );
   assert.equal(
     getEmbeddingSync('winter', { baseUrl: '-o/tmp/pwned', timeoutMs: 100 }),
@@ -113,7 +95,7 @@ const run = async () => {
     'semantic rerank should gracefully fall back when Ollama is unavailable',
   );
 
-  await withEmbeddingServer(async (baseUrl) => {
+  await withFakeCurl(async () => {
     const ws = makeTempWorkspace('gb-v6-embedding-');
     const db = openDb(ws.dbPath);
     try {
@@ -136,7 +118,7 @@ const run = async () => {
         recall: {
           semanticRerankEnabled: true,
           semanticRerankAlpha: 0.2,
-          ollamaUrl: baseUrl,
+          ollamaUrl: 'http://127.0.0.1:11434',
           embeddingTimeoutMs: 500,
         },
       }, db);
@@ -147,7 +129,7 @@ const run = async () => {
     }
   });
 
-  await withEmbeddingServer(async (baseUrl) => {
+  await withFakeCurl(async () => {
     const ws = makeTempWorkspace('gb-v6-embedding-nightly-');
     const db = openDb(ws.dbPath);
     try {
@@ -170,14 +152,14 @@ const run = async () => {
       const first = buildMissingEmbeddings(db, {
         recall: {
           semanticRerankEnabled: true,
-          ollamaUrl: baseUrl,
+          ollamaUrl: 'http://127.0.0.1:11434',
           embeddingTimeoutMs: 500,
         },
       });
       const second = buildMissingEmbeddings(db, {
         recall: {
           semanticRerankEnabled: true,
-          ollamaUrl: baseUrl,
+          ollamaUrl: 'http://127.0.0.1:11434',
           embeddingTimeoutMs: 500,
         },
       });
