@@ -6,6 +6,7 @@ It is built for local-first production use: SQLite-backed recall, deterministic 
 
 Release references:
 
+- `v0.6.1` release notes: [`release-notes/v0.6.1.md`](release-notes/v0.6.1.md)
 - `v0.6.0` release notes: [`release-notes/v0.6.0.md`](release-notes/v0.6.0.md)
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)
 - `v0.5.3` release notes: [`release-notes/v0.5.3.md`](release-notes/v0.5.3.md)
@@ -14,14 +15,14 @@ Release references:
 
 ## Latest release
 
-`v0.6.0` is live.
+`v0.6.1` is live.
 
-- Recall quality is now measurable with an in-process eval harness, nightly quality history, and latency metrics.
-- Lexical recall now uses BM25, with adaptive budgets, confidence labels, and optional semantic reranking.
-- OpenClaw, Codex, Claude Code, and Claude Desktop all ship on the hardened stable path, including fixed OpenClaw hook behavior, empty-store bootstrap, dynamic helper resolution, and the portable Claude Desktop launcher bundle.
-- The world model is more visible across surfaces through `/gb/evolution`, `/gb/relationships`, and new standalone MCP tools for entities, contradictions, and relationships.
+- `v0.6.1` is the post-release hardening follow-up to `v0.6.0`, focused on safer fresh installs, legacy-store upgrades, and tighter scoped recall behavior.
+- Standalone helper scripts no longer depend on ephemeral `~/.npm/_npx/...` cache paths and now degrade cleanly through durable package-spec fallback.
+- Older native stores now migrate `memory_native_chunks` safely before scope indexes are built, preventing startup failures on legacy Nimbus and OpenClaw registries.
+- Deep-audit fixes also harden malformed-config handling, scoped world-model/entity resolution, relation filtering, and partial-cache semantic rerank behavior.
 
-Community thanks for `v0.6.0`:
+Community thanks across `v0.6.0` and `v0.6.1`:
 
 - [@unboxed-ai](https://github.com/unboxed-ai) for reporting issues [`#40`](https://github.com/legendaryvibecoder/gigabrain/issues/40), [`#41`](https://github.com/legendaryvibecoder/gigabrain/issues/41), and [`#42`](https://github.com/legendaryvibecoder/gigabrain/issues/42)
 - [@vibeputin](https://github.com/vibeputin) for [`PR #33`](https://github.com/legendaryvibecoder/gigabrain/pull/33)
@@ -146,7 +147,7 @@ What the setup wizard does:
 - Ensures `plugins.entries.gigabrain` exists in `~/.openclaw/openclaw.json`
 - Sets `plugins.slots.memory = "gigabrain"` so OpenClaw uses Gigabrain as the active memory provider
 - Sets runtime paths (`workspaceRoot`, `memoryRoot`, `outputDir`, `registryPath`)
-- Enables the `v0.6.0` hybrid memory defaults for explicit remember intent, native promotion, and world-model-aware surfaces
+- Enables the `v0.6.x` hybrid memory defaults for explicit remember intent, native promotion, and world-model-aware surfaces
 - Bootstraps the DB and indexes native memory files
 - Enables the Obsidian memory surface by default and builds the first vault unless `--skip-vault`
 - Adds or refreshes the AGENTS memory protocol block (unless `--skip-agents`)
@@ -241,7 +242,7 @@ Install Gigabrain into your repo or workspace:
 npm install @legendaryvibecoder/gigabrain
 ```
 
-Bootstrap Codex wiring for the current repo. Fresh installs use the host-neutral shared standalone store under `~/.gigabrain/`, keep the shared personal user store under `~/.gigabrain/profile/`, and derive a stable repo-specific scope for the current workspace. If you already have a supported legacy install under `~/.codex/gigabrain/`, setup reuses it in place for `0.6.0`:
+Bootstrap Codex wiring for the current repo. Fresh installs use the host-neutral shared standalone store under `~/.gigabrain/`, keep the shared personal user store under `~/.gigabrain/profile/`, and derive a stable repo-specific scope for the current workspace. If you already have a supported legacy install under `~/.codex/gigabrain/`, setup reuses it in place for `0.6.1`:
 
 ```bash
 npx gigabrain-codex-setup --project-root /path/to/repo
@@ -338,7 +339,7 @@ Install Gigabrain into your repo or workspace:
 npm install @legendaryvibecoder/gigabrain
 ```
 
-Bootstrap Claude wiring for the current repo. Fresh installs use the same shared standalone store as Codex under `~/.gigabrain/`, keep the shared personal user store under `~/.gigabrain/profile/`, and derive the same stable repo-specific scope. If you already have a supported legacy install under `~/.codex/gigabrain/`, setup reuses it in place for `0.6.0`:
+Bootstrap Claude wiring for the current repo. Fresh installs use the same shared standalone store as Codex under `~/.gigabrain/`, keep the shared personal user store under `~/.gigabrain/profile/`, and derive the same stable repo-specific scope. If you already have a supported legacy install under `~/.codex/gigabrain/`, setup reuses it in place for `0.6.1`:
 
 ```bash
 npx gigabrain-claude-setup --project-root /path/to/repo
@@ -426,7 +427,7 @@ Cowork note:
 ## Upgrade / existing users
 
 - **OpenClaw users from older Gigabrain docs**: move to `openclaw plugins install @legendaryvibecoder/gigabrain`, rerun `npm run setup -- --workspace ...`, then run `npx gigabrainctl doctor --config ~/.openclaw/openclaw.json`.
-- **Codex `0.5.1` / `0.5.2` users**: rerun `npx gigabrain-codex-setup --project-root /path/to/repo` to refresh the shared standalone defaults, verify helper scripts, and doctor path. Existing `~/.codex/gigabrain` installs remain supported in place for `0.6.0`.
+- **Codex `0.5.1` / `0.5.2` users**: rerun `npx gigabrain-codex-setup --project-root /path/to/repo` to refresh the shared standalone defaults, verify helper scripts, and doctor path. Existing `~/.codex/gigabrain` installs remain supported in place for `0.6.1`.
 - **Claude adopters**: run `npx gigabrain-claude-setup --project-root /path/to/repo`, review `CLAUDE.md` and `.mcp.json`, then run doctor before building the desktop extension.
 
 Across all hosts, the expected upgrade order is:
@@ -930,7 +931,7 @@ Release validation can go further with:
 
 - `npm run test:release-live` for live Codex CLI registration and live OpenClaw install/setup checks on a machine that has both CLIs installed
 - `npm run eval:deep-recall` for the expanded recall-routing evaluation used when the core recall stack changes
-- `node scripts/eval-runner.js --config ~/.openclaw/openclaw.json --mode golden --cases eval/cases.jsonl --out /tmp/gigabrain-eval.json` when you want a standalone v0.6.0 recall-quality report outside the nightly run
+- `node scripts/eval-runner.js --config ~/.openclaw/openclaw.json --mode golden --cases eval/cases.jsonl --out /tmp/gigabrain-eval.json` when you want a standalone `v0.6.x` recall-quality report outside the nightly run
 
 ## Contributing
 

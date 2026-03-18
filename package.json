@@ -1,6 +1,6 @@
 {
     "name": "@legendaryvibecoder/gigabrain",
-    "version": "0.6.0",
+    "version": "0.6.1",
     "type": "module",
     "description": "Local-first memory layer for OpenClaw, Codex, and Claude — capture, recall, dedupe, audit, native sync",
     "author": "Legendary Vibecoder",

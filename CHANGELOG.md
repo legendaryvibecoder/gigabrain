@@ -2,6 +2,21 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.6.1] — 2026-03-18
+
+### Changed
+- Fresh standalone helper generation now uses a durable package-spec fallback instead of embedding ephemeral `~/.npm/_npx/...` cache paths
+- Codex and Claude setup flows now fail closed on malformed standalone configs and surface clearer recovery guidance
+- Scoped world-model/entity access now stays aligned across orchestrator, recall, and memory-API relation surfaces
+
+### Fixed
+- Legacy `memory_native_chunks` stores are now migrated before scope-based indexes are created, preventing `no such column: scope` startup failures on older Nimbus/OpenClaw registries
+- `gigabrainctl doctor --config <missing>` now exits with an explicit config-path error instead of dropping into a raw SQLite failure
+- `gigabrain-mcp` now delays MCP/service import until after config resolution so fresh helper-based launches do not fail prematurely in non-installed repos
+- Multi-entity reranking now uses real entity signals instead of ineffective opaque-id text matching
+- Partial-cache semantic rerank no longer demotes uncached rows when embeddings are unavailable
+- Memory API relation reads now filter related rows by the same scope/access rules as their anchor memories
+
 ## [0.6.0] — 2026-03-18
 
 ### Added
