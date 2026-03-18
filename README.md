@@ -12,6 +12,21 @@ Release references:
 - `v0.5.2` release notes: [`release-notes/v0.5.2.md`](release-notes/v0.5.2.md)
 - `v0.5.1` release notes: [`release-notes/v0.5.1.md`](release-notes/v0.5.1.md)
 
+## Latest release
+
+`v0.6.0` is live.
+
+- Recall quality is now measurable with an in-process eval harness, nightly quality history, and latency metrics.
+- Lexical recall now uses BM25, with adaptive budgets, confidence labels, and optional semantic reranking.
+- OpenClaw, Codex, Claude Code, and Claude Desktop all ship on the hardened stable path, including fixed OpenClaw hook behavior, empty-store bootstrap, dynamic helper resolution, and the portable Claude Desktop launcher bundle.
+- The world model is more visible across surfaces through `/gb/evolution`, `/gb/relationships`, and new standalone MCP tools for entities, contradictions, and relationships.
+
+Community thanks for `v0.6.0`:
+
+- [@unboxed-ai](https://github.com/unboxed-ai) for reporting issues [`#40`](https://github.com/legendaryvibecoder/gigabrain/issues/40), [`#41`](https://github.com/legendaryvibecoder/gigabrain/issues/41), and [`#42`](https://github.com/legendaryvibecoder/gigabrain/issues/42)
+- [@vibeputin](https://github.com/vibeputin) for [`PR #33`](https://github.com/legendaryvibecoder/gigabrain/pull/33)
+- [@Emphasonic](https://github.com/Emphasonic) for [`PR #38`](https://github.com/legendaryvibecoder/gigabrain/pull/38)
+
 ## Supported clients
 
 | Host surface | Best starting point | What Gigabrain owns | What the host owns |
