@@ -10,6 +10,8 @@ import {
   readPackageSpecFromRoot,
 } from '../lib/core/standalone-client.js';
 
+const packageVersion = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+
 const writeExecutable = (filePath, content) => {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, content, 'utf8');
@@ -26,16 +28,16 @@ const run = async () => {
   fs.mkdirSync(ephemeralPackageRoot, { recursive: true });
   fs.writeFileSync(path.join(stablePackageRoot, 'package.json'), JSON.stringify({
     name: '@legendaryvibecoder/gigabrain',
-    version: '0.6.0',
+    version: packageVersion,
   }, null, 2), 'utf8');
   fs.writeFileSync(path.join(ephemeralPackageRoot, 'package.json'), JSON.stringify({
     name: '@legendaryvibecoder/gigabrain',
-    version: '0.6.0',
+    version: packageVersion,
   }, null, 2), 'utf8');
   fs.mkdirSync(path.join(stablePackageRoot, 'scripts'), { recursive: true });
   fs.writeFileSync(path.join(stablePackageRoot, 'scripts', 'gigabrain-mcp.js'), 'console.log("stable hint used");\n', 'utf8');
 
-  assert.equal(readPackageSpecFromRoot(stablePackageRoot), '@legendaryvibecoder/gigabrain@0.6.0', 'package spec reader should extract name and version');
+  assert.equal(readPackageSpecFromRoot(stablePackageRoot), `@legendaryvibecoder/gigabrain@${packageVersion}`, 'package spec reader should extract name and version');
   assert.equal(isEphemeralPackageRootHint(stablePackageRoot), false, 'stable package roots should not be treated as ephemeral');
   assert.equal(isEphemeralPackageRootHint(ephemeralPackageRoot), true, 'npx cache package roots should be treated as ephemeral');
 
@@ -78,7 +80,7 @@ run_gigabrain_cli gigabrain-mcp scripts/gigabrain-mcp.js --config /tmp/gigabrain
   assert.equal(ephemeralRun.status, 0, 'ephemeral resolver should fall through to the durable npx package fallback');
   const npxCalls = fs.readFileSync(npxLog, 'utf8');
   assert.match(npxCalls, /--no-install gigabrain-mcp --help/, 'resolver should first probe local/global npx availability without install');
-  assert.match(npxCalls, /--yes --package @legendaryvibecoder\/gigabrain@0\.6\.0 gigabrain-mcp --config \/tmp\/gigabrain\.json/, 'resolver should fall back to the package-spec npx path');
+  assert.match(npxCalls, new RegExp(`--yes --package @legendaryvibecoder/gigabrain@${packageVersion.replace(/\./g, '\\.')} gigabrain-mcp --config /tmp/gigabrain\\.json`), 'resolver should fall back to the package-spec npx path');
 
   const stableSnippet = buildGigabrainCliResolverSnippet({
     projectRoot,

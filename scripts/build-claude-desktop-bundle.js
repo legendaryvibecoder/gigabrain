@@ -107,7 +107,9 @@ const copyRuntimeDependencies = (stagingRoot) => {
     if (!dependencyName || seen.has(dependencyName)) continue;
     const resolvedDependency = resolveDependencyPackageRoot(dependencyName, resolver);
     if (!resolvedDependency) {
-      throw new Error(`Unable to resolve runtime dependency: ${dependencyName}`);
+      throw new Error(
+        `Unable to resolve runtime dependency: ${dependencyName}. Run npm install in the Gigabrain repo before building the Claude Desktop bundle.`,
+      );
     }
     const {
       packageRoot,
