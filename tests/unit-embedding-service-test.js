@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 
 import { ensureProjectionStore } from '../lib/core/projection-store.js';
 import {
+  buildEmbeddingEndpoint,
   buildMissingEmbeddings,
   ensureEmbeddingStore,
   semanticRerank,
@@ -70,13 +71,30 @@ const run = async () => {
   );
 
   assert.equal(isSafeEmbeddingBaseUrl('http://127.0.0.1:11434'), true, 'http Ollama endpoints should be accepted');
-  assert.equal(isSafeEmbeddingBaseUrl('https://example.com/ollama'), true, 'https embedding endpoints should be accepted');
+  assert.equal(isSafeEmbeddingBaseUrl('http://localhost:11434/'), true, 'localhost Ollama endpoints should be accepted');
+  assert.equal(isSafeEmbeddingBaseUrl('http://[::1]:11434'), true, 'IPv6 loopback Ollama endpoints should be accepted');
+  assert.equal(isSafeEmbeddingBaseUrl('https://example.com/ollama'), false, 'remote embedding endpoints must be rejected');
   assert.equal(isSafeEmbeddingBaseUrl('-o/tmp/pwned'), false, 'flag-like base URLs must be rejected');
   assert.equal(isSafeEmbeddingBaseUrl('not-a-url'), false, 'non-URL base values must be rejected');
+  assert.equal(
+    buildEmbeddingEndpoint('http://127.0.0.1:11434///')?.toString(),
+    'http://127.0.0.1:11434/v1/embeddings',
+    'embedding endpoint should normalize trailing slashes without regex ambiguity',
+  );
+  assert.equal(
+    buildEmbeddingEndpoint('http://127.0.0.1:11434/ollama/')?.toString(),
+    'http://127.0.0.1:11434/ollama/v1/embeddings',
+    'embedding endpoint should preserve explicit local path prefixes',
+  );
   assert.equal(
     getEmbeddingSync('winter', { baseUrl: '-o/tmp/pwned', timeoutMs: 100 }),
     null,
     'sync embedding fetch must fail closed on unsafe base URLs before invoking curl',
+  );
+  assert.equal(
+    getEmbeddingSync('winter', { baseUrl: 'https://example.com/ollama', timeoutMs: 100 }),
+    null,
+    'sync embedding fetch must fail closed on non-local embedding endpoints',
   );
 
   const missingOllamaCandidates = [
