@@ -78,6 +78,8 @@ const run = async () => {
   assert.equal(claudeMd.includes(summary.projectScope), true, 'CLAUDE.md should include the repo-specific scope');
   assert.equal(claudeMd.includes('target: "user"'), true, 'CLAUDE.md should teach personal-memory targeting');
   assert.equal(claudeMd.includes('target: "project"'), true, 'CLAUDE.md should teach repo-memory targeting');
+  assert.equal(claudeMd.includes('Prefer Gigabrain MCP tools over direct CLI writes whenever the MCP server is available.'), true, 'CLAUDE.md should explicitly prefer MCP over raw CLI writes');
+  assert.equal(claudeMd.includes('node ~/.npm/_npx/.../scripts/gigabrainctl.js'), true, 'CLAUDE.md should explicitly forbid ephemeral npx cache paths');
 
   const mcp = readJson(path.join(projectRoot, '.mcp.json'));
   assert.equal(typeof mcp.mcpServers, 'object', 'Claude mcp config should define mcpServers');
@@ -102,6 +104,10 @@ const run = async () => {
   const verifyScript = fs.readFileSync(path.join(projectRoot, '.claude', 'actions', 'verify-gigabrain.sh'), 'utf8');
   assert.equal(verifyScript.includes('node_modules/.bin/$tool'), true, 'claude verify action should prefer repo-local binaries through the shared helper resolver');
   assert.equal(verifyScript.includes('npx --no-install "$tool"'), true, 'claude verify action should fall back to npx without reinstalling');
+  assert.equal(verifyScript.includes('npx --yes --package "$PACKAGE_SPEC" "$tool"'), true, 'claude verify action should include a durable package-spec npx fallback');
+  assert.equal(Array.isArray(summary.nextSteps), true, 'claude setup should print next steps');
+  assert.equal(summary.nextSteps.some((step) => String(step).includes('Use Gigabrain through MCP first once Claude is reading the local launcher.')), true, 'claude setup next steps should explicitly prefer MCP first');
+  assert.equal(summary.nextSteps.some((step) => String(step).includes('node ~/.npm/_npx/.../scripts/gigabrainctl.js')), true, 'claude setup next steps should explicitly warn against ephemeral npx cache paths');
 
   const checkpoint = spawnSync(path.join(projectRoot, '.claude', 'actions', 'checkpoint-gigabrain-session.sh'), [
     '--summary', 'Implemented Claude Desktop MCP support.',

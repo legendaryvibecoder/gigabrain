@@ -60,6 +60,8 @@ npx gigabrain-codex-setup --project-root /path/to/repo
 
 Sharing by default: Codex uses the shared standalone store at `~/.gigabrain/config.json` on fresh installs and shares memory with Claude only when both point at the same config.
 
+Important: once MCP is registered, use Gigabrain through MCP first. If you ever need a CLI fallback, use the generated helper scripts or `npx --yes --package @legendaryvibecoder/gigabrain@<version> ...`, not raw `node ~/.npm/_npx/.../scripts/gigabrainctl.js` cache paths.
+
 ### I use Claude Code / Claude Desktop
 
 ```bash
@@ -75,6 +77,8 @@ npm run claude:desktop:bundle
 ```
 
 Important: run `gigabrain-claude-setup` first. The desktop bundle points at the standalone config that setup creates. On fresh installs that is usually `~/.gigabrain/config.json`; importing the `.dxt` before setup will fail because that config does not exist yet.
+
+Important: once MCP is registered, use Gigabrain through MCP first. If you need a CLI fallback, use the generated helper scripts or `npx --yes --package @legendaryvibecoder/gigabrain@<version> ...`, not raw `node ~/.npm/_npx/.../scripts/gigabrainctl.js` cache paths.
 
 Sharing by default: Claude uses the same shared standalone store as Codex only when both point at the same config. Cowork is compatibility-audited only.
 
@@ -254,7 +258,7 @@ What the Codex setup does:
 - Teaches the current repo a stable repo scope so its continuity stays separated inside the shared standalone store by default
 - Migrates older Codex configs that still have an empty `codex.userProfilePath`, legacy `codex:global` project scope defaults, or a recall order that skips the user store
 - Prints the resolved config path, store root, sharing mode, and whether the path is canonical or legacy-supported
-- Writes helper scripts that resolve Gigabrain dynamically from repo-local `node_modules/.bin`, `command -v`, or `npx --no-install` instead of depending on the original install temp path
+- Writes helper scripts that resolve Gigabrain dynamically from repo-local `node_modules/.bin`, `command -v`, a package-aware `npx` fallback, and only stable setup-time source hints instead of depending on an original `_npx` temp path
 
 What gets shared by default:
 
@@ -351,7 +355,7 @@ What the Claude setup does:
 - Creates repo-local `.claude/setup.sh` plus `.claude/actions/` helper scripts for verify, maintenance, MCP launch, and manual session checkpointing
 - Preserves existing `CLAUDE.md` content and unrelated `.mcp.json` server entries on rerun
 - Prints the resolved config path, store root, sharing mode, and whether the path is canonical or legacy-supported
-- Writes helper scripts that resolve Gigabrain dynamically from repo-local `node_modules/.bin`, `command -v`, or `npx --no-install` instead of depending on the original install temp path
+- Writes helper scripts that resolve Gigabrain dynamically from repo-local `node_modules/.bin`, `command -v`, a package-aware `npx` fallback, and only stable setup-time source hints instead of depending on an original `_npx` temp path
 
 What gets shared by default:
 

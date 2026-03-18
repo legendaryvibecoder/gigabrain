@@ -225,6 +225,7 @@ const main = async () => {
       `Repo memory stays separated by scope (${projectScope}); personal memory is shared through ${mergedConfig.codex.userProfilePath}.`,
       `Use --store-mode project-local if you want this repo isolated from other Codex/Claude workspaces.`,
       `Run ${path.join(projectRoot, '.codex', 'actions', 'install-gigabrain-mcp.sh')} or ${mcpCommand}.`,
+      'Use Gigabrain through MCP first once it is registered in Codex. Do not hardcode node ~/.npm/_npx/.../scripts/gigabrainctl.js cache paths.',
       `Run ${path.join(projectRoot, '.codex', 'actions', 'verify-gigabrain.sh')} before hand-editing config. Absolute fallback: npx gigabrainctl doctor --config ${configPath} --target both.`,
       `Run npx gigabrain-codex-checkpoint --config ${configPath} --summary "Completed ..." after meaningful work if you want episodic session capture.`,
       `Run npx gigabrainctl maintain --config ${configPath} when you want manual consolidation in Codex mode.`,

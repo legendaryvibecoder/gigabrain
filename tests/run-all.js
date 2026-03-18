@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 const TEST_FILES = [
   'unit-config-test.js',
   'unit-policy-test.js',
+  'unit-standalone-client-test.js',
   'unit-bm25-test.js',
   'unit-eval-harness-test.js',
   'unit-projection-store-test.js',
