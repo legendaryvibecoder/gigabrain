@@ -218,6 +218,24 @@ def _ensure_scope_allowed(scope: str, auth: dict) -> None:
         raise HTTPException(status_code=403, detail="Scope forbidden")
 
 
+def _resolve_single_scope(scope: Optional[str], auth: dict) -> str:
+    requested = (scope or "").strip()
+    if _is_admin(auth):
+        return requested
+    allowed = _allowed_scopes(auth)
+    if not allowed:
+        raise HTTPException(status_code=403, detail="No scope access")
+    if requested:
+        if requested.endswith("*"):
+            raise HTTPException(status_code=403, detail="Wildcard scope not allowed")
+        if requested not in allowed:
+            raise HTTPException(status_code=403, detail="Scope forbidden")
+        return requested
+    if len(allowed) == 1:
+        return next(iter(allowed))
+    raise HTTPException(status_code=400, detail="Explicit scope required")
+
+
 def _ensure_doc_access(auth: dict) -> None:
     if _is_admin(auth):
         return
@@ -494,6 +512,12 @@ def _safe_doc_filename(doc_id: str) -> str:
         raise ValueError(f"invalid doc_id: {doc_id}")
     return sanitized
 
+
+def _yaml_scalar(value: Optional[str]) -> str:
+    normalized = str(value or "").replace("\r", " ").replace("\n", " ").strip()
+    return json.dumps(normalized, ensure_ascii=False)
+
+
 def write_doc_file(doc_id: str, title: str, source: str, url: str, tags: list, content: str, created_at: str) -> str:
     ensure_docs_dir()
     doc_uuid = _safe_doc_filename(doc_id)
@@ -502,8 +526,8 @@ def write_doc_file(doc_id: str, title: str, source: str, url: str, tags: list, c
         "---",
         f"id: {doc_id}",
         f"title: {sanitize_title(title)}",
-        f"source: {source}",
-        f"url: {url or ''}",
+        f"source: {_yaml_scalar(source)}",
+        f"url: {_yaml_scalar(url)}",
         f"tags: {json.dumps(tags or [])}",
         f"created_at: {created_at}",
         "---",
@@ -1559,6 +1583,7 @@ def recall_explain(payload: RecallExplainPayload, auth: dict = Depends(require_t
     query = payload.query
     if not query.strip():
         return {"strategy": "quick_context", "result_count": 0, "results": []}
+    effective_scope = _resolve_single_scope(payload.scope, auth)
 
     try:
         headers = {"Authorization": f"Bearer {PLUGIN_PROXY_TOKEN}"} if PLUGIN_PROXY_TOKEN else {}
@@ -1566,7 +1591,7 @@ def recall_explain(payload: RecallExplainPayload, auth: dict = Depends(require_t
             response = client.post(
                 GB_RECALL_EXPLAIN_URL,
                 headers=headers,
-                json={"query": query, "scope": payload.scope or ""},
+                json={"query": query, "scope": effective_scope},
             )
             if response.status_code == 200:
                 return response.json()

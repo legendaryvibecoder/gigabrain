@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 
 import { makeTempWorkspace } from './helpers.js';
-import { openDatabase } from '../lib/core/sqlite.js';
+import { openDatabase, parseBusyTimeoutMs } from '../lib/core/sqlite.js';
 
 const waitFor = (predicate, { timeoutMs = 3000, intervalMs = 25 } = {}) => new Promise((resolve, reject) => {
   const started = Date.now();
@@ -21,6 +21,12 @@ const waitFor = (predicate, { timeoutMs = 3000, intervalMs = 25 } = {}) => new P
 });
 
 const run = async () => {
+  assert.equal(parseBusyTimeoutMs('9000', 5000), 9000, 'busy timeout parser should accept numeric strings');
+  assert.equal(parseBusyTimeoutMs('  ', 5000), 5000, 'blank busy timeout values should fall back cleanly');
+  assert.equal(parseBusyTimeoutMs('oops', 5000), 5000, 'malformed busy timeout values should fall back cleanly');
+  assert.equal(parseBusyTimeoutMs('-5', 5000), 0, 'negative busy timeout values should clamp to zero');
+  assert.equal(parseBusyTimeoutMs('999999999', 5000), 600000, 'busy timeout values should clamp to a sane upper bound');
+
   const ws = makeTempWorkspace('gb-v3-unit-sqlite-');
   const setupDb = openDatabase(ws.dbPath);
   setupDb.exec('CREATE TABLE IF NOT EXISTS lock_probe(id INTEGER PRIMARY KEY, value TEXT)');

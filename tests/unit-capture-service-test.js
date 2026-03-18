@@ -135,6 +135,31 @@ const run = async () => {
     assert.equal(fs.existsSync(queuePath), true, 'missing remember note should create a review queue row');
     const queueText = fs.readFileSync(queuePath, 'utf8');
     assert.match(queueText, /remember_intent_missing_note/, 'review queue should record the explicit remember failure reason');
+
+    // Phase 0A: Thinking block contamination must be stripped before parsing
+    const thinkingContaminated = parseMemoryNotes(`
+<thinking>I should store a memory about the user's pet.</thinking>
+<memory_note type="USER_FACT" confidence="0.9">User has a cat named Whiskers.</memory_note>
+    `);
+    assert.equal(thinkingContaminated.length, 1, 'thinking blocks must be stripped — note should still be parsed');
+    assert.equal(thinkingContaminated[0].content, 'User has a cat named Whiskers.');
+
+    const antlrThinking = parseMemoryNotes(`
+<antlr:thinking>Let me consider what to store...</antlr:thinking>
+<memory_note type="PREFERENCE" confidence="high">User prefers dark mode.</memory_note>
+    `);
+    assert.equal(antlrThinking.length, 1, 'antlr:thinking blocks must also be stripped');
+    assert.equal(antlrThinking[0].content, 'User prefers dark mode.');
+
+    const nestedThinkingNotes = parseMemoryNotes(`
+<thinking>
+The user mentioned something important.
+<memory_note type="USER_FACT" confidence="0.8">Nested inside thinking — should be stripped.</memory_note>
+</thinking>
+<memory_note type="USER_FACT" confidence="0.85">Outside thinking — should be captured.</memory_note>
+    `);
+    assert.equal(nestedThinkingNotes.length, 1, 'memory_notes nested inside thinking blocks must be discarded');
+    assert.match(nestedThinkingNotes[0].content, /Outside thinking/, 'only non-thinking memory_notes should survive');
   } finally {
     db.close();
   }

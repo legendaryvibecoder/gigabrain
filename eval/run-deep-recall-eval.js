@@ -11,8 +11,9 @@ import { makeTempWorkspace, makeConfigObject, openDb } from '../tests/helpers.js
 
 const NOW = new Date().toISOString();
 const RUNS = Math.max(3, Number(process.env.GB_DEEP_EVAL_RUNS || 7) || 7);
-const OUTPUT_JSON = path.join(process.cwd(), 'eval', 'deep-recall-eval-2026-03-11.json');
-const OUTPUT_MD = path.join(process.cwd(), 'eval', 'deep-recall-eval-2026-03-11.md');
+const RUN_STAMP = NOW.replace(/[:.]/g, '-');
+const OUTPUT_JSON = path.join(process.cwd(), 'eval', `deep-recall-eval-${RUN_STAMP}.json`);
+const OUTPUT_MD = path.join(process.cwd(), 'eval', `deep-recall-eval-${RUN_STAMP}.md`);
 
 const median = (values = []) => {
   if (!values.length) return 0;

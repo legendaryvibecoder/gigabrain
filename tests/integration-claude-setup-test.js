@@ -61,6 +61,7 @@ const run = async () => {
   assert.equal(fs.existsSync(path.join(projectRoot, 'CLAUDE.md')), true, 'claude setup should create CLAUDE.md');
   assert.equal(fs.existsSync(path.join(projectRoot, '.mcp.json')), true, 'claude setup should create .mcp.json');
   assert.equal(fs.existsSync(path.join(projectRoot, '.claude', 'setup.sh')), true, 'claude setup should create .claude/setup.sh');
+  assert.equal(fs.existsSync(path.join(projectRoot, '.claude', 'actions', 'launch-gigabrain-mcp.sh')), true, 'claude setup should create a project-local MCP launcher');
   assert.equal(fs.existsSync(path.join(projectRoot, '.claude', 'actions', 'verify-gigabrain.sh')), true, 'claude setup should create a verify action');
   assert.equal(fs.existsSync(path.join(projectRoot, '.claude', 'actions', 'run-gigabrain-maintenance.sh')), true, 'claude setup should create a maintenance action');
   assert.equal(fs.existsSync(path.join(projectRoot, '.claude', 'actions', 'checkpoint-gigabrain-session.sh')), true, 'claude setup should create a checkpoint action');
@@ -80,9 +81,8 @@ const run = async () => {
 
   const mcp = readJson(path.join(projectRoot, '.mcp.json'));
   assert.equal(typeof mcp.mcpServers, 'object', 'Claude mcp config should define mcpServers');
-  assert.equal(mcp.mcpServers.gigabrain.command, 'node', 'Gigabrain server entry should use node');
-  assert.equal(mcp.mcpServers.gigabrain.args.includes(path.join(repoRoot, 'scripts', 'gigabrain-mcp.js')), true, 'Claude mcp config should point to the Gigabrain MCP server');
-  assert.equal(mcp.mcpServers.gigabrain.args.includes(path.join(sharedStoreRoot, 'config.json')), true, 'Claude mcp config should point to the standalone config');
+  assert.equal(mcp.mcpServers.gigabrain.command, '/bin/sh', 'Gigabrain server entry should use the project-local launcher via /bin/sh');
+  assert.deepEqual(mcp.mcpServers.gigabrain.args, [path.join(projectRoot, '.claude', 'actions', 'launch-gigabrain-mcp.sh')], 'Claude mcp config should point at the project-local launcher');
 
   const verify = spawnSync(path.join(projectRoot, '.claude', 'actions', 'verify-gigabrain.sh'), [], {
     cwd: projectRoot,
@@ -99,6 +99,9 @@ const run = async () => {
   assert.equal(verifyResult.ok, true, 'claude verify action should report both stores healthy');
   assert.equal(verifyResult.stores.length, 2, 'claude verify action should report both stores');
   assert.equal(verifyResult.standalone_path_kind, 'canonical', 'claude doctor should report the canonical standalone path');
+  const verifyScript = fs.readFileSync(path.join(projectRoot, '.claude', 'actions', 'verify-gigabrain.sh'), 'utf8');
+  assert.equal(verifyScript.includes('node_modules/.bin/$tool'), true, 'claude verify action should prefer repo-local binaries through the shared helper resolver');
+  assert.equal(verifyScript.includes('npx --no-install "$tool"'), true, 'claude verify action should fall back to npx without reinstalling');
 
   const checkpoint = spawnSync(path.join(projectRoot, '.claude', 'actions', 'checkpoint-gigabrain-session.sh'), [
     '--summary', 'Implemented Claude Desktop MCP support.',
@@ -118,6 +121,9 @@ const run = async () => {
   assert.equal(checkpointResult.ok, true, 'claude checkpoint action should succeed');
   assert.equal(checkpointResult.scope, summary.projectScope, 'claude checkpoint should use the repo-specific scope automatically');
   assert.equal(fs.existsSync(checkpointResult.source_path), true, 'claude checkpoint should create the daily session log');
+  assert.equal(checkpointResult.written_sections.includes('Claude Sessions'), true, 'claude checkpoint should write into a Claude-specific session section');
+  const checkpointNote = fs.readFileSync(checkpointResult.source_path, 'utf8');
+  assert.equal(checkpointNote.includes('Claude session:'), true, 'claude checkpoint should label the native summary as a Claude session');
 
   fs.writeFileSync(path.join(projectRoot, 'CLAUDE.md'), `# Project notes\n\nKeep this text.\n\n${claudeMd}`, 'utf8');
   fs.writeFileSync(path.join(projectRoot, '.mcp.json'), `${JSON.stringify({
@@ -157,7 +163,7 @@ const run = async () => {
   const codexThenClaudeSummary = JSON.parse(String(codexThenClaude.stdout || '{}'));
   assert.equal(codexThenClaudeSummary.projectScope, codexFirstSummary.projectScope, 'codex then claude should preserve the same project scope');
   assert.equal(codexThenClaudeSummary.standaloneConfigPath, path.join(sharedStoreRoot, 'config.json'), 'codex then claude should continue using the same shared standalone config');
-  assert.equal(readJson(path.join(codexFirstProject, '.mcp.json')).mcpServers.gigabrain.command, 'node', 'codex then claude should leave Claude MCP wiring installed');
+  assert.equal(readJson(path.join(codexFirstProject, '.mcp.json')).mcpServers.gigabrain.command, '/bin/sh', 'codex then claude should leave Claude MCP wiring installed through the launcher');
   assert.equal(fs.existsSync(path.join(codexFirstProject, '.codex', 'actions', 'verify-gigabrain.sh')), true, 'codex then claude should preserve Codex actions');
 
   const claudeFirst = runClaudeSetup({ projectRoot: claudeFirstProject, homeRoot });

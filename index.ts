@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
+import { createHash } from 'node:crypto';
 
 import { V3_CONFIG_SCHEMA, normalizeConfig } from './lib/core/config.js';
 import { GIGABRAIN_HTTP_ROUTES, createMemoryHttpHandler } from './lib/core/http-routes.js';
@@ -13,6 +13,7 @@ import { promoteNativeChunks } from './lib/core/native-promotion.js';
 import { ensurePersonStore, rebuildEntityMentions } from './lib/core/person-service.js';
 import { ensureWorldModelReady, ensureWorldModelStore, getSynthesis, rebuildWorldModel } from './lib/core/world-model.js';
 import { openDatabase } from './lib/core/sqlite.js';
+import { recordRecallLatency } from './lib/core/metrics.js';
 
 type PluginApi = {
   config?: unknown;
@@ -57,6 +58,37 @@ const parseAgentIdFromSessionKey = (sessionKey: string): string => {
   return String(parts[1] || 'shared').trim() || 'shared';
 };
 
+const slugifyScopeToken = (value: string): string => {
+  const input = String(value || '').toLowerCase();
+  let out = '';
+  let lastWasDash = false;
+  for (const char of input) {
+    const code = char.charCodeAt(0);
+    const isLower = code >= 97 && code <= 122;
+    const isDigit = code >= 48 && code <= 57;
+    if (isLower || isDigit) {
+      out += char;
+      lastWasDash = false;
+      continue;
+    }
+    if (!lastWasDash && out) {
+      out += '-';
+      lastWasDash = true;
+    }
+  }
+  if (out.endsWith('-')) out = out.slice(0, -1);
+  return out.slice(0, 40);
+};
+
+const deriveScopeFromWorkspaceDir = (workspaceDir: string): string => {
+  const resolved = String(workspaceDir || '').trim();
+  if (!resolved) return '';
+  const absolute = path.resolve(resolved);
+  const slug = slugifyScopeToken(path.basename(absolute)) || 'workspace';
+  const hash = createHash('sha1').update(absolute).digest('hex').slice(0, 8);
+  return `project:${slug}:${hash}`;
+};
+
 const GIGABRAIN_CONTEXT_RE = /<gigabrain-context>([\s\S]*?)<\/gigabrain-context>/gi;
 const QUERY_META_LINE_RE = /^(?:fallback|memories|instruction|entity_mode|conversation info|to send an image back)\s*:/i;
 const BOOTSTRAP_INJECTION_RE = /\b(?:you are running a boot check|boot\.md|reply with only:\s*no_reply|a new session was started via \/new or \/reset|session startup sequence|follow boot\.md instructions exactly)\b/i;
@@ -68,6 +100,8 @@ const ENTITY_STOPWORDS = new Set([
   'sie', 'er', 'ihr', 'ihn', 'her', 'him', 'them', 'diese', 'dieser', 'diesem',
   'jener', 'jene', 'jenem', 'person', 'about', 'ueber', 'über', 'who', 'what',
 ]);
+const MAX_QUERY_SCAN_MESSAGES = 200;
+const MAX_QUERY_MESSAGE_CHARS = 12000;
 
 const messageToText = (msg: any): string => {
   if (typeof msg?.content === 'string') return msg.content;
@@ -78,6 +112,14 @@ const messageToText = (msg: any): string => {
   }
   return '';
 };
+
+const getScannableMessages = (event: any): any[] => {
+  const messages = Array.isArray(event?.messages) ? event.messages : [];
+  if (messages.length <= MAX_QUERY_SCAN_MESSAGES) return messages;
+  return messages.slice(-MAX_QUERY_SCAN_MESSAGES);
+};
+
+const messageToScannableText = (msg: any): string => messageToText(msg).slice(0, MAX_QUERY_MESSAGE_CHARS);
 
 const extractContextQuery = (input: string): string => {
   const text = String(input || '');
@@ -134,20 +176,66 @@ const sanitizeCandidateQuery = (input: string): string => {
 };
 
 const resolveScopeForEvent = (event: any): string => {
-  const explicit = String(event?.agentId || event?.scope || '').trim();
+  const explicit = String(event?.scope || event?.agentId || '').trim();
   if (explicit) return explicit;
-  const sessionKey = String(event?.sessionKey || event?.meta?.sessionKey || '');
+
+  const sessionKey = String(event?.sessionKey || event?.meta?.sessionKey || '').trim();
+  if (sessionKey) {
+    const parsedAgentId = parseAgentIdFromSessionKey(sessionKey);
+    if (parsedAgentId && parsedAgentId !== 'shared') return parsedAgentId;
+  }
+
+  const workspaceScope = deriveScopeFromWorkspaceDir(String(event?.workspaceDir || '').trim());
+  if (workspaceScope) return workspaceScope;
   if (!sessionKey) return 'shared';
   return parseAgentIdFromSessionKey(sessionKey);
 };
 
+const mergeEventWithCtx = (event: any, ctx: any) => {
+  const merged = {
+    ...(isObject(event) ? event : {}),
+  } as any;
+  const context = isObject(ctx) ? ctx : {};
+
+  const sessionKey = String(
+    merged?.sessionKey
+    || merged?.meta?.sessionKey
+    || merged?.metadata?.sessionKey
+    || context?.sessionKey
+    || '',
+  ).trim();
+  const agentId = String(merged?.agentId || context?.agentId || '').trim();
+
+  if (agentId && !String(merged.agentId || '').trim()) merged.agentId = agentId;
+  if (sessionKey && !String(merged.sessionKey || '').trim()) merged.sessionKey = sessionKey;
+  if (sessionKey) {
+    const meta = isObject(merged.meta) ? merged.meta : {};
+    if (!String(meta.sessionKey || '').trim()) {
+      merged.meta = {
+        ...meta,
+        sessionKey,
+      };
+    }
+  }
+  if (!String(merged.workspaceDir || '').trim() && String(context?.workspaceDir || '').trim()) {
+    merged.workspaceDir = String(context.workspaceDir).trim();
+  }
+  if (!String(merged.trigger || '').trim() && String(context?.trigger || '').trim()) {
+    merged.trigger = String(context.trigger).trim();
+  }
+  if (!String(merged.channelId || '').trim() && String(context?.channelId || '').trim()) {
+    merged.channelId = String(context.channelId).trim();
+  }
+  return merged;
+};
+
 const extractUserQuery = (event: any): string => {
-  const messages = Array.isArray(event?.messages) ? event.messages : [];
+  const messages = getScannableMessages(event);
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     const msg = messages[i];
     const role = String(msg?.role || '').toLowerCase();
     if (role !== 'user') continue;
-    const content = messageToText(msg);
+    const content = messageToScannableText(msg);
     const sanitized = sanitizeCandidateQuery(content);
     if (sanitized) return sanitized;
   }
@@ -179,12 +267,12 @@ const normalizedQueryKey = (value: string): string =>
   String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
 const findPreviousEntityHint = (messages: any[], currentQuery: string): string => {
-  const list = Array.isArray(messages) ? messages : [];
+  const list = Array.isArray(messages) ? messages.slice(-MAX_QUERY_SCAN_MESSAGES) : [];
   let skippedCurrent = false;
   for (let i = list.length - 1; i >= 0; i -= 1) {
     const msg = list[i];
     if (String(msg?.role || '').toLowerCase() !== 'user') continue;
-    const candidate = sanitizeCandidateQuery(messageToText(msg));
+    const candidate = sanitizeCandidateQuery(messageToScannableText(msg));
     if (!candidate) continue;
     if (!skippedCurrent && normalizedQueryKey(candidate) === normalizedQueryKey(currentQuery)) {
       skippedCurrent = true;
@@ -246,7 +334,33 @@ const buildSessionPreludeInjection = (content: string): string => {
   return `${lines.join('\n')}\n`;
 };
 
-const withDb = <T,>(dbPath: string, config: PluginConfig, fn: (db: DatabaseSync) => T): T => {
+const BRIEFED_SESSION_LIMIT = 2048;
+const BRIEFED_SESSION_RETAIN = 1536;
+
+const hasSessionPrelude = (cache: Map<string, number>, sessionKey: string): boolean => {
+  const key = String(sessionKey || '').trim();
+  if (!key) return false;
+  const existing = cache.get(key);
+  if (!Number.isFinite(existing)) return false;
+  cache.set(key, Date.now());
+  return true;
+};
+
+const markSessionBriefed = (cache: Map<string, number>, sessionKey: string) => {
+  const key = String(sessionKey || '').trim();
+  if (!key) return;
+  cache.set(key, Date.now());
+  if (cache.size <= BRIEFED_SESSION_LIMIT) return;
+  const survivors = Array.from(cache.entries())
+    .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))
+    .slice(0, BRIEFED_SESSION_RETAIN);
+  cache.clear();
+  for (const [survivorKey, timestamp] of survivors) {
+    cache.set(survivorKey, timestamp);
+  }
+};
+
+const withDb = <T,>(dbPath: string, config: PluginConfig, fn: (db: any) => T): T => {
   // Reuse the shared SQLite opener so transient writer contention waits instead of failing fast.
   const db = openDatabase(dbPath);
   try {
@@ -286,7 +400,7 @@ const gigabrainPlugin = {
   register(api: PluginApi) {
     const logger = api.logger || {};
     const rawConfig = resolveRawPluginConfig(api.config);
-    const briefedSessions = new Set<string>();
+    const briefedSessions = new Map<string, number>();
 
     let config: PluginConfig;
     try {
@@ -372,27 +486,38 @@ const gigabrainPlugin = {
       }
     }
 
-    api.on('before_agent_start', async (event: any) => {
+    api.on('before_agent_start', async (event: any, ctx: any) => {
       try {
-        const baseQuery = extractUserQuery(event);
-        const messages = Array.isArray(event?.messages) ? event.messages : [];
+        const resolvedEvent = mergeEventWithCtx(event, ctx);
+        const baseQuery = extractUserQuery(resolvedEvent);
+        const messages = Array.isArray(resolvedEvent?.messages) ? resolvedEvent.messages : [];
         const query = enrichQueryWithEntityContext(baseQuery, messages);
         if (shouldSkipRecall(query)) return;
-        const scope = resolveScopeForEvent(event);
-        const sessionKey = resolveSessionKey(event);
+        const scope = resolveScopeForEvent(resolvedEvent);
+        const sessionKey = resolveSessionKey(resolvedEvent);
         const { recall, sessionPrelude } = withDb(dbPath, config, (db) => {
+          const recallStartMs = performance.now();
           const orchestrated = orchestrateRecall({
             db,
             config,
             query,
             scope,
           });
+          const recallElapsedMs = Math.round(performance.now() - recallStartMs);
+          const recallChars = String(orchestrated?.injection || '').length;
+          recordRecallLatency({
+            ms: recallElapsedMs,
+            strategy: orchestrated?.strategy || '',
+            chars: recallChars,
+            resultCount: Array.isArray(orchestrated?.results) ? orchestrated.results.length : 0,
+          });
+          logger.info?.(`[gigabrain] recall injected ${recallChars} chars in ${recallElapsedMs}ms strategy=${orchestrated?.strategy || 'unknown'}`);
           const shouldInjectPrelude = Boolean(
             config?.synthesis?.enabled !== false
             && config?.synthesis?.briefing?.enabled !== false
             && config?.synthesis?.briefing?.includeSessionPrelude !== false
             && sessionKey
-            && !briefedSessions.has(sessionKey),
+            && !hasSessionPrelude(briefedSessions, sessionKey),
           );
           if (!shouldInjectPrelude) {
             return {
@@ -412,43 +537,16 @@ const gigabrainPlugin = {
         });
         if (!recall?.injection) return;
 
-        const existing = Array.isArray(event?.messages) ? event.messages : [];
-        const systemMessages = [];
-        if (sessionPrelude) {
-          systemMessages.push({
-            role: 'system',
-            content: sessionPrelude,
-          });
-        }
-        systemMessages.push({
-          role: 'system',
-          content: recall.injection,
-        });
-        const lastUserIdx = (() => {
-          for (let i = existing.length - 1; i >= 0; i -= 1) {
-            if (String(existing[i]?.role || '').toLowerCase() === 'user') return i;
-          }
-          return -1;
-        })();
-        const injected = lastUserIdx >= 0
-          ? [
-            ...existing.slice(0, lastUserIdx),
-            ...systemMessages,
-            ...existing.slice(lastUserIdx),
-          ]
-          : [...systemMessages, ...existing];
+        const combinedInjection = [sessionPrelude, recall.injection]
+          .filter((part) => String(part || '').trim().length > 0)
+          .join('\n\n');
+        if (!combinedInjection) return;
         if (sessionKey && sessionPrelude) {
-          briefedSessions.add(sessionKey);
-          if (briefedSessions.size > 2048) {
-            const items = Array.from(briefedSessions.values()).slice(-512);
-            briefedSessions.clear();
-            for (const item of items) briefedSessions.add(item);
-          }
+          markSessionBriefed(briefedSessions, sessionKey);
         }
-        logger.info?.(`[gigabrain] recall injected ${recall.injection.length} chars`);
+        logger.info?.(`[gigabrain] recall injected ${recall.injection.length} chars strategy=${recall.strategy || 'unknown'}`);
         return {
-          ...event,
-          messages: injected,
+          appendSystemContext: combinedInjection,
         };
       } catch (err) {
         logger.warn?.(`[gigabrain] recall hook error: ${err instanceof Error ? err.message : String(err)}`);
@@ -456,10 +554,11 @@ const gigabrainPlugin = {
       }
     });
 
-    api.on('agent_end', async (event: any) => {
+    api.on('agent_end', async (event: any, ctx: any) => {
       if (config.capture.enabled === false) return;
       try {
-        const payload = extractCapturePayload(event);
+        const resolvedEvent = mergeEventWithCtx(event, ctx);
+        const payload = extractCapturePayload(resolvedEvent);
         const result = withDb(dbPath, config, (db) => captureFromEvent({
           db,
           config,
@@ -477,3 +576,8 @@ const gigabrainPlugin = {
 };
 
 export default gigabrainPlugin;
+export {
+  deriveScopeFromWorkspaceDir,
+  hasSessionPrelude,
+  markSessionBriefed,
+};

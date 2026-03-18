@@ -4,11 +4,14 @@ import { rebuildEntityMentions } from '../lib/core/person-service.js';
 import { ensureNativeStore } from '../lib/core/native-sync.js';
 import {
   ensureWorldModelReady,
+  getEntityEvolution,
   getEntityDetail,
   listContradictions,
   listEntities,
+  listRelationships,
   listSyntheses,
   pickSurfaceSummaryBelief,
+  resolveOpenLoopsFromNewMemories,
   resolveMemoryTier,
   selectSurfaceBeliefsForEntity,
   rebuildWorldModel,
@@ -204,6 +207,8 @@ const run = async () => {
     assert.equal(Boolean(lizSummary), true, 'Liz should have a surface summary belief');
     assert.doesNotMatch(lizSummary.content, /mail friend|memory-?notes/i, 'surface summary should avoid weak meta-style facts');
     assert.match(lizSummary.content, /partner|community|lives/i, 'surface summary should prefer stable relationship/profile facts');
+    const relationships = listRelationships(db, { entityId: liz.entity_id, limit: 20, minEvidence: 1 });
+    assert.equal(relationships.length >= 1, true, 'world model should persist co-occurrence relationships in memory_entity_relationships');
 
     const elisabeth = entities.find((entity) => entity.display_name.toLowerCase().includes('elisabeth'));
     assert.equal(Boolean(elisabeth), true, 'Elisabeth entity should exist');
@@ -230,6 +235,134 @@ const run = async () => {
 
     const warm = ensureWorldModelReady({ db, config, rebuildIfEmpty: true });
     assert.equal(warm.rebuilt, false, 'warm check should not rebuild once data exists');
+
+    seedMemoryCurrent(db, [
+      {
+        memory_id: 'loop-source',
+        type: 'CONTEXT',
+        content: 'Follow up with Liz about the relocation update soon?',
+        scope: 'nimbusmain',
+        confidence: 0.86,
+        created_at: '2026-03-08T12:10:00.000Z',
+        updated_at: '2026-03-08T12:10:00.000Z',
+      },
+      {
+        memory_id: 'loop-older',
+        type: 'CONTEXT',
+        content: 'Liz shared a relocation update before the follow-up note.',
+        scope: 'nimbusmain',
+        confidence: 0.91,
+        created_at: '2026-03-08T12:00:00.000Z',
+        updated_at: '2026-03-08T12:00:00.000Z',
+      },
+      {
+        memory_id: 'loop-low-confidence',
+        type: 'CONTEXT',
+        content: 'Liz shared a relocation update after the follow-up note.',
+        scope: 'nimbusmain',
+        confidence: 0.51,
+        created_at: '2026-03-09T12:20:00.000Z',
+        updated_at: '2026-03-09T12:20:00.000Z',
+      },
+    ]);
+    db.prepare(`
+      INSERT INTO memory_beliefs (
+        belief_id, entity_id, type, content, status, confidence, valid_from, valid_to, supersedes_belief_id,
+        source_memory_id, source_layer, source_path, source_line, payload
+      ) VALUES (?, ?, 'CONTEXT', ?, 'active', ?, ?, NULL, NULL, ?, 'registry', '', NULL, ?)
+    `).run(
+      'belief:loop-source',
+      liz.entity_id,
+      'Follow up with Liz about the relocation update soon?',
+      0.86,
+      '2026-03-08',
+      'loop-source',
+      JSON.stringify({ claim_slot: 'follow_up.relocation', claim_value: 'pending' }),
+    );
+    db.prepare(`
+      INSERT INTO memory_beliefs (
+        belief_id, entity_id, type, content, status, confidence, valid_from, valid_to, supersedes_belief_id,
+        source_memory_id, source_layer, source_path, source_line, payload
+      ) VALUES (?, ?, 'CONTEXT', ?, 'active', ?, ?, NULL, NULL, ?, 'registry', '', NULL, ?)
+    `).run(
+      'belief:loop-older',
+      liz.entity_id,
+      'Liz shared a relocation update before the follow-up note.',
+      0.91,
+      '2026-03-08',
+      'loop-older',
+      JSON.stringify({ claim_slot: 'follow_up.relocation', claim_value: 'older' }),
+    );
+    db.prepare(`
+      INSERT INTO memory_beliefs (
+        belief_id, entity_id, type, content, status, confidence, valid_from, valid_to, supersedes_belief_id,
+        source_memory_id, source_layer, source_path, source_line, payload
+      ) VALUES (?, ?, 'CONTEXT', ?, 'active', ?, ?, NULL, NULL, ?, 'registry', '', NULL, ?)
+    `).run(
+      'belief:loop-low-confidence',
+      liz.entity_id,
+      'Liz shared a relocation update after the follow-up note.',
+      0.51,
+      '2026-03-09',
+      'loop-low-confidence',
+      JSON.stringify({ claim_slot: 'follow_up.relocation', claim_value: 'low_confidence' }),
+    );
+    db.prepare(`
+      INSERT INTO memory_open_loops (
+        loop_id, kind, title, status, priority, related_entity_id, source_memory_ids, payload
+      ) VALUES (?, 'follow_up', ?, 'open', 0.82, ?, ?, ?)
+    `).run(
+      'loop:liz-relocation',
+      'Follow up with Liz about the relocation update',
+      liz.entity_id,
+      JSON.stringify(['loop-source']),
+      JSON.stringify({ topic: 'follow_up', subtopic: 'relocation' }),
+    );
+    const unresolvedLoops = resolveOpenLoopsFromNewMemories(db, {
+      worldModel: {
+        autoResolveLoops: true,
+        autoResolveOverlapThreshold: 0.4,
+        autoResolveMinConfidence: 0.7,
+      },
+    });
+    assert.equal(unresolvedLoops.resolved, 0, 'open-loop auto-resolution should skip source memories, older memories, and low-confidence matches');
+
+    seedMemoryCurrent(db, [
+      {
+        memory_id: 'loop-resolver',
+        type: 'CONTEXT',
+        content: 'Liz shared a relocation update after moving to Berlin, so the follow-up is resolved.',
+        scope: 'nimbusmain',
+        confidence: 0.92,
+        created_at: '2026-03-10T12:30:00.000Z',
+        updated_at: '2026-03-10T12:30:00.000Z',
+      },
+    ]);
+    db.prepare(`
+      INSERT INTO memory_beliefs (
+        belief_id, entity_id, type, content, status, confidence, valid_from, valid_to, supersedes_belief_id,
+        source_memory_id, source_layer, source_path, source_line, payload
+      ) VALUES (?, ?, 'CONTEXT', ?, 'active', ?, ?, NULL, NULL, ?, 'registry', '', NULL, ?)
+    `).run(
+      'belief:loop-resolver',
+      liz.entity_id,
+      'Liz shared a relocation update after moving to Berlin, so the follow-up is resolved.',
+      0.92,
+      '2026-03-10',
+      'loop-resolver',
+      JSON.stringify({ claim_slot: 'follow_up.relocation', claim_value: 'resolved' }),
+    );
+    const resolvedLoops = resolveOpenLoopsFromNewMemories(db, {
+      worldModel: {
+        autoResolveLoops: true,
+        autoResolveOverlapThreshold: 0.4,
+        autoResolveMinConfidence: 0.7,
+      },
+    });
+    const loopRow = db.prepare('SELECT status, payload FROM memory_open_loops WHERE loop_id = ?').get('loop:liz-relocation');
+    assert.equal(resolvedLoops.resolved, 1, 'open-loop auto-resolution should resolve newer linked memories that meet confidence and overlap thresholds');
+    assert.equal(loopRow?.status, 'resolved_auto', 'open-loop auto-resolution should mark the loop resolved_auto');
+    assert.equal(JSON.parse(loopRow?.payload || '{}').resolved_by_memory_id, 'loop-resolver', 'open-loop auto-resolution should record the resolving memory id');
 
     seedMemoryCurrent(db, [
       {

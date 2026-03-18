@@ -1,16 +1,120 @@
-# Core entity and profile recall cases
-{"query": "wer ist riley", "queries": ["wer ist riley", "riley partner sozialberater", "riley person"], "expected": ["riley", "partner", "lebens- und sozialberater"], "agent": "shared"}
-{"query": "wer ist sam", "queries": ["wer ist sam", "sam person"], "expected": ["sam"], "agent": "shared"}
-{"query": "wer ist alex", "queries": ["wer ist alex", "alex person"], "expected": ["alex"], "agent": "shared"}
-
-# Identity and preference style prompts
-{"query": "what do you know about yourself atlas", "queries": ["what do you know about yourself", "agent identity"], "expected": ["agent", "identity"], "agent": "main"}
-{"query": "welche jahreszeit magst du", "queries": ["welche jahreszeit magst du", "favorite season"], "expected": ["season", "preference"], "agent": "main"}
-
-# Temporal / context retrieval checks
-{"query": "was war letzte woche wichtig", "queries": ["was war letzte woche wichtig", "letzte woche"], "expected": ["woche"], "agent": "shared"}
-{"query": "what changed recently", "queries": ["what changed recently", "recent update"], "expected": ["updated", "context"], "agent": "shared"}
-
-# Negation / correction behavior checks
-{"query": "was stimmt nicht mehr über riley", "queries": ["was stimmt nicht mehr über riley", "riley corrected"], "expected": ["riley"], "agent": "shared"}
-{"query": "what was corrected", "queries": ["what was corrected", "corrected memory"], "expected": ["correct", "updated"], "agent": "shared"}
+{"query": "wer ist liz", "expected": ["liz", "elisabeth"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "who is stefan", "expected": ["stefan"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "tell me about chris", "expected": ["chris"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "wer ist riley", "expected": ["riley", "partner"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "who is novara", "expected": ["novara"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "was weißt du über sam", "expected": ["sam"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "tell me about alex", "expected": ["alex"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "wer ist jordan", "expected": ["jordan"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "who is tria", "expected": ["tria"], "expected_strategy": "entity_brief", "agent": "main", "category": "entity"}
+{"query": "was weißt du über atlas", "expected": ["atlas", "agent"], "expected_strategy": "entity_brief", "agent": "main", "category": "entity"}
+{"query": "tell me about the nimbus setup", "expected": ["nimbus"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "wer ist flint", "expected": ["flint"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "who is kimi", "expected": ["kimi"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "tell me about gigabrain", "expected": ["gigabrain", "memory"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "was weißt du über openclaw", "expected": ["openclaw"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "wer ist moonshot", "expected": ["moonshot"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "who is spark", "expected": ["spark"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "tell me about the viral machine", "expected": ["viral"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "wer war letztens wichtig", "expected": ["context"], "expected_strategy": "quick_context", "agent": "shared", "category": "entity"}
+{"query": "who is the main user", "expected": ["jordan", "chris", "user"], "expected_strategy": "entity_brief", "agent": "shared", "category": "entity"}
+{"query": "how do chris and liz know each other", "expected": ["chris", "liz"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "multi_entity"}
+{"query": "what connects stefan and nimbus", "expected": ["stefan", "nimbus"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "multi_entity"}
+{"query": "was verbindet jordan und riley", "expected": ["jordan", "riley"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "multi_entity"}
+{"query": "relationship between chris and stefan", "expected": ["chris", "stefan"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "multi_entity"}
+{"query": "tell me about jordan and sam together", "expected": ["jordan", "sam"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "multi_entity"}
+{"query": "wie kennen sich alex und jordan", "expected": ["alex", "jordan"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "multi_entity"}
+{"query": "what do jordan and atlas work on", "expected": ["jordan", "atlas"], "expected_strategy": "relationship_brief", "agent": "main", "category": "multi_entity"}
+{"query": "how are tria and jordan connected", "expected": ["tria", "jordan"], "expected_strategy": "relationship_brief", "agent": "main", "category": "multi_entity"}
+{"query": "beziehung zwischen chris und riley", "expected": ["chris", "riley"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "multi_entity"}
+{"query": "what links novara and jordan", "expected": ["novara", "jordan"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "multi_entity"}
+{"query": "what happened in january 2026", "expected": ["january", "2026"], "expected_strategy": "timeline_brief", "agent": "main", "category": "temporal"}
+{"query": "was war im februar 2026", "expected": ["february", "februar", "2026"], "expected_strategy": "timeline_brief", "agent": "main", "category": "temporal"}
+{"query": "timeline of events in march", "expected": ["march", "2026"], "expected_strategy": "timeline_brief", "agent": "main", "category": "temporal"}
+{"query": "what happened today", "expected": ["today", "context"], "expected_strategy": "timeline_brief", "agent": "shared", "category": "temporal"}
+{"query": "was war gestern wichtig", "expected": ["context"], "expected_strategy": "timeline_brief", "agent": "shared", "category": "temporal"}
+{"query": "timeline of the gigabrain project", "expected": ["gigabrain"], "expected_strategy": "timeline_brief", "agent": "main", "category": "temporal"}
+{"query": "what happened in december 2025", "expected": ["december", "2025"], "expected_strategy": "timeline_brief", "agent": "main", "category": "temporal"}
+{"query": "was war im januar los", "expected": ["januar", "january"], "expected_strategy": "timeline_brief", "agent": "main", "category": "temporal"}
+{"query": "give me a timeline of this year", "expected": ["2026"], "expected_strategy": "timeline_brief", "agent": "main", "category": "temporal"}
+{"query": "wann haben wir den vault sync repariert", "expected": ["vault", "sync"], "expected_strategy": "timeline_brief", "agent": "main", "category": "temporal"}
+{"query": "what happened with the migration", "expected": ["migration", "migrate"], "expected_strategy": "timeline_brief", "agent": "main", "category": "temporal"}
+{"query": "when did we start using ollama", "expected": ["ollama"], "expected_strategy": "timeline_brief", "agent": "main", "category": "temporal"}
+{"query": "was passierte im maerz 2026", "expected": ["march", "maerz", "2026"], "expected_strategy": "timeline_brief", "agent": "main", "category": "temporal"}
+{"query": "events from last week", "expected": ["context"], "expected_strategy": "timeline_brief", "agent": "shared", "category": "temporal"}
+{"query": "recent timeline of changes", "expected": ["context"], "expected_strategy": "timeline_brief", "agent": "shared", "category": "temporal"}
+{"query": "who is chris's partner", "expected": ["partner"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "relationship"}
+{"query": "wer ist stefans freundin", "expected": ["stefan", "partner", "freundin"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "relationship"}
+{"query": "who does jordan live with", "expected": ["jordan", "partner", "live"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "relationship"}
+{"query": "wer ist jordans partnerin", "expected": ["jordan", "partner"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "relationship"}
+{"query": "who is riley's boyfriend", "expected": ["riley", "partner", "boyfriend"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "relationship"}
+{"query": "ist riley in einer beziehung", "expected": ["riley", "partner", "beziehung"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "relationship"}
+{"query": "what do we know about jordan's relationships", "expected": ["jordan", "partner", "relationship"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "relationship"}
+{"query": "who is liz's partner", "expected": ["liz", "partner"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "relationship"}
+{"query": "who are jordan's close people", "expected": ["jordan"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "relationship"}
+{"query": "freunde von chris", "expected": ["chris", "friend"], "expected_strategy": "relationship_brief", "agent": "shared", "category": "relationship"}
+{"query": "where did you read that", "expected": ["source", "file"], "expected_strategy": "verification_lookup", "agent": "shared", "category": "verification"}
+{"query": "source for liz info", "expected": ["liz", "source"], "expected_strategy": "verification_lookup", "agent": "shared", "category": "verification"}
+{"query": "welche datei enthält das", "expected": ["datei", "file"], "expected_strategy": "verification_lookup", "agent": "shared", "category": "verification"}
+{"query": "show me the exact source for riley", "expected": ["riley", "source"], "expected_strategy": "verification_lookup", "agent": "shared", "category": "verification"}
+{"query": "wo steht das genau", "expected": ["source", "file"], "expected_strategy": "verification_lookup", "agent": "shared", "category": "verification"}
+{"query": "which file mentions tria", "expected": ["tria", "file"], "expected_strategy": "verification_lookup", "agent": "main", "category": "verification"}
+{"query": "zeig mir die quelle fuer jordan", "expected": ["jordan", "quelle"], "expected_strategy": "verification_lookup", "agent": "shared", "category": "verification"}
+{"query": "where is this written exactly", "expected": ["source", "written"], "expected_strategy": "verification_lookup", "agent": "shared", "category": "verification"}
+{"query": "what is the exact wording about novara", "expected": ["novara", "wording"], "expected_strategy": "verification_lookup", "agent": "shared", "category": "verification"}
+{"query": "quote the exact memory about atlas", "expected": ["atlas", "exact"], "expected_strategy": "verification_lookup", "agent": "main", "category": "verification"}
+{"query": "what is NOT true about jordan", "expected": ["jordan"], "expected_strategy": "contradiction_check", "agent": "shared", "category": "negation"}
+{"query": "was stimmt nicht mehr ueber riley", "expected": ["riley"], "expected_strategy": "contradiction_check", "agent": "shared", "category": "negation"}
+{"query": "are there any contradictions about liz", "expected": ["liz", "contradiction"], "expected_strategy": "contradiction_check", "agent": "shared", "category": "negation"}
+{"query": "stimmt das noch dass riley partnerin ist", "expected": ["riley", "partner"], "expected_strategy": "contradiction_check", "agent": "shared", "category": "negation"}
+{"query": "is there conflicting info about stefan", "expected": ["stefan", "conflict"], "expected_strategy": "contradiction_check", "agent": "shared", "category": "negation"}
+{"query": "was wurde korrigiert ueber chris", "expected": ["chris"], "expected_strategy": "contradiction_check", "agent": "shared", "category": "negation"}
+{"query": "widerspruch bei novara infos", "expected": ["novara", "widerspruch"], "expected_strategy": "contradiction_check", "agent": "shared", "category": "negation"}
+{"query": "ist das unsicher was du ueber jordan weisst", "expected": ["jordan", "unsicher"], "expected_strategy": "contradiction_check", "agent": "shared", "category": "negation"}
+{"query": "what does chris prefer", "expected": ["chris", "prefer"], "expected_strategy": "entity_brief", "agent": "shared", "category": "preference"}
+{"query": "was mag liz am liebsten", "expected": ["liz"], "expected_strategy": "entity_brief", "agent": "shared", "category": "preference"}
+{"query": "welche jahreszeit mag jordan", "expected": ["jordan", "season", "winter"], "expected_strategy": "entity_brief", "agent": "main", "category": "preference"}
+{"query": "what are jordan's preferences", "expected": ["jordan", "prefer"], "expected_strategy": "entity_brief", "agent": "shared", "category": "preference"}
+{"query": "does chris have a favorite tool", "expected": ["chris", "tool", "favorite"], "expected_strategy": "entity_brief", "agent": "shared", "category": "preference"}
+{"query": "was bevorzugt jordan beim arbeiten", "expected": ["jordan", "prefer", "work"], "expected_strategy": "entity_brief", "agent": "shared", "category": "preference"}
+{"query": "favorite things about the workspace", "expected": ["workspace", "prefer"], "expected_strategy": "entity_brief", "agent": "shared", "category": "preference"}
+{"query": "what style does jordan prefer", "expected": ["jordan", "prefer", "style"], "expected_strategy": "entity_brief", "agent": "shared", "category": "preference"}
+{"query": "what do you know about yourself", "expected": ["agent", "identity", "atlas"], "expected_strategy": "entity_brief", "agent": "main", "category": "agent_identity"}
+{"query": "who are you", "expected": ["agent", "identity"], "expected_strategy": "entity_brief", "agent": "main", "category": "agent_identity"}
+{"query": "wer bist du", "expected": ["agent", "identity"], "expected_strategy": "entity_brief", "agent": "main", "category": "agent_identity"}
+{"query": "what is your role in this workspace", "expected": ["agent", "workspace", "role"], "expected_strategy": "entity_brief", "agent": "main", "category": "agent_identity"}
+{"query": "tell me about the atlas agent", "expected": ["atlas", "agent"], "expected_strategy": "entity_brief", "agent": "main", "category": "agent_identity"}
+{"query": "what was discussed recently", "expected": ["context"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "was war neulich wichtig", "expected": ["context"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "give me a quick update", "expected": ["context", "update"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "was ist gerade aktuell", "expected": ["context", "aktuell"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "any recent changes", "expected": ["context", "change"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "what should I know right now", "expected": ["context"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "was gibts neues", "expected": ["context"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "summary of current state", "expected": ["context", "state"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "catch me up on what happened", "expected": ["context"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "was laeuft gerade", "expected": ["context"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "current priorities", "expected": ["context", "priority"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "open tasks", "expected": ["context", "task"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "key decisions made this week", "expected": ["decision"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "was wurde diese woche entschieden", "expected": ["decision", "entschieden"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "latest important notes", "expected": ["context", "notes"], "expected_strategy": "quick_context", "agent": "shared", "category": "quick_context"}
+{"query": "what do all agents know about the weight goal", "expected": ["weight", "goal"], "expected_strategy": "entity_brief", "agent": "shared", "category": "cross_scope"}
+{"query": "shared knowledge about the calorie club", "expected": ["calorie", "club"], "expected_strategy": "entity_brief", "agent": "shared", "category": "cross_scope"}
+{"query": "what is stored across scopes about jordan", "expected": ["jordan"], "expected_strategy": "entity_brief", "agent": "shared", "category": "cross_scope"}
+{"query": "global memory about the vault setup", "expected": ["vault", "setup"], "expected_strategy": "entity_brief", "agent": "shared", "category": "cross_scope"}
+{"query": "shared facts about the architecture", "expected": ["architecture"], "expected_strategy": "entity_brief", "agent": "shared", "category": "cross_scope"}
+{"query": "", "expected": [], "expected_strategy": "quick_context", "agent": "shared", "category": "edge_case"}
+{"query": "System: [2026-03-14 08:00:00 UTC] Exec completed (code 0) :: ok\n\nwho is jordan?", "expected": ["jordan"], "expected_strategy": "entity_brief", "agent": "shared", "category": "edge_case"}
+{"query": "aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq rrrr ssss tttt uuuu vvvv wwww xxxx yyyy zzzz aaaa bbbb cccc dddd", "expected": [], "expected_strategy": "quick_context", "agent": "shared", "category": "edge_case"}
+{"query": "cron: pipeline step 14 completed", "expected": [], "expected_strategy": "quick_context", "agent": "shared", "category": "edge_case"}
+{"query": "was weißt du über den vault sync", "expected": ["vault", "sync"], "expected_strategy": "entity_brief", "agent": "shared", "category": "german"}
+{"query": "wer war letzte woche da", "expected": ["context"], "expected_strategy": "timeline_brief", "agent": "shared", "category": "german"}
+{"query": "erzähl mir über die migration", "expected": ["migration"], "expected_strategy": "entity_brief", "agent": "shared", "category": "german"}
+{"query": "was ist das nightly maintenance", "expected": ["nightly", "maintenance"], "expected_strategy": "entity_brief", "agent": "shared", "category": "german"}
+{"query": "welche projekte gibt es gerade", "expected": ["project"], "expected_strategy": "quick_context", "agent": "shared", "category": "german"}
+{"query": "was weißt du über die oura integration", "expected": ["oura"], "expected_strategy": "entity_brief", "agent": "shared", "category": "german"}
+{"query": "wann war das letzte audit", "expected": ["audit"], "expected_strategy": "timeline_brief", "agent": "shared", "category": "german"}
+{"query": "gibt es neuigkeiten zum telegram bot", "expected": ["telegram", "bot"], "expected_strategy": "quick_context", "agent": "shared", "category": "german"}
+{"query": "was ist der aktuelle stand von openclaw", "expected": ["openclaw", "stand"], "expected_strategy": "entity_brief", "agent": "shared", "category": "german"}
+{"query": "wie funktioniert die entity erkennung", "expected": ["entity", "erkennung"], "expected_strategy": "entity_brief", "agent": "shared", "category": "german"}

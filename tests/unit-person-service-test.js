@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 
 import { ensureNativeStore } from '../lib/core/native-sync.js';
-import { containsEntity, ensurePersonStore, rebuildEntityMentions, resolveEntityKeysForQuery, scorePersonContent } from '../lib/core/person-service.js';
+import { buildEntityMentionScopeFilter, containsEntity, ensurePersonStore, rebuildEntityMentions, resolveEntityKeysForQuery, scorePersonContent } from '../lib/core/person-service.js';
 import { openDb, makeTempWorkspace, seedMemoryCurrent } from './helpers.js';
 
 const run = async () => {
@@ -29,6 +29,8 @@ const run = async () => {
     seedMemoryCurrent(db, [
       { memory_id: 'p1', type: 'USER_FACT', content: 'Jordan and Riley live together', scope: 'shared', confidence: 0.7 },
       { memory_id: 'p2', type: 'USER_FACT', content: 'Riley gave conference talks about relationships', scope: 'shared', confidence: 0.7 },
+      { memory_id: 'p-alpha', type: 'USER_FACT', content: 'Mira coordinates the alpha launch.', scope: 'project:alpha', confidence: 0.76 },
+      { memory_id: 'p-beta', type: 'USER_FACT', content: 'Soren coordinates the beta launch.', scope: 'project:beta', confidence: 0.76 },
       { memory_id: 'p4', type: 'CONTEXT', content: 'Archive Contact Content Date are section labels, not people.', scope: 'shared', confidence: 0.8 },
     ]);
     db.prepare(`
@@ -72,6 +74,24 @@ const run = async () => {
     const keys = resolveEntityKeysForQuery(db, 'wer ist riley?');
     assert.equal(keys.includes('riley'), true, 'query resolver should detect person key');
     assert.equal(resolveEntityKeysForQuery(db, 'wer ist partnerin?').includes('partnerin'), false, 'query resolver should reject generic relationship nouns as entities');
+    const alphaFilter = buildEntityMentionScopeFilter('project:alpha');
+    const alphaKeys = db.prepare(`
+      SELECT DISTINCT entity_key
+      FROM memory_entity_mentions
+      WHERE ${alphaFilter.sql}
+      ORDER BY entity_key ASC
+    `).all(...alphaFilter.params).map((row) => String(row.entity_key || ''));
+    assert.equal(alphaKeys.includes('mira'), true, 'project scope filters should retain same-scope entity mentions');
+    assert.equal(alphaKeys.includes('soren'), false, 'project scope filters should not leak foreign project entity mentions');
+    const sharedFilter = buildEntityMentionScopeFilter('shared');
+    const sharedKeys = db.prepare(`
+      SELECT DISTINCT entity_key
+      FROM memory_entity_mentions
+      WHERE ${sharedFilter.sql}
+      ORDER BY entity_key ASC
+    `).all(...sharedFilter.params).map((row) => String(row.entity_key || ''));
+    assert.equal(sharedKeys.includes('riley'), true, 'shared scope filters should retain shared entity mentions');
+    assert.equal(sharedKeys.includes('mira'), false, 'shared scope filters should not see project-local entity mentions');
     const noisyMentions = db.prepare(`
       SELECT COUNT(*) AS c
       FROM memory_entity_mentions
@@ -94,6 +114,30 @@ const run = async () => {
     assert.doesNotThrow(() => rebuildEntityMentions(freshDb), 'entity mention rebuild should bootstrap missing projection/native tables on fresh DBs');
   } finally {
     freshDb.close();
+  }
+
+  const legacyWs = makeTempWorkspace('gb-v3-unit-person-legacy-');
+  const legacyDb = new DatabaseSync(legacyWs.dbPath);
+  try {
+    legacyDb.exec(`
+      CREATE TABLE memory_entity_mentions (
+        id TEXT PRIMARY KEY,
+        memory_id TEXT NOT NULL,
+        entity_key TEXT NOT NULL,
+        entity_display TEXT NOT NULL,
+        role TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        source TEXT NOT NULL
+      )
+    `);
+    assert.doesNotThrow(
+      () => ensurePersonStore(legacyDb),
+      'person store bootstrap should upgrade legacy mention tables before adding scope indexes',
+    );
+    const columns = legacyDb.prepare('PRAGMA table_info(memory_entity_mentions)').all().map((row) => String(row.name || ''));
+    assert.equal(columns.includes('scope'), true, 'legacy mention table upgrade should add the scope column');
+  } finally {
+    legacyDb.close();
   }
 };
 

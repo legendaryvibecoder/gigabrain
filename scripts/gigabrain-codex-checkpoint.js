@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { runCheckpoint } from '../lib/core/codex-service.js';
 
-const HELP = `Gigabrain Codex checkpoint
+const HELP = `Gigabrain session checkpoint
 
 Usage:
   node scripts/gigabrain-codex-checkpoint.js --config /path/to/.gigabrain/config.json --summary "Implemented the MCP server"
@@ -11,6 +11,7 @@ Flags:
   --workspace-root <path>       Optional workspace override for config loading
   --mode <mode>                 Config loading mode (auto|standalone|openclaw)
   --scope <scope>               Optional scope override (default: project:main)
+  --surface <surface>           Optional host surface hint (codex|claude|openclaw|agent)
   --session-label <label>       Optional short label for the session checkpoint
   --summary <text>              Short summary of the completed work
   --decision <text>             Repeatable decision entry
@@ -57,6 +58,7 @@ try {
     workspaceRoot: readFlag('--workspace-root', ''),
     mode: readFlag('--mode', ''),
     scope: readFlag('--scope', ''),
+    surface: readFlag('--surface', ''),
     sessionLabel: readFlag('--session-label', ''),
     summary: readFlag('--summary', ''),
     decisions: readMultiFlag('--decision'),

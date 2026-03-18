@@ -158,8 +158,7 @@ const main = async () => {
   });
   const mcp = upsertClaudeMcpConfig({
     mcpPath,
-    packageRoot: PACKAGE_ROOT,
-    configPath,
+    projectRoot,
   });
   const claudeFiles = writeClaudeSupportFiles({
     projectRoot,

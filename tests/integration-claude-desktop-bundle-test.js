@@ -38,7 +38,8 @@ const run = async () => {
       'with zipfile.ZipFile(bundle, "r") as zf:',
       '    names = zf.namelist()',
       '    manifest = json.loads(zf.read("manifest.json").decode("utf-8"))',
-      'print(json.dumps({"names": names, "manifest": manifest}))',
+      '    launcher = zf.read("scripts/claude-desktop-launcher.sh").decode("utf-8")',
+      'print(json.dumps({"names": names, "manifest": manifest, "launcher": launcher}))',
     ].join('\n'),
     summary.bundlePath,
   ], {
@@ -55,16 +56,53 @@ const run = async () => {
   assert.equal(parsed.names.includes('manifest.json'), true, 'bundle should contain manifest.json');
   assert.equal(parsed.names.includes('package.json'), true, 'bundle should contain package.json for ESM resolution');
   assert.equal(parsed.names.includes('scripts/gigabrain-mcp.js'), true, 'bundle should include the Gigabrain MCP entry script');
+  assert.equal(parsed.names.includes('scripts/claude-desktop-launcher.sh'), true, 'bundle should include the Claude Desktop launcher script');
   assert.equal(parsed.names.includes('lib/core/codex-mcp.js'), true, 'bundle should include the MCP server implementation');
   assert.equal(parsed.names.includes('node_modules/zod-to-json-schema/package.json'), true, 'bundle should include MCP SDK runtime dependencies that are not direct Gigabrain deps');
   assert.equal(parsed.manifest.manifest_version, '0.3', 'bundle manifest should target Claude Desktop extension manifest version 0.3');
   assert.equal(parsed.manifest.server.type, 'node', 'bundle manifest should declare a node server');
   assert.equal(parsed.manifest.server.entry_point, 'scripts/gigabrain-mcp.js', 'bundle manifest should point to the bundled Gigabrain MCP entrypoint');
-  assert.equal(parsed.manifest.server.mcp_config.command, 'node', 'bundle manifest should run the server with node');
+  assert.equal(parsed.manifest.server.mcp_config.command, '/bin/sh', 'bundle manifest should launch through the hardened shell wrapper');
+  assert.equal(parsed.manifest.server.mcp_config.args[0], '${__dirname}/scripts/claude-desktop-launcher.sh', 'bundle manifest should point at the launcher first');
   assert.equal(parsed.manifest.server.mcp_config.args.includes('${user_config.config_path}'), true, 'bundle manifest should expose a configurable shared Gigabrain config path');
   assert.equal(parsed.manifest.user_config.config_path.default, path.join(os.homedir(), '.gigabrain', 'config.json'), 'bundle manifest should default to the canonical absolute standalone config path');
   assert.equal(String(parsed.manifest.user_config.config_path.default).includes('${HOME}'), false, 'bundle manifest should no longer show a raw HOME placeholder');
   assert.equal(parsed.manifest.compatibility.platforms.includes('darwin'), true, 'bundle manifest should target macOS Claude Desktop');
+  assert.match(parsed.launcher, /\.volta\/bin/, 'launcher should search common Volta paths');
+  assert.match(parsed.launcher, /\.nvm\/versions\/node/, 'launcher should search common nvm paths');
+  assert.match(parsed.launcher, /\.fnm/, 'launcher should search common fnm paths');
+  assert.match(parsed.launcher, /\.asdf\/shims/, 'launcher should search common asdf paths');
+  assert.match(parsed.launcher, /could not find Node\.js 22\+/i, 'launcher should explain how to fix missing Node setups');
+
+  const zipLookup = spawnSync('/bin/sh', ['-lc', 'command -v zip'], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: process.env,
+  });
+  const zipPath = String(zipLookup.stdout || '').trim();
+  if (zipPath) {
+    const toolDir = path.join(root, 'bundle-tools');
+    fs.mkdirSync(toolDir, { recursive: true });
+    fs.symlinkSync(zipPath, path.join(toolDir, 'zip'));
+    const zipOnlyOutDir = path.join(root, 'dist-zip-only');
+    const zipOnlyResult = spawnSync(process.execPath, [
+      'scripts/build-claude-desktop-bundle.js',
+      '--out-dir', zipOnlyOutDir,
+    ], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: toolDir,
+      },
+    });
+    if (zipOnlyResult.status !== 0) {
+      throw new Error(`claude desktop zip fallback build failed:\n${zipOnlyResult.stderr || zipOnlyResult.stdout}`);
+    }
+    const zipOnlySummary = JSON.parse(String(zipOnlyResult.stdout || '{}'));
+    assert.equal(zipOnlySummary.archiver, 'zip', 'bundle build should fall back to zip when python3 is unavailable');
+    assert.equal(fs.existsSync(zipOnlySummary.bundlePath), true, 'zip-only fallback should still emit a .dxt artifact');
+  }
 
   const portableOutDir = path.join(root, 'dist-portable');
   const portableResult = spawnSync('node', [

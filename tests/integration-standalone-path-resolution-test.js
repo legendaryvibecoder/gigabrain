@@ -97,6 +97,26 @@ const run = async () => {
   const explicitSummary = JSON.parse(String(explicitRun.stdout || '{}'));
   assert.equal(explicitSummary.configPath, explicitConfigPath, 'explicit standalone config should override both canonical and legacy defaults');
   assert.equal(explicitSummary.standalonePathKind, 'custom', 'explicit custom config should be reported as custom');
+
+  const missingRuntimeConfigPath = path.join(root, 'missing-store', 'config.json');
+  const missingRuntime = spawnSync('node', [
+    path.join('scripts', 'gigabrain-mcp.js'),
+    '--config',
+    missingRuntimeConfigPath,
+  ], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      HOME: homeRoot,
+    },
+  });
+  assert.notEqual(missingRuntime.status, 0, 'runtime MCP config resolution should fail closed for explicit missing configs');
+  assert.match(
+    missingRuntime.stderr || missingRuntime.stdout,
+    /could not find a standalone config/i,
+    'runtime MCP startup should explain missing explicit config paths instead of silently falling back',
+  );
 };
 
 export { run };

@@ -56,6 +56,7 @@ const run = async () => {
   assert.equal(summary.userStorePath, sharedUserStore, 'packaged codex setup should report the shared user store');
   assert.equal(fs.existsSync(path.join(sharedStoreRoot, 'config.json')), true, 'packaged codex setup should create config.json');
   assert.equal(fs.existsSync(path.join(projectRoot, '.codex', 'actions', 'verify-gigabrain.sh')), true, 'packaged codex setup should create verify action');
+  assert.equal(fs.existsSync(path.join(projectRoot, '.codex', 'actions', 'launch-gigabrain-mcp.sh')), true, 'packaged codex setup should create the project-local MCP launcher');
 
   const verify = runCommand({
     cmd: path.join(projectRoot, '.codex', 'actions', 'verify-gigabrain.sh'),
@@ -73,7 +74,10 @@ const run = async () => {
   assert.equal(verifyResult.standalone_path_kind, 'canonical', 'packaged codex verify should report the canonical standalone path');
 
   const mcpCommand = String(summary.mcpCommand || '');
-  assert.equal(mcpCommand.includes(path.join(installedPackageRoot, 'scripts', 'gigabrain-mcp.js')), true, 'packaged codex setup should print an MCP command that points at the installed package');
+  assert.equal(mcpCommand.includes(path.join(projectRoot, '.codex', 'actions', 'launch-gigabrain-mcp.sh')), true, 'packaged codex setup should register the project-local launcher with Codex');
+  const verifyScript = fs.readFileSync(path.join(projectRoot, '.codex', 'actions', 'verify-gigabrain.sh'), 'utf8');
+  assert.equal(verifyScript.includes('node_modules/.bin/$tool'), true, 'packaged codex verify action should prefer the shared repo-local binary resolver');
+  assert.equal(verifyScript.includes(installedPackageRoot), true, 'packaged codex verify action may keep an installed-package hint as a last resort');
 
   const config = readJson(path.join(sharedStoreRoot, 'config.json'));
   assert.equal(config.codex.userProfilePath, sharedUserStore, 'packaged codex setup should keep the shared user store configured');

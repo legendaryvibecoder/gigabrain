@@ -54,9 +54,18 @@ The UI is served at `http://127.0.0.1:7077/`.
 
 ## Auth
 
-All endpoints require the `X-GB-Token` header matching `GB_UI_TOKEN`.
+All endpoints require the `X-GB-Token` header.
+
+- `GB_UI_TOKEN` grants admin access.
+- `GB_UI_SCOPE_TOKENS` can provide scoped read/write access for specific memory scopes.
 
 If `GB_UI_TOKEN` is not set, **all requests are rejected** (fail-closed). The UI prompts for the token on first load and keeps it in memory for the current page session.
+
+For `POST /recall/explain`:
+
+- admin tokens may omit `scope`
+- single-scope tokens may omit `scope` and the server will derive it
+- multi-scope tokens should send an explicit concrete scope such as `shared` or `profile:main`
 
 ## Remote access
 
@@ -151,7 +160,7 @@ WantedBy=multi-user.target
 | `PATCH` | `/docs/{id}` | Update document |
 | `DELETE` | `/docs/{id}` | Delete document |
 | `GET` | `/profile` | Get agent profile |
-| `POST` | `/recall/explain` | Recall with debug info |
+| `POST` | `/recall/explain` | Recall with debug info (explicit scope required for multi-scope tokens) |
 | `GET` | `/graph` | Knowledge graph data |
 | `GET` | `/surface` | Shared Obsidian/web surface summary, including native vs registry source-layer counts |
 | `GET` | `/metrics` | Registry statistics |

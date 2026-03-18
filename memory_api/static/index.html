@@ -607,6 +607,7 @@
       <div class="card stack">
         <h3>Recall Debug</h3>
         <input id="recall-query" placeholder="Ask a recall query" />
+        <input id="recall-scope" placeholder="Optional scope (for example: shared or profile:main)" />
         <button id="recall-run">Explain Recall</button>
         <pre id="recall-result" class="muted"></pre>
       </div>
@@ -1491,11 +1492,12 @@ function renderGraph(data) {
 // Recall debug
 async function explainRecall() {
   const q = document.getElementById('recall-query').value;
+  const scope = document.getElementById('recall-scope').value.trim();
   if (!q) return;
   const res = await fetch(api('/recall/explain'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
-    body: JSON.stringify({ query: q })
+    body: JSON.stringify({ query: q, ...(scope ? { scope } : {}) })
   });
   const data = await res.json();
   document.getElementById('recall-result').textContent = JSON.stringify(data, null, 2);

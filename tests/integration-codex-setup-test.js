@@ -50,10 +50,12 @@ const run = async () => {
   assert.equal(fs.existsSync(path.join(sharedUserStore, 'MEMORY.md')), true, 'setup should bootstrap the shared personal MEMORY.md');
   assert.equal(fs.existsSync(path.join(projectRoot, '.codex', 'setup.sh')), true, 'setup should create the Codex setup script');
   assert.equal(fs.existsSync(path.join(projectRoot, '.codex', 'actions', 'install-gigabrain-mcp.sh')), true, 'setup should create the MCP install action');
+  assert.equal(fs.existsSync(path.join(projectRoot, '.codex', 'actions', 'launch-gigabrain-mcp.sh')), true, 'setup should create the MCP launcher action');
   assert.equal(fs.existsSync(path.join(projectRoot, '.codex', 'actions', 'verify-gigabrain.sh')), true, 'setup should create the doctor action');
   assert.equal(fs.existsSync(path.join(projectRoot, '.codex', 'actions', 'run-gigabrain-maintenance.sh')), true, 'setup should create the maintenance action');
   assert.equal(fs.existsSync(path.join(projectRoot, '.codex', 'actions', 'checkpoint-gigabrain-session.sh')), true, 'setup should create the checkpoint action');
   assert.equal(String(summary.mcpCommand).includes('codex'), true, 'setup should print the exact codex mcp add command');
+  assert.equal(String(summary.mcpCommand).includes(path.join(projectRoot, '.codex', 'actions', 'launch-gigabrain-mcp.sh')), true, 'setup should point Codex MCP registration at the project-local launcher');
 
   const config = JSON.parse(fs.readFileSync(path.join(sharedStoreRoot, 'config.json'), 'utf8'));
   assert.equal(config.runtime.paths.workspaceRoot, sharedStoreRoot, 'standalone workspace root should default to the shared standalone store');
@@ -91,6 +93,10 @@ const run = async () => {
   assert.equal(verifyResult.stores.some((store) => store.target === 'user' && store.ok === true), true, 'verify action should report the personal store as healthy');
   assert.equal(verifyResult.standalone_path_kind, 'canonical', 'doctor should report the canonical standalone path');
   assert.equal(verifyResult.sharing_mode, 'shared-standalone', 'doctor should explain the standalone sharing mode');
+
+  const verifyScript = fs.readFileSync(path.join(projectRoot, '.codex', 'actions', 'verify-gigabrain.sh'), 'utf8');
+  assert.equal(verifyScript.includes('node_modules/.bin/$tool'), true, 'verify action should prefer repo-local binaries through the shared helper resolver');
+  assert.equal(verifyScript.includes('npx --no-install "$tool"'), true, 'verify action should fall back to npx without reinstalling');
 
   const checkpoint = spawnSync(path.join(projectRoot, '.codex', 'actions', 'checkpoint-gigabrain-session.sh'), [
     '--summary', 'Implemented the Codex App checkpoint workflow.',

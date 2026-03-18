@@ -429,7 +429,7 @@ const main = () => {
   }
 
   const summary = {
-    ok: true,
+    ok: restartOk || skipRestart,
     configPath,
     workspaceRoot,
     registryPath: bootstrap.dbPath,

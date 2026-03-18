@@ -61,6 +61,34 @@ const run = async () => {
   const agents = fs.readFileSync(agentsPath, 'utf8');
   assert.equal(agents.includes('Gigabrain uses a hybrid memory model.'), true, 'setup should refresh the AGENTS block');
   assert.equal(agents.includes('Old block'), false, 'setup should replace stale AGENTS content');
+
+  const restartFailure = spawnSync(process.execPath, [
+    'scripts/setup-first-run.js',
+    '--config', ws.configPath,
+    '--workspace', ws.workspace,
+    '--agents-path', agentsPath,
+    '--vault-path', vaultRoot,
+  ], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      PATH: '/usr/bin:/bin',
+    },
+  });
+
+  if (restartFailure.status !== 0) {
+    throw new Error(`setup command should still exit cleanly on restart failure:\n${restartFailure.stderr || restartFailure.stdout}`);
+  }
+
+  const restartFailureSummary = JSON.parse(String(restartFailure.stdout || '{}'));
+  assert.equal(restartFailureSummary.ok, false, 'setup should report not-ok when the gateway restart step fails');
+  assert.equal(restartFailureSummary.gatewayRestart, 'failed', 'setup should report the failed gateway restart');
+  assert.equal(
+    restartFailureSummary.nextSteps.some((step) => step.includes('openclaw gateway restart')),
+    true,
+    'setup should tell the user to run gateway restart manually when restart fails',
+  );
 };
 
 export { run };

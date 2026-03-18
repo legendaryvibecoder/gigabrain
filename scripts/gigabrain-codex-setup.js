@@ -7,7 +7,6 @@ import { fileURLToPath } from 'node:url';
 import { bootstrapStandaloneStore } from '../lib/core/codex-service.js';
 import {
   buildCodexMcpAddCommand,
-  buildMcpLaunchArgs,
   createStandaloneCodexConfig,
   deriveProjectScope,
   ensureGitIgnoreEntry,
@@ -118,12 +117,8 @@ const mergeSetupConfig = ({
   };
 };
 
-const runMcpInstall = (configPath) => {
-  const launchArgs = buildMcpLaunchArgs({
-    packageRoot: PACKAGE_ROOT,
-    configPath,
-  });
-  return spawnSync('codex', ['mcp', 'add', 'gigabrain', '--', ...launchArgs], {
+const runMcpInstall = (projectRoot) => {
+  return spawnSync('codex', ['mcp', 'add', 'gigabrain', '--', '/bin/sh', path.join(projectRoot, '.codex', 'actions', 'launch-gigabrain-mcp.sh')], {
     cwd: process.cwd(),
     encoding: 'utf8',
     env: process.env,
@@ -186,15 +181,14 @@ const main = async () => {
     storeMode,
   });
   const mcpCommand = buildCodexMcpAddCommand({
-    packageRoot: PACKAGE_ROOT,
-    configPath,
+    projectRoot,
   });
 
   let mcpInstall = {
     status: 'skipped',
   };
   if (hasFlag('--install-mcp')) {
-    const install = runMcpInstall(configPath);
+    const install = runMcpInstall(projectRoot);
     mcpInstall = {
       status: install.status === 0 ? 'installed' : 'failed',
       exitCode: Number(install.status ?? 1),

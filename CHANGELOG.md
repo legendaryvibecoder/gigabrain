@@ -2,6 +2,44 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.6.0] — 2026-03-17
+
+### Added
+- In-process recall evaluation with canonical aggregate metrics via `lib/core/eval-harness.js`, `scripts/eval-runner.js`, `scripts/eval-compare.js`, and nightly `memory_eval_history` persistence
+- Optional semantic reranking infrastructure via `embedding-service.js` and additive `memory_embeddings` storage, with graceful lexical fallback when Ollama is unavailable
+- World-model relationship graph storage in `memory_entity_relationships`, plus `/gb/evolution` and `/gb/relationships` HTTP endpoints
+- New standalone MCP tools: `gigabrain_entity`, `gigabrain_contradictions`, and `gigabrain_relationships`
+- Regression coverage for nightly eval artifacts, semantic dedupe timeout resolution, semantic rerank behavior, eval tooling, MCP world-model tools, and world-model API surfaces
+
+### Changed
+- The recall stack now standardizes on machine-safe aggregate keys such as `precision_at_3`, `mrr`, `hit_rate`, `avg_injection_tokens`, `latency_median_ms`, and `latency_p95_ms`
+- Recall ranking now supports BM25-based lexical scoring, adaptive budget profiles, confidence labeling, and config-gated semantic reranking on top-N candidates
+- The orchestrator now supports multi-entity routing, fallback-chain tracking, and richer confidence signals for injected memory context
+- Nightly maintenance now records recall latency summaries, graph node/edge counts, embedding build results, and persisted eval artifacts in the execution report
+- Entity, contradiction, relationship, evolution, vault, HTTP, and MCP surfaces now share normalized world-model helper outputs instead of reconstructing divergent schemas per surface
+
+### Fixed
+- Capture parsing now strips model thinking blocks before `parseMemoryNotes`, preventing review-queue buildup from contaminated extraction output
+- Semantic dedupe timeout resolution now archives only the stored loser for still-borderline pairs and preserves auditable queue metadata instead of acting on an arbitrary queued side
+- Open-loop auto-resolution now only considers newer, non-source memories with real entity linkage and sufficient overlap/confidence
+- Standalone contradictions, relationships, and entity evolution surfaces now use the actual world-model schema fields (`loop_id`, `related_entity_id`, `source_memory_id`, `payload.claim_slot`, `payload.claim_value`)
+- Eval comparison no longer misclassifies tiny runtime jitter in latency metrics as a quality regression
+- OpenClaw hook injection now uses `appendSystemContext`, merges `ctx` correctly, and keeps scope derivation deterministic instead of silently collapsing to `shared`
+- Empty-store recall now still emits a minimal `<gigabrain-context>` block with `bootstrap_mode: true`, so fresh installs can bootstrap memory instead of deadlocking on the first session
+- Public OpenClaw correctness issues `#40`, `#41`, and `#42` are now resolved in the stable branch
+- Setup now reports OpenClaw gateway restart failures honestly instead of claiming success after a failed restart
+- Generated Codex and Claude helper scripts no longer depend on stale setup-time absolute install paths; they resolve Gigabrain dynamically from the current repo or host environment
+- Claude Desktop bundles now launch through a bundled shell wrapper so Desktop does not rely on Finder resolving `node` in PATH
+- CLI and MCP SQLite entrypoints now fail fast with a friendly Node `>=22` runtime error instead of raw `node:sqlite` import crashes
+- Review-queue writes now serialize append-plus-retention under a queue lock, preventing lost updates during concurrent writes
+- HTTP rate-limit bookkeeping now prunes empty/stale endpoint buckets instead of growing without bound
+- Maintenance now records FTS rebuild failures explicitly in nightly artifacts instead of swallowing them silently
+- Audit/review idempotency now includes an effective config fingerprint so changed thresholds/options are not skipped under the same review version
+
+### Thanks
+- Thanks to [@unboxed-ai](https://github.com/unboxed-ai) for the OpenClaw issue reports in `#40`, `#41`, and `#42`
+- Thanks to [@vibeputin](https://github.com/vibeputin) and [@Emphasonic](https://github.com/Emphasonic) for earlier community fixes that informed the `v0.6.0` hardening pass
+
 ## [0.5.3] — 2026-03-13
 
 ### Added

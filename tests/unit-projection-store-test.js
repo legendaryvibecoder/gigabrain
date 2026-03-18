@@ -43,6 +43,17 @@ const run = async () => {
       statuses: ['active'],
     });
     assert.equal(graphResults[0]?.memory_id === 'plain-hit' || graphResults[0]?.memory_id === 'fts-prefix-hit', true, 'search should still rank normal lexical hits after FTS weighting');
+
+    assert.throws(
+      () => searchCurrentMemories(db, {
+        query: 'graph',
+        topK: 5,
+        scope: '../../etc/passwd',
+        statuses: ['active'],
+      }),
+      /Invalid Gigabrain scope/i,
+      'projection-store search should reject invalid scope strings instead of accepting raw values',
+    );
   } finally {
     db.close();
   }

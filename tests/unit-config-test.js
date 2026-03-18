@@ -177,14 +177,38 @@ const run = async () => {
   assert.equal(expandHome('~/.gigabrain/config.json'), path.join(os.homedir(), '.gigabrain', 'config.json'), 'standalone helpers should expand ~ config paths');
 
   const runtimeCanonical = resolveRuntimeStandaloneConfigPath('~/.gigabrain/config.json');
-  const runtimeExpectedPath = fs.existsSync(path.join(os.homedir(), '.gigabrain', 'config.json'))
-    ? path.join(os.homedir(), '.gigabrain', 'config.json')
-    : (fs.existsSync(path.join(os.homedir(), '.codex', 'gigabrain', 'config.json'))
-      ? path.join(os.homedir(), '.codex', 'gigabrain', 'config.json')
-      : path.join(os.homedir(), '.gigabrain', 'config.json'));
-  assert.equal(runtimeCanonical.resolvedPath, runtimeExpectedPath, 'runtime standalone resolution should expand portable canonical paths and respect canonical-then-legacy fallback');
+  const runtimeCanonicalPath = path.join(os.homedir(), '.gigabrain', 'config.json');
+  if (fs.existsSync(runtimeCanonicalPath)) {
+    assert.equal(runtimeCanonical.resolvedPath, runtimeCanonicalPath, 'runtime standalone resolution should expand portable canonical paths when they exist');
+    assert.equal(runtimeCanonical.fallbackKind, 'explicit', 'existing explicit canonical paths should stay explicit');
+  } else {
+    assert.equal(runtimeCanonical.resolvedPath, runtimeCanonicalPath, 'missing explicit canonical paths should stay pointed at the requested config');
+    assert.equal(runtimeCanonical.fallbackKind, 'missing', 'missing explicit config paths must fail closed instead of silently falling back');
+  }
   const runtimeLegacy = resolveRuntimeStandaloneConfigPath('${HOME}/.codex/gigabrain/config.json');
-  assert.equal(runtimeLegacy.resolvedPath, path.join(os.homedir(), '.codex', 'gigabrain', 'config.json'), 'runtime standalone resolution should expand portable legacy paths');
+  const runtimeLegacyPath = path.join(os.homedir(), '.codex', 'gigabrain', 'config.json');
+  assert.equal(runtimeLegacy.resolvedPath, runtimeLegacyPath, 'runtime standalone resolution should expand portable legacy paths');
+  assert.equal(
+    runtimeLegacy.fallbackKind,
+    fs.existsSync(runtimeLegacyPath) ? 'explicit' : 'missing',
+    'runtime standalone resolution should keep explicit legacy paths explicit or missing, never redirect them elsewhere',
+  );
+
+  const malformedStandalonePath = path.join(os.tmpdir(), `gb-malformed-standalone-${Date.now()}.json`);
+  fs.writeFileSync(malformedStandalonePath, '{"runtime":', 'utf8');
+  assert.throws(
+    () => loadResolvedConfig({ configPath: malformedStandalonePath, mode: 'standalone' }),
+    /Invalid JSON in standalone Gigabrain config|Invalid JSON in Gigabrain config/i,
+    'malformed standalone config files should fail closed with a clear parse error',
+  );
+
+  const malformedOpenclawPath = path.join(os.tmpdir(), `gb-malformed-openclaw-${Date.now()}.json`);
+  fs.writeFileSync(malformedOpenclawPath, '{"plugins":', 'utf8');
+  assert.throws(
+    () => loadResolvedConfig({ configPath: malformedOpenclawPath, mode: 'openclaw' }),
+    /Invalid JSON in OpenClaw config|Invalid JSON in Gigabrain config/i,
+    'malformed OpenClaw config files should fail closed with a clear parse error',
+  );
 };
 
 export { run };

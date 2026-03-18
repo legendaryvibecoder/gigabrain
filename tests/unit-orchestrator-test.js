@@ -212,6 +212,46 @@ const run = async () => {
     assert.equal(verifyRecall.deepLookupReason, 'source_request', 'source request should surface a single normalized deep lookup reason');
     assert.equal(Array.isArray(verifyRecall.explain.result_breakdown), true, 'explain output should expose ranked result breakdown');
     assert.equal(verifyRecall.results.every((row) => String(row.content || '').toLowerCase().includes('tria')), true, 'verification recall should stay scoped to the selected entity when one is available');
+
+    const freshWs = makeTempWorkspace('gb-v5-orchestrator-empty-');
+    const freshConfig = normalizeConfig(makeConfigObject(freshWs.workspace).plugins.entries.gigabrain.config);
+    const freshDb = openDb(freshWs.dbPath);
+    try {
+      const freshRecall = orchestrateRecall({
+        db: freshDb,
+        config: freshConfig,
+        query: 'What should I focus on next?',
+        scope: 'shared',
+      });
+      assert.equal(freshRecall.strategy, 'quick_context', 'fresh empty recall should default to quick_context');
+      assert.equal(Array.isArray(freshRecall.results), true);
+      assert.equal(freshRecall.results.length, 0, 'fresh empty recall should not require pre-existing memories');
+      assert.equal(freshRecall.injection.includes('<gigabrain-context>'), true, 'fresh empty recall should still produce a Gigabrain context block');
+      assert.equal(freshRecall.injection.includes('bootstrap_mode: true'), true, 'orchestrator should preserve bootstrap mode in zero-memory injections');
+      assert.equal(freshRecall.injection.includes('capture_instruction:'), true, 'orchestrator should preserve capture instructions in zero-memory injections');
+    } finally {
+      freshDb.close();
+    }
+
+    // Phase 2A: Multi-entity query detection
+    assert.equal(classifyQueryIntent('How do Chris and Liz know each other?').strategy, 'multi_entity_brief', 'multi-entity queries should use multi_entity_brief strategy');
+    assert.equal(classifyQueryIntent('What connects Tria and Chris?').strategy, 'multi_entity_brief', 'connection queries should use multi_entity_brief');
+    assert.equal(classifyQueryIntent('Tell me about Chris and Liz').strategy, 'multi_entity_brief', 'dual-entity about queries should use multi_entity_brief');
+
+    // Phase 2A: Multi-entity recall
+    const multiEntityRecall = orchestrateRecall({
+      db,
+      config,
+      query: 'How do Chris and Liz know each other?',
+      scope: 'nimbusmain',
+    });
+    assert.equal(multiEntityRecall.strategy, 'multi_entity_brief', 'multi-entity query should use multi_entity_brief strategy');
+    assert.equal(multiEntityRecall.usedWorldModel, true, 'multi-entity recall should use world model');
+    assert.equal(multiEntityRecall.entityIds.length >= 2, true, 'multi-entity recall should resolve at least 2 entities');
+    assert.equal(multiEntityRecall.injection.includes('gigabrain-context'), true, 'multi-entity recall should produce a context block');
+
+    // Phase 2B: Fallback chain tracking
+    assert.equal(multiEntityRecall.explain.fallback_chain === undefined || Array.isArray(multiEntityRecall.explain.fallback_chain), true, 'explain should include fallback_chain if fallback occurred');
   } finally {
     db.close();
   }

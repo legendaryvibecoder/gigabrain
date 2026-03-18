@@ -52,6 +52,7 @@ const run = async () => {
   assert.equal(summary.standalonePathKind, 'canonical', 'packaged claude setup should use the canonical standalone path');
   assert.equal(fs.existsSync(path.join(projectRoot, 'CLAUDE.md')), true, 'packaged claude setup should create CLAUDE.md');
   assert.equal(fs.existsSync(path.join(projectRoot, '.mcp.json')), true, 'packaged claude setup should create .mcp.json');
+  assert.equal(fs.existsSync(path.join(projectRoot, '.claude', 'actions', 'launch-gigabrain-mcp.sh')), true, 'packaged claude setup should create the project-local MCP launcher');
   assert.equal(fs.existsSync(path.join(projectRoot, '.claude', 'actions', 'verify-gigabrain.sh')), true, 'packaged claude setup should create verify action');
 
   const verify = runCommand({
@@ -66,10 +67,13 @@ const run = async () => {
   const verifyResult = JSON.parse(String(verify.stdout || '{}'));
   assert.equal(verifyResult.ok, true, 'packaged claude verify action should succeed');
   assert.equal(verifyResult.standalone_path_kind, 'canonical', 'packaged claude verify should report the canonical standalone path');
+  const verifyScript = fs.readFileSync(path.join(projectRoot, '.claude', 'actions', 'verify-gigabrain.sh'), 'utf8');
+  assert.equal(verifyScript.includes('node_modules/.bin/$tool'), true, 'packaged claude verify action should prefer the shared repo-local binary resolver');
 
   const mcp = readJson(path.join(projectRoot, '.mcp.json'));
-  assert.equal(mcp.mcpServers.gigabrain.args.includes(path.join(installedPackageRoot, 'scripts', 'gigabrain-mcp.js')), true, 'packaged claude setup should point .mcp.json at the installed package');
-  assert.equal(mcp.mcpServers.gigabrain.args.includes(path.join(sharedStoreRoot, 'config.json')), true, 'packaged claude setup should point .mcp.json at the shared config');
+  assert.equal(mcp.mcpServers.gigabrain.command, '/bin/sh', 'packaged claude setup should use the project-local launcher');
+  assert.deepEqual(mcp.mcpServers.gigabrain.args, [path.join(projectRoot, '.claude', 'actions', 'launch-gigabrain-mcp.sh')], 'packaged claude setup should point .mcp.json at the launcher instead of an installed package path');
+  assert.equal(verifyScript.includes(installedPackageRoot), true, 'packaged claude verify action may keep an installed-package hint as a last resort');
 };
 
 export { run };

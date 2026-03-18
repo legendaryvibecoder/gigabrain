@@ -41,11 +41,13 @@ const readFlag = (name, fallback = '') => {
   return fallback;
 };
 
+const HOME_DIR = os.homedir() || process.env.HOME || '';
+
 const expandHome = (value = '') => {
   const raw = String(value || '').trim();
   if (!raw) return raw;
-  if (raw === '~') return process.env.HOME || raw;
-  if (raw.startsWith('~/')) return path.join(process.env.HOME || '', raw.slice(2));
+  if (raw === '~') return HOME_DIR || raw;
+  if (raw.startsWith('~/')) return HOME_DIR ? path.join(HOME_DIR, raw.slice(2)) : raw;
   return raw;
 };
 
@@ -134,8 +136,48 @@ const writeJsonPretty = (filePath, payload) => {
 };
 
 const ensureSuccess = (result, label) => {
+  if (result.error?.code === 'ENOENT') {
+    throw new Error(`${label} failed: required tool '${result.spawnargs?.[0] || 'unknown'}' was not found in PATH`);
+  }
   if (result.status === 0) return;
   throw new Error(`${label} failed:\n${String(result.stderr || result.stdout || '').trim()}`);
+};
+
+const resolveArchiveCommand = (bundlePath) => {
+  const entries = [
+    'manifest.json',
+    'package.json',
+    'README.md',
+    'LICENSE',
+    'scripts',
+    'lib',
+    'node_modules',
+  ];
+  const pythonPreflight = spawnSync('python3', ['--version'], {
+    encoding: 'utf8',
+  });
+  if (!pythonPreflight.error && pythonPreflight.status === 0) {
+    return {
+      label: 'Claude Desktop bundle archive (python3 -m zipfile)',
+      command: 'python3',
+      args: ['-m', 'zipfile', '-c', bundlePath, ...entries],
+    };
+  }
+
+  const zipPreflight = spawnSync('zip', ['-v'], {
+    encoding: 'utf8',
+  });
+  if (!zipPreflight.error && zipPreflight.status === 0) {
+    return {
+      label: 'Claude Desktop bundle archive (zip -qr)',
+      command: 'zip',
+      args: ['-qr', bundlePath, ...entries],
+    };
+  }
+
+  throw new Error(
+    'Claude Desktop bundle build requires python3 or zip in PATH. Install python3 (recommended) or ensure zip is available before building the .dxt bundle.',
+  );
 };
 
 const main = () => {
@@ -201,9 +243,9 @@ const main = () => {
       type: 'node',
       entry_point: 'scripts/gigabrain-mcp.js',
       mcp_config: {
-        command: 'node',
+        command: '/bin/sh',
         args: [
-          '${__dirname}/scripts/gigabrain-mcp.js',
+          '${__dirname}/scripts/claude-desktop-launcher.sh',
           '--config',
           '${user_config.config_path}',
         ],
@@ -222,23 +264,12 @@ const main = () => {
 
   fs.mkdirSync(outDir, { recursive: true });
   if (fs.existsSync(bundlePath)) fs.rmSync(bundlePath, { force: true });
-  const archiveResult = spawnSync('python3', [
-    '-m',
-    'zipfile',
-    '-c',
-    bundlePath,
-    'manifest.json',
-    'package.json',
-    'README.md',
-    'LICENSE',
-    'scripts',
-    'lib',
-    'node_modules',
-  ], {
+  const archiver = resolveArchiveCommand(bundlePath);
+  const archiveResult = spawnSync(archiver.command, archiver.args, {
     cwd: stagingRoot,
     encoding: 'utf8',
   });
-  ensureSuccess(archiveResult, 'Claude Desktop bundle archive');
+  ensureSuccess(archiveResult, archiver.label);
 
   console.log(JSON.stringify({
     ok: true,
@@ -247,6 +278,7 @@ const main = () => {
     bundlePath,
     defaultConfigPath,
     manifestPath: path.join(stagingRoot, 'manifest.json'),
+    archiver: archiver.command,
   }, null, 2));
 };
 

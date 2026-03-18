@@ -266,6 +266,26 @@ const run = async () => {
   } finally {
     db.close();
   }
+
+  const freshWs = makeTempWorkspace('gb-v3-int-native-recall-bootstrap-');
+  const freshConfig = normalizeConfig(makeConfigObject(freshWs.workspace).plugins.entries.gigabrain.config);
+  const freshDb = openDb(freshWs.dbPath);
+  try {
+    const freshRecall = recallForQuery({
+      db: freshDb,
+      config: freshConfig,
+      query: 'What should I focus on today?',
+      scope: 'shared',
+    });
+    assert.equal(freshRecall.results.length, 0, 'fresh recall fixture should have zero recalled rows');
+    const freshInjection = String(freshRecall.injection || '');
+    assert.equal(freshInjection.includes('<gigabrain-context>'), true, 'fresh recall should still include a Gigabrain context block');
+    assert.equal(freshInjection.includes('bootstrap_mode: true'), true, 'fresh recall should mark bootstrap mode when no memories are available');
+    assert.equal(freshInjection.includes('capture_instruction:'), true, 'fresh recall should still include capture instructions');
+    assert.equal(freshInjection.includes('No recalled memories matched this query yet.'), true, 'fresh recall should state that no prior memories were found');
+  } finally {
+    freshDb.close();
+  }
 };
 
 export { run };

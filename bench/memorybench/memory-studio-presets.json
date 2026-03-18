@@ -1,0 +1,82 @@
+{
+  "memorybench": {
+    "origin": "https://github.com/supermemoryai/memorybench.git",
+    "commit": "59338e40759d6ad0241bdb11a1a65a472209c26c",
+    "benchmark": "longmemeval",
+    "provider": "gigabrain"
+  },
+  "models": {
+    "judge": "claude-sonnet-4-20250514",
+    "answering": "claude-sonnet-4-20250514"
+  },
+  "allowedCoreFiles": [
+    "lib/core/capture-service.js",
+    "lib/core/recall-service.js",
+    "lib/core/world-model.js"
+  ],
+  "baseline": {
+    "main30": {
+      "accuracy": 0.2,
+      "singleSessionPreferenceAccuracy": 0.6,
+      "reportRunId": "compare-20260314-071631-gigabrain"
+    }
+  },
+  "presets": {
+    "dev12": {
+      "description": "Fast inner-loop benchmark with 2 LongMemEval questions per category.",
+      "samplePerCategory": 2,
+      "sampleType": "consecutive",
+      "expectedQuestionIds": [
+        "d24813b1",
+        "caf03d32",
+        "15745da0",
+        "8ebdbe50",
+        "gpt4_2f8be40d",
+        "2ce6a0f2",
+        "gpt4_483dd43c",
+        "gpt4_8279ba03",
+        "c7dc5443",
+        "a2f3aa27",
+        "89527b6b",
+        "51b23612"
+      ]
+    },
+    "main30": {
+      "description": "Promotion benchmark with 5 LongMemEval questions per category.",
+      "samplePerCategory": 5,
+      "sampleType": "consecutive",
+      "expectedQuestionIds": [
+        "d24813b1",
+        "caf03d32",
+        "8a2466db",
+        "06878be2",
+        "195a1a1b",
+        "15745da0",
+        "8ebdbe50",
+        "118b2229",
+        "ccb36322",
+        "e01b8e2f",
+        "gpt4_2f8be40d",
+        "2ce6a0f2",
+        "7024f17c",
+        "3fdac837",
+        "f0e564bc",
+        "gpt4_483dd43c",
+        "gpt4_8279ba03",
+        "2ebe6c90",
+        "gpt4_93159ced_abs",
+        "a3045048",
+        "c7dc5443",
+        "a2f3aa27",
+        "08e075c7",
+        "ce6d2d27",
+        "0ddfec37",
+        "89527b6b",
+        "51b23612",
+        "4baee567",
+        "6222b6eb",
+        "18dcd5a5"
+      ]
+    }
+  }
+}
