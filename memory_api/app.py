@@ -251,6 +251,35 @@ def _memory_scope_or_404(conn: sqlite3.Connection, memory_id: str, auth: dict) -
     return scope
 
 
+def _memory_scope(conn: sqlite3.Connection, memory_id: str) -> Optional[str]:
+    row = conn.execute("SELECT scope FROM memories WHERE id = ?", (memory_id,)).fetchone()
+    if not row:
+        return None
+    return str(row["scope"] or "shared")
+
+
+def _memory_is_accessible(conn: sqlite3.Connection, memory_id: str, auth: dict) -> bool:
+    scope = _memory_scope(conn, memory_id)
+    if scope is None:
+        return False
+    if _is_admin(auth):
+        return True
+    return scope in _allowed_scopes(auth)
+
+
+def _filter_relation_rows(conn: sqlite3.Connection, rows: list[sqlite3.Row], auth: dict) -> list[dict]:
+    out: list[dict] = []
+    for row in rows or []:
+        from_memory_id = str(row["from_memory_id"] or "")
+        to_memory_id = str(row["to_memory_id"] or "")
+        if not _memory_is_accessible(conn, from_memory_id, auth):
+            continue
+        if not _memory_is_accessible(conn, to_memory_id, auth):
+            continue
+        out.append(dict(row))
+    return out
+
+
 def _escape_like(value: str) -> str:
     return str(value or "").replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
@@ -1453,8 +1482,9 @@ def memory_relations(memory_id: str, auth: dict = Depends(require_token)):
         """,
         (memory_id, memory_id),
     ).fetchall()
+    filtered = _filter_relation_rows(conn, rels, auth)
     conn.close()
-    return {"id": memory_id, "relations": [dict(r) for r in rels]}
+    return {"id": memory_id, "relations": filtered}
 
 
 @app.get("/relations")
@@ -1493,8 +1523,9 @@ def list_relations(
         f"SELECT * FROM memory_relations {where} ORDER BY created_at DESC LIMIT ?",
         params + [min(max(int(limit or 200), 1), 1000)],
     ).fetchall()
+    filtered = _filter_relation_rows(conn, rows, auth)
     conn.close()
-    return [dict(r) for r in rows]
+    return filtered
 
 
 @app.post("/memories/{memory_id}/confirm")

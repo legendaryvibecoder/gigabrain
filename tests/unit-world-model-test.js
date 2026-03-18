@@ -4,6 +4,7 @@ import { rebuildEntityMentions } from '../lib/core/person-service.js';
 import { ensureNativeStore } from '../lib/core/native-sync.js';
 import {
   ensureWorldModelReady,
+  findEntityMatches,
   getEntityEvolution,
   getEntityDetail,
   listContradictions,
@@ -197,6 +198,15 @@ const run = async () => {
     const liz = entities.find((entity) => entity.display_name.toLowerCase().includes('liz'));
     assert.equal(Boolean(liz), true, 'Liz entity should exist');
     assert.equal(entities.some((entity) => entity.entity_id === 'organization:tria'), true, 'strong alias-scoped organization entities should remain visible');
+
+    const sharedLizMatches = findEntityMatches(db, 'Liz', { scope: 'shared', limit: 10 });
+    assert.equal(
+      sharedLizMatches.some((entity) => entity.entity_id === liz.entity_id),
+      false,
+      'scoped entity matching should not lock onto entities that only exist in another project scope',
+    );
+    const scopedLizDetail = getEntityDetail(db, liz.entity_id, { scope: 'shared' });
+    assert.equal(scopedLizDetail, null, 'scoped entity detail should fail closed when the entity is not visible in the requested scope');
 
     const detail = getEntityDetail(db, liz.entity_id);
     assert.equal(detail.kind, 'person', 'relationship memory should classify Liz as a person');

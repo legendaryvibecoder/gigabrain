@@ -117,6 +117,28 @@ const run = async () => {
     /could not find a standalone config/i,
     'runtime MCP startup should explain missing explicit config paths instead of silently falling back',
   );
+
+  const missingDoctor = spawnSync('node', [
+    path.join('scripts', 'gigabrainctl.js'),
+    'doctor',
+    '--config',
+    missingRuntimeConfigPath,
+    '--target',
+    'both',
+  ], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      HOME: homeRoot,
+    },
+  });
+  assert.notEqual(missingDoctor.status, 0, 'doctor should fail closed for explicit missing configs');
+  assert.match(
+    missingDoctor.stderr || missingDoctor.stdout,
+    /could not find a config at/i,
+    'doctor should explain missing explicit config paths instead of surfacing a raw sqlite error',
+  );
 };
 
 export { run };

@@ -189,13 +189,22 @@ const run = async () => {
         db: wmOnlyDb,
         config: wmOnlyConfig,
         query: 'wer ist riley?',
-        scope: 'shared',
+        scope: 'profile:main',
       });
       assert.equal(wmOnlyRecall.strategy, 'entity_brief', 'world-model-only entity prompts should keep entity-brief routing');
       assert.equal(wmOnlyRecall.selectedEntityId, 'person:riley', 'world-model-only entity prompts should still lock onto the selected entity');
       assert.equal(wmOnlyRecall.rankingMode, 'entity_brief:entity_locked', 'reported ranking mode should reflect entity-brief routing even when no supporting recall rows survive');
       assert.equal(Array.isArray(wmOnlyRecall.results), true);
-      assert.equal(wmOnlyRecall.results.length, 0, 'world-model-only fallback fixture should not require supporting recall rows');
+      assert.equal(wmOnlyRecall.results.length >= 1, true, 'world-model-only profile-scope fixtures may still surface matching supporting rows when the native memory is visible');
+
+      const wmOnlySharedRecall = orchestrateRecall({
+        db: wmOnlyDb,
+        config: wmOnlyConfig,
+        query: 'wer ist riley?',
+        scope: 'shared',
+      });
+      assert.equal(wmOnlySharedRecall.selectedEntityId, '', 'shared-scope world-model-only prompts should fail closed instead of locking onto profile-only entities');
+      assert.equal(wmOnlySharedRecall.strategy, 'quick_context', 'shared-scope world-model-only prompts should degrade to quick_context when the entity is not visible');
     } finally {
       wmOnlyDb.close();
     }

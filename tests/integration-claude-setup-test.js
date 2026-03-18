@@ -6,9 +6,10 @@ import { spawnSync } from 'node:child_process';
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
-const runClaudeSetup = ({ projectRoot, homeRoot }) => spawnSync('node', [
+const runClaudeSetup = ({ projectRoot, homeRoot, extraArgs = [] }) => spawnSync('node', [
   'scripts/gigabrain-claude-setup.js',
   '--project-root', projectRoot,
+  ...extraArgs,
 ], {
   cwd: repoRoot,
   encoding: 'utf8',
@@ -182,6 +183,26 @@ const run = async () => {
   assert.equal(claudeThenCodexSummary.standaloneConfigPath, path.join(sharedStoreRoot, 'config.json'), 'claude then codex should continue using the same shared standalone config');
   assert.equal(fs.existsSync(path.join(claudeFirstProject, 'CLAUDE.md')), true, 'claude then codex should preserve CLAUDE.md');
   assert.equal(fs.existsSync(path.join(claudeFirstProject, '.codex', 'actions', 'verify-gigabrain.sh')), true, 'claude then codex should add Codex actions');
+
+  const malformedRoot = fs.mkdtempSync(path.join(root, 'malformed-'));
+  const malformedProject = path.join(malformedRoot, 'project');
+  fs.mkdirSync(malformedProject, { recursive: true });
+  fs.writeFileSync(path.join(malformedProject, 'package.json'), '{"name":"malformed-claude","private":true}\n', 'utf8');
+  const malformedConfigPath = path.join(malformedRoot, 'store', 'config.json');
+  fs.mkdirSync(path.dirname(malformedConfigPath), { recursive: true });
+  fs.writeFileSync(malformedConfigPath, '{broken json', 'utf8');
+  const malformedRun = runClaudeSetup({
+    projectRoot: malformedProject,
+    homeRoot,
+    extraArgs: ['--config', malformedConfigPath],
+  });
+  assert.notEqual(malformedRun.status, 0, 'claude setup should fail closed when an existing standalone config is malformed');
+  assert.match(
+    malformedRun.stderr || malformedRun.stdout,
+    /Invalid JSON in standalone Gigabrain config/i,
+    'claude setup should explain malformed standalone config files instead of overwriting them',
+  );
+  assert.equal(fs.readFileSync(malformedConfigPath, 'utf8'), '{broken json', 'claude setup should leave malformed config files untouched when it aborts');
 };
 
 export { run };

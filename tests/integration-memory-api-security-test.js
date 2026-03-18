@@ -53,6 +53,32 @@ const run = async () => {
   );
 
   assert.match(
+    source,
+    /def _filter_relation_rows\(conn: sqlite3\.Connection, rows: list\[sqlite3\.Row\], auth: dict\) -> list\[dict\]:/,
+    'memory API should centralize per-row relation filtering for scoped tokens',
+  );
+  assert.match(
+    source,
+    /if not _memory_is_accessible\(conn, from_memory_id, auth\):\s+continue/s,
+    'relation filtering should drop rows whose source memory is outside the caller scope',
+  );
+  assert.match(
+    source,
+    /if not _memory_is_accessible\(conn, to_memory_id, auth\):\s+continue/s,
+    'relation filtering should drop rows whose related memory is outside the caller scope',
+  );
+  assert.match(
+    source,
+    /filtered = _filter_relation_rows\(conn, rels, auth\)/,
+    'memory-specific relation endpoint should filter relation rows through scoped access checks',
+  );
+  assert.match(
+    source,
+    /filtered = _filter_relation_rows\(conn, rows, auth\)/,
+    'bulk relation endpoint should filter relation rows through scoped access checks',
+  );
+
+  assert.match(
     uiSource,
     /id="recall-scope"/,
     'the web console should expose a recall scope field so scoped tokens can use /recall/explain safely',

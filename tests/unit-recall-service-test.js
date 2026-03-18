@@ -69,6 +69,33 @@ const run = async () => {
         value_score: 0.82,
         value_label: 'core',
       },
+      {
+        memory_id: 'chris-liz-together',
+        type: 'CONTEXT',
+        content: 'Chris and Liz planned the release together and aligned the rollout.',
+        scope: 'shared',
+        confidence: 0.93,
+        value_score: 0.86,
+        value_label: 'core',
+      },
+      {
+        memory_id: 'chris-solo',
+        type: 'CONTEXT',
+        content: 'Chris planned the release checklist alone.',
+        scope: 'shared',
+        confidence: 0.81,
+        value_score: 0.62,
+        value_label: 'situational',
+      },
+      {
+        memory_id: 'liz-solo',
+        type: 'CONTEXT',
+        content: 'Liz reviewed the release notes before launch.',
+        scope: 'shared',
+        confidence: 0.8,
+        value_score: 0.6,
+        value_label: 'situational',
+      },
     ]);
     ensurePersonStore(db);
     rebuildEntityMentions(db);
@@ -155,6 +182,26 @@ const run = async () => {
       sharedEntityResult.injection.includes('bootstrap_mode: true') || sharedEntityResult.results.every((row) => row.memory_id !== 'alpha-mira'),
       true,
       'shared-scope entity recall should fail closed to shared/bootstrap behavior instead of leaking project-local entity context',
+    );
+
+    const multiEntityResult = recallForQuery({
+      db,
+      config,
+      query: 'how do chris and liz work together',
+      scope: 'shared',
+      strategyContext: {
+        strategy: 'multi_entity_brief',
+        entityIds: ['person:chris', 'person:liz'],
+        multiEntities: [
+          { entity_id: 'person:chris', kind: 'person', display_name: 'Chris', aliases: ['Chris'] },
+          { entity_id: 'person:liz', kind: 'person', display_name: 'Liz', aliases: ['Liz'] },
+        ],
+      },
+    });
+    assert.equal(
+      multiEntityResult.results[0]?.memory_id,
+      'chris-liz-together',
+      'multi-entity reranking should boost memories that mention both selected entities instead of looking for opaque internal entity ids',
     );
   } finally {
     db.close();

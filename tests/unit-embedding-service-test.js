@@ -124,6 +124,24 @@ const run = async () => {
       }, db);
 
       assert.equal(reranked[0].memory_id, 'candidate-winter', 'semantic rerank should promote the semantically matching candidate');
+
+      const partialCache = semanticRerank([
+        { memory_id: 'uncached-strong', content: 'Deploy checklist for the release.', _score: 10 },
+        { memory_id: 'candidate-winter', content: 'Jordan prefers winter.', _score: 6 },
+      ], 'winter preference', {
+        recall: {
+          semanticRerankEnabled: true,
+          semanticRerankAlpha: 0.7,
+          ollamaUrl: 'http://127.0.0.1:11434',
+          embeddingTimeoutMs: 500,
+        },
+      }, db);
+
+      assert.equal(
+        partialCache[0].memory_id,
+        'uncached-strong',
+        'partial semantic rerank should leave uncached rows on their original BM25 scale instead of demoting them below cached rows',
+      );
     } finally {
       db.close();
     }

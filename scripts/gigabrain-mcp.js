@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { startMcpServer } from '../lib/core/codex-mcp.js';
 import { resolveRuntimeStandaloneConfigPath } from '../lib/core/standalone-client.js';
 
 const HELP = `Gigabrain MCP server
@@ -71,11 +70,13 @@ process.on('SIGTERM', () => {
   void shutdown(0);
 });
 
-startMcpServer(defaults)
-  .then((started) => {
-    activeServer = started;
-  })
-  .catch((error) => {
-    console.error(error instanceof Error ? error.stack || error.message : String(error));
-    process.exit(1);
-  });
+const main = async () => {
+  const { startMcpServer } = await import('../lib/core/codex-mcp.js');
+  const started = await startMcpServer(defaults);
+  activeServer = started;
+};
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.stack || error.message : String(error));
+  process.exit(1);
+});

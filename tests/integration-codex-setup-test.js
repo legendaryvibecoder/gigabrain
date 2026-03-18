@@ -6,9 +6,10 @@ import { spawnSync } from 'node:child_process';
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
-const runSetup = ({ projectRoot, homeRoot }) => spawnSync('node', [
+const runSetup = ({ projectRoot, homeRoot, extraArgs = [] }) => spawnSync('node', [
   'scripts/gigabrain-codex-setup.js',
   '--project-root', projectRoot,
+  ...extraArgs,
 ], {
   cwd: repoRoot,
   encoding: 'utf8',
@@ -147,6 +148,26 @@ const run = async () => {
   assert.deepEqual(migratedConfig.codex.recallOrder, ['project', 'user', 'remote'], 'setup rerun should migrate recall order to include the personal store');
   assert.equal(fs.existsSync(checkpointResult.source_path), true, 'setup rerun should preserve previously written native project memory');
   assert.equal(rerunSummary.standalonePathKind, 'canonical', 'setup rerun should keep using the canonical standalone path');
+
+  const malformedRoot = fs.mkdtempSync(path.join(root, 'malformed-'));
+  const malformedProject = path.join(malformedRoot, 'project');
+  fs.mkdirSync(malformedProject, { recursive: true });
+  fs.writeFileSync(path.join(malformedProject, 'package.json'), '{"name":"malformed-codex","private":true}\n', 'utf8');
+  const malformedConfigPath = path.join(malformedRoot, 'store', 'config.json');
+  fs.mkdirSync(path.dirname(malformedConfigPath), { recursive: true });
+  fs.writeFileSync(malformedConfigPath, '{broken json', 'utf8');
+  const malformedRun = runSetup({
+    projectRoot: malformedProject,
+    homeRoot,
+    extraArgs: ['--config', malformedConfigPath],
+  });
+  assert.notEqual(malformedRun.status, 0, 'setup should fail closed when an existing standalone config is malformed');
+  assert.match(
+    malformedRun.stderr || malformedRun.stdout,
+    /Invalid JSON in standalone Gigabrain config/i,
+    'setup should explain malformed standalone config files instead of overwriting them',
+  );
+  assert.equal(fs.readFileSync(malformedConfigPath, 'utf8'), '{broken json', 'setup should leave malformed config files untouched when it aborts');
 };
 
 export { run };

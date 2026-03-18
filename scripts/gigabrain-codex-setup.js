@@ -145,7 +145,10 @@ const main = async () => {
   const userOverlayPath = userOverlayFlag ? path.resolve(expandHome(userOverlayFlag)) : '';
   const projectScope = deriveProjectScope(projectRoot);
 
-  const existingConfig = readJson(configPath, {});
+  const existingConfig = readJson(configPath, {}, {
+    failOnMalformed: true,
+    label: 'standalone Gigabrain config',
+  });
   const mergedConfig = mergeSetupConfig({
     projectRoot,
     storeRoot,

@@ -101,6 +101,16 @@ const duplicateGroups = (db) => {
 
 const loadConfigAndDbPath = () => {
   const configPath = readFlag('--config', '');
+  if (configPath) {
+    const explicitConfigPath = path.resolve(configPath);
+    if (!fs.existsSync(explicitConfigPath)) {
+      throw new Error([
+        `Gigabrain could not find a config at ${explicitConfigPath}.`,
+        'If this should be a standalone store, run gigabrain-codex-setup or gigabrain-claude-setup first.',
+        'If this should be an OpenClaw install, point --config at an existing openclaw.json.',
+      ].join('\n'));
+    }
+  }
   const workspaceOverride = readFlag('--workspace', '');
   const mode = readFlag('--mode', '');
   const loaded = loadResolvedConfig({
