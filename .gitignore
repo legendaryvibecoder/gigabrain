@@ -25,7 +25,6 @@ Thumbs.db
 
 # Generated / build
 config/
-docs/
 eval/harness-cases.jsonl
 lib/obsidian-cli-adapter.js
 lib/obsidian-fs-adapter.js
