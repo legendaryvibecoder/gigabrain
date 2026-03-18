@@ -2,7 +2,7 @@
 
 All notable changes to Gigabrain are documented in this file.
 
-## [0.6.0] — 2026-03-17
+## [0.6.0] — 2026-03-18
 
 ### Added
 - In-process recall evaluation with canonical aggregate metrics via `lib/core/eval-harness.js`, `scripts/eval-runner.js`, `scripts/eval-compare.js`, and nightly `memory_eval_history` persistence
@@ -37,8 +37,9 @@ All notable changes to Gigabrain are documented in this file.
 - Audit/review idempotency now includes an effective config fingerprint so changed thresholds/options are not skipped under the same review version
 
 ### Thanks
-- Thanks to [@unboxed-ai](https://github.com/unboxed-ai) for the OpenClaw issue reports in `#40`, `#41`, and `#42`
-- Thanks to [@vibeputin](https://github.com/vibeputin) and [@Emphasonic](https://github.com/Emphasonic) for earlier community fixes that informed the `v0.6.0` hardening pass
+- Thanks to [@unboxed-ai](https://github.com/unboxed-ai) for the OpenClaw issue reports in [`#40`](https://github.com/legendaryvibecoder/gigabrain/issues/40), [`#41`](https://github.com/legendaryvibecoder/gigabrain/issues/41), and [`#42`](https://github.com/legendaryvibecoder/gigabrain/issues/42)
+- Thanks to [@vibeputin](https://github.com/vibeputin) for [`PR #33`](https://github.com/legendaryvibecoder/gigabrain/pull/33)
+- Thanks to [@Emphasonic](https://github.com/Emphasonic) for [`PR #38`](https://github.com/legendaryvibecoder/gigabrain/pull/38)
 
 ## [0.5.3] — 2026-03-13
 
