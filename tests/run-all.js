@@ -25,6 +25,7 @@ const TEST_FILES = [
   'unit-world-model-custom-slots-test.js',
   'unit-orchestrator-test.js',
   'unit-plugin-runtime-test.js',
+  'unit-openclaw-memory-runtime-test.js',
   'unit-sqlite-test.js',
   'unit-runtime-guard-test.js',
   'unit-llm-router-test.js',

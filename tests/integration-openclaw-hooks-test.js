@@ -37,6 +37,8 @@ const deriveScopeFromWorkspaceDir = (workspaceDir = '') => {
 const registerPlugin = (workspace) => {
   const handlers = new Map();
   const logs = [];
+  let memoryCapability = null;
+  let cliRegistration = null;
   const api = {
     config: makeConfigObject(workspace).plugins.entries.gigabrain.config,
     logger: {
@@ -47,21 +49,35 @@ const registerPlugin = (workspace) => {
     on: (name, handler) => {
       handlers.set(name, handler);
     },
+    registerMemoryCapability: (capability) => {
+      memoryCapability = capability;
+    },
+    registerMemoryRuntime: (runtime) => {
+      memoryCapability = { runtime };
+    },
+    registerCli: (registrar, opts) => {
+      cliRegistration = { registrar, opts };
+    },
   };
   gigabrainPlugin.register(api);
-  return { handlers, logs };
+  return { handlers, logs, memoryCapability, cliRegistration };
 };
 
 const run = async () => {
   const ws = makeTempWorkspace('gb-v053-openclaw-hooks-');
   const workspaceOnlyDir = path.join(ws.root, 'Agent Workspace', 'CPTO Ops');
   const workspaceOnlyScope = deriveScopeFromWorkspaceDir(workspaceOnlyDir);
-  const { handlers, logs } = registerPlugin(ws.workspace);
+  const { handlers, logs, memoryCapability, cliRegistration } = registerPlugin(ws.workspace);
+  const beforePromptBuild = handlers.get('before_prompt_build');
   const beforeAgentStart = handlers.get('before_agent_start');
   const agentEnd = handlers.get('agent_end');
 
-  assert.equal(typeof beforeAgentStart, 'function', 'plugin should register before_agent_start');
+  assert.equal(typeof beforePromptBuild, 'function', 'plugin should register before_prompt_build');
+  assert.equal(typeof beforeAgentStart, 'function', 'plugin should preserve before_agent_start compatibility');
   assert.equal(typeof agentEnd, 'function', 'plugin should register agent_end');
+  assert.equal(Boolean(memoryCapability?.runtime), true, 'plugin should register the OpenClaw memory runtime');
+  assert.equal(typeof memoryCapability.runtime.getMemorySearchManager, 'function', 'runtime should expose getMemorySearchManager');
+  assert.equal(Boolean(cliRegistration?.opts?.commands?.includes('memory')), true, 'plugin should register the memory CLI command');
 
   const db = openDb(ws.dbPath);
   try {
@@ -91,7 +107,7 @@ const run = async () => {
     db.close();
   }
 
-  const recallResult = await beforeAgentStart(
+  const recallResult = await beforePromptBuild(
     {
       messages: [
         { role: 'user', content: 'Who owns roadmap planning?' },
@@ -113,7 +129,7 @@ const run = async () => {
   );
   assert.equal('messages' in (recallResult || {}), false, 'hook should not rely on returning a rewritten messages array');
 
-  const workspaceRecall = await beforeAgentStart(
+  const workspaceRecall = await beforePromptBuild(
     {
       messages: [
         { role: 'user', content: 'Where are the workspace runbooks stored?' },
@@ -127,7 +143,7 @@ const run = async () => {
   assert.equal(
     String(workspaceRecall?.appendSystemContext || '').includes('/ops/runbooks/cpto'),
     true,
-    'before_agent_start should derive scope from ctx.workspaceDir when agent identity is missing',
+    'before_prompt_build should derive scope from ctx.workspaceDir when agent identity is missing',
   );
 
   await agentEnd(
