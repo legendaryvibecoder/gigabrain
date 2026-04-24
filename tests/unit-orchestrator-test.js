@@ -90,6 +90,38 @@ const run = async () => {
         value_score: 0.72,
         content_time: '2026-03-14',
       },
+      {
+        memory_id: 'm-9',
+        type: 'ENTITY',
+        content: 'Project Narwhal Ledger is the reporting workspace for treasury operations.',
+        scope: 'shared',
+        confidence: 0.92,
+        value_score: 0.82,
+      },
+      {
+        memory_id: 'm-10',
+        type: 'PREFERENCE',
+        content: 'Project Narwhal Ledger prefers weekly reporting packs over ad hoc status pings.',
+        scope: 'shared',
+        confidence: 0.91,
+        value_score: 0.81,
+      },
+      {
+        memory_id: 'm-11',
+        type: 'PREFERENCE',
+        content: 'Narwhal prefers concise standups.',
+        scope: 'shared',
+        confidence: 0.89,
+        value_score: 0.8,
+      },
+      {
+        memory_id: 'm-12',
+        type: 'PREFERENCE',
+        content: 'Ledger prefers immutable logs.',
+        scope: 'shared',
+        confidence: 0.88,
+        value_score: 0.79,
+      },
     ]);
     ensureNativeStore(db);
     rebuildEntityMentions(db);
@@ -127,6 +159,62 @@ const run = async () => {
     assert.equal(String(selfRecall.results[0]?.type || ''), 'AGENT_IDENTITY', 'self-identity prompts should prioritize AGENT_IDENTITY rows');
     assert.equal(String(selfRecall.results[0]?.content || '').toLowerCase().includes('atlas is the coding agent'), true, 'self-identity prompts should surface the agent identity row');
 
+    fs.writeFileSync(path.join(ws.workspace, 'IDENTITY.md'), '# IDENTITY.md\n\n- **Name:** Lobster\n- **Creature:** Personal AI operator\n- **Vibe:** Direct\n- **Emoji:** 🦞\n', 'utf8');
+    fs.writeFileSync(path.join(ws.workspace, 'USER.md'), '# USER.md\n\n- **Name:** Alex Lomtatidze\n- **What to call them:** Alex\n- **Timezone:** Europe/London\n', 'utf8');
+    seedMemoryCurrent(db, [
+      {
+        memory_id: 'm-13',
+        type: 'AGENT_IDENTITY',
+        content: 'Lobster is the personal AI operator for this workspace.',
+        scope: 'profile:main',
+        confidence: 0.98,
+        value_score: 0.92,
+      },
+      {
+        memory_id: 'm-14',
+        type: 'USER_FACT',
+        content: 'Alex Lomtatidze is London-based and runs an AI agency.',
+        scope: 'profile:main',
+        confidence: 0.97,
+        value_score: 0.91,
+      },
+      {
+        memory_id: 'm-15',
+        type: 'PREFERENCE',
+        content: 'Alex prefers direct, verified answers and practical business value.',
+        scope: 'profile:main',
+        confidence: 0.95,
+        value_score: 0.9,
+      },
+      {
+        memory_id: 'm-16',
+        type: 'AGENT_IDENTITY',
+        content: 'Lobster is direct, pragmatic, and quietly supportive.',
+        scope: 'profile:main',
+        confidence: 0.96,
+        value_score: 0.9,
+      },
+    ]);
+    rebuildEntityMentions(db);
+
+    const userIdentityRecall = orchestrateRecall({
+      db,
+      config,
+      query: 'Who am I?',
+      scope: 'profile:main',
+    });
+    assert.equal(userIdentityRecall.selectedEntityId, 'person:alex');
+    assert.equal(userIdentityRecall.strategy, 'entity_brief');
+
+    const agentIdentityRecall = orchestrateRecall({
+      db,
+      config,
+      query: 'Who are you?',
+      scope: 'profile:main',
+    });
+    assert.equal(agentIdentityRecall.selectedEntityId, 'person:lobster');
+    assert.equal(agentIdentityRecall.strategy, 'entity_brief');
+
     const preferenceRecall = orchestrateRecall({
       db,
       config,
@@ -135,6 +223,19 @@ const run = async () => {
     });
     assert.equal(String(preferenceRecall.results[0]?.type || ''), 'PREFERENCE', 'short preference prompts should prioritize preference memories');
     assert.equal(String(preferenceRecall.results[0]?.content || '').toLowerCase().includes('winter'), true, 'short preference prompts should recover the season preference row');
+
+    const compoundPreferenceRecall = orchestrateRecall({
+      db,
+      config,
+      query: 'What does Project Narwhal Ledger prefer?',
+      scope: 'shared',
+    });
+    assert.equal(compoundPreferenceRecall.strategy, 'entity_brief', 'entity-directed preference queries should promote out of quick_context into entity_brief when the entity is resolved');
+    assert.equal(compoundPreferenceRecall.usedWorldModel, true, 'entity-directed preference queries should use the selected entity brief when available');
+    assert.equal(compoundPreferenceRecall.selectedEntityId, 'project:narwhal-ledger', 'compound project preference queries should lock onto the exact compound project entity');
+    assert.equal(compoundPreferenceRecall.rankingMode, 'entity_brief:entity_locked', 'compound project preference queries should use entity-locked ranking');
+    assert.equal(String(compoundPreferenceRecall.results[0]?.content || '').toLowerCase().includes('project narwhal ledger prefers weekly reporting packs'), true, 'compound project preference queries should rank the exact project preference fact first');
+    assert.equal(compoundPreferenceRecall.results.every((row) => /narwhal ledger/i.test(String(row.content || ''))), true, 'entity-locked preference recall should suppress fragment-only Narwhal or Ledger rows');
 
     const timelineRecall = orchestrateRecall({
       db,
