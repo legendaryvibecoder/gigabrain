@@ -10,7 +10,7 @@ npm install @legendaryvibecoder/gigabrain
 
 ## Bootstrap
 
-Bootstrap Codex wiring for the current repo. Fresh installs use the host-neutral shared standalone store under `~/.gigabrain/`, keep the shared personal user store under `~/.gigabrain/profile/`, and derive a stable repo-specific scope for the current workspace. If you already have a supported legacy install under `~/.codex/gigabrain/`, setup reuses it in place for `0.6.1`:
+Bootstrap Codex wiring for the current repo. Fresh installs use the host-neutral shared standalone store under `~/.gigabrain/`, keep the shared personal user store under `~/.gigabrain/profile/`, and derive a stable repo-specific scope for the current workspace. If you already have a supported legacy install under `~/.codex/gigabrain/`, setup reuses it in place for `0.7.0`:
 
 ```bash
 npx gigabrain-codex-setup --project-root /path/to/repo
@@ -51,7 +51,30 @@ npx gigabrainctl doctor --config ~/.gigabrain/config.json --target both
 npx gigabrainctl maintain --config ~/.gigabrain/config.json
 ```
 
-## Standalone Codex defaults in v0.6.1
+## Using Gigabrain across multiple agents
+
+Codex, Claude, and other local agents can share Gigabrain when they point at the same standalone config, usually `~/.gigabrain/config.json`.
+
+```bash
+npx gigabrain-codex-setup --project-root /path/to/repo
+npx gigabrain-claude-setup --project-root /path/to/repo
+npx gigabrainctl sync-hosts --config ~/.gigabrain/config.json --host codex,claude_code,cursor,windsurf
+npx gigabrainctl sync-hosts status --config ~/.gigabrain/config.json
+```
+
+Use `sync-hosts sources --include-discovery` to inspect visible local host memories before or after sync. Codex memories are read from `~/.codex/memories/` when that folder exists; Claude Code memories are read from `~/.claude/projects/*/memory/` when present.
+
+Manual cloud-product imports are always explicit and local:
+
+```bash
+npx gigabrainctl sync-hosts --config ~/.gigabrain/config.json \
+  --manual-import ./chatgpt-memory-export.md \
+  --manual-source-host chatgpt_manual
+```
+
+Gigabrain does not scrape ChatGPT, Claude.ai, Gemini, or Microsoft Copilot memory. For those products, use `gigabrain_export_brief` or `npx gigabrainctl sync-hosts export-brief` and paste/import manually where the product allows it.
+
+## Standalone Codex defaults in v0.7.0
 
 - `llm.provider = "none"`
 - `llm.review.enabled = false`
@@ -61,7 +84,7 @@ npx gigabrainctl maintain --config ~/.gigabrain/config.json
 - `codex.defaultProjectScope = project:<repo>:<hash>`
 - `codex.recallOrder = ["project", "user", "remote"]`
 
-## Codex App behavior in v0.6.1
+## Codex App behavior in v0.7.0
 
 - Codex App works through MCP, not through undocumented internal Codex state.
 - `gigabrain_remember` with `target=user` is for stable personal preferences and facts that should follow you across repos.
@@ -95,6 +118,6 @@ That keeps the store under `/path/to/repo/.gigabrain/`, places the personal user
 - If you want to inspect only the user store, run `npx gigabrainctl doctor --config ~/.gigabrain/config.json --target user`.
 - If you want to inspect only the repo store, run `npx gigabrainctl doctor --config ~/.gigabrain/config.json --target project`.
 
-## Upgrading from v0.5.x
+## Upgrading from v0.5.x or v0.6.x
 
-Re-run `npx gigabrain-codex-setup --project-root /path/to/repo` to refresh the shared standalone defaults, verify helper scripts, and doctor path. Existing `~/.codex/gigabrain` installs remain supported in place for `0.6.1`.
+Re-run `npx gigabrain-codex-setup --project-root /path/to/repo` to refresh the shared standalone defaults, verify helper scripts, and doctor path. Existing `~/.codex/gigabrain` installs remain supported in place for `0.7.0`.

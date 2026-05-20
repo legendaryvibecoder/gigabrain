@@ -1,8 +1,8 @@
 {
     "name": "@legendaryvibecoder/gigabrain",
-    "version": "0.6.1",
+    "version": "0.7.0",
     "type": "module",
-    "description": "Local-first memory layer for OpenClaw, Codex, and Claude — capture, recall, dedupe, audit, native sync",
+    "description": "Local-first memory control plane for agents — cross-host recall, provenance, dedupe, audit, native sync",
     "author": "Legendary Vibecoder",
     "homepage": "https://github.com/legendaryvibecoder/gigabrain#readme",
     "bugs": {
@@ -19,6 +19,7 @@
     "scripts": {
         "setup": "node scripts/setup-first-run.js",
         "codex:setup": "node scripts/gigabrain-codex-setup.js",
+        "hermes:setup": "node scripts/gigabrain-hermes-setup.js",
         "codex:mcp": "node scripts/gigabrain-mcp.js",
         "codex:checkpoint": "node scripts/gigabrain-codex-checkpoint.js --config \"$HOME/.gigabrain/config.json\" --surface codex",
         "codex:doctor": "node scripts/gigabrainctl.js doctor --config \"$HOME/.gigabrain/config.json\" --target both",
@@ -36,11 +37,15 @@
         "test:regression": "node tests/run-all.js --filter regression",
         "test:performance": "node tests/run-all.js --filter performance",
         "test:release-live": "RELEASE_LIVE_SMOKE=1 node tests/release-live-codex-cli-test.js && RELEASE_LIVE_SMOKE=1 node tests/release-live-openclaw-install-test.js",
-        "test:release": "node tests/run-all.js && npm run test:release-live && npm run eval:deep-recall",
+        "test:release": "node tests/run-all.js && npm run audit:high && npm run pack:dry-run && npm run test:release-live && npm run eval:deep-recall",
+        "demo:passport": "scripts/demo-memory-passport.sh",
+        "audit:high": "npm audit --audit-level=high",
+        "pack:dry-run": "npm --cache \"${TMPDIR:-/tmp}/gigabrain-npm-cache\" pack --dry-run",
         "gigabrainctl": "node scripts/gigabrainctl.js",
         "nightly": "node scripts/gigabrainctl.js nightly",
         "maintain": "node scripts/gigabrainctl.js maintain",
         "audit": "node scripts/gigabrainctl.js audit --mode shadow",
+        "passport": "node scripts/gigabrainctl.js passport",
         "inventory": "node scripts/gigabrainctl.js inventory",
         "doctor": "node scripts/gigabrainctl.js doctor",
         "world": "node scripts/gigabrainctl.js world rebuild",
@@ -59,6 +64,10 @@
     "keywords": [
         "openclaw",
         "memory",
+        "cross-agent",
+        "memory-bus",
+        "memory-passport",
+        "local-first",
         "plugin",
         "gigabrain",
         "codex",
@@ -70,6 +79,7 @@
         "gigabrain-codex-checkpoint": "./scripts/gigabrain-codex-checkpoint.js",
         "gigabrain-mcp": "./scripts/gigabrain-mcp.js",
         "gigabrain-codex-setup": "./scripts/gigabrain-codex-setup.js",
+        "gigabrain-hermes-setup": "./scripts/gigabrain-hermes-setup.js",
         "gigabrain-claude-setup": "./scripts/gigabrain-claude-setup.js"
     },
     "openclaw": {
@@ -89,6 +99,8 @@
         "index.ts",
         "lib/",
         "scripts/",
+        "docs/",
+        "site/",
         "eval/*.js",
         "eval/deep-recall-summary-2026-03-11.md",
         "eval/cases.jsonl",

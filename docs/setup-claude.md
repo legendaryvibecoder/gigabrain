@@ -10,7 +10,7 @@ npm install @legendaryvibecoder/gigabrain
 
 ## Bootstrap
 
-Bootstrap Claude wiring for the current repo. Fresh installs use the same shared standalone store as Codex under `~/.gigabrain/`, keep the shared personal user store under `~/.gigabrain/profile/`, and derive the same stable repo-specific scope. If you already have a supported legacy install under `~/.codex/gigabrain/`, setup reuses it in place for `0.6.1`:
+Bootstrap Claude wiring for the current repo. Fresh installs use the same shared standalone store as Codex under `~/.gigabrain/`, keep the shared personal user store under `~/.gigabrain/profile/`, and derive the same stable repo-specific scope. If you already have a supported legacy install under `~/.codex/gigabrain/`, setup reuses it in place for `0.7.0`:
 
 ```bash
 npx gigabrain-claude-setup --project-root /path/to/repo
@@ -71,13 +71,36 @@ npm run claude:desktop:bundle
 6. If Claude asks for a config path, use the resolved path from setup. On fresh installs that is usually `~/.gigabrain/config.json`; legacy standalone installs may still use `~/.codex/gigabrain/config.json`.
 7. Use `.claude/actions/checkpoint-gigabrain-session.sh --summary "..."` after meaningful work if you want episodic session capture.
 
+## Using Gigabrain across multiple agents
+
+Claude Code, Codex, and other local agents can share Gigabrain when they point at the same standalone config, usually `~/.gigabrain/config.json`.
+
+```bash
+npx gigabrain-codex-setup --project-root /path/to/repo
+npx gigabrain-claude-setup --project-root /path/to/repo
+npx gigabrainctl sync-hosts --config ~/.gigabrain/config.json --host codex,claude_code,cursor,windsurf
+npx gigabrainctl sync-hosts status --config ~/.gigabrain/config.json
+```
+
+Use `sync-hosts sources --include-discovery` to inspect visible local host memories before or after sync. Claude Code memories are read from `~/.claude/projects/*/memory/` when present; Codex memories are read from `~/.codex/memories/` when that folder exists.
+
+Manual cloud-product imports are always explicit and local:
+
+```bash
+npx gigabrainctl sync-hosts --config ~/.gigabrain/config.json \
+  --manual-import ./claude-export.md \
+  --manual-source-host claude_manual
+```
+
+Gigabrain does not scrape ChatGPT, Claude.ai, Gemini, or Microsoft Copilot memory. For those products, use `gigabrain_export_brief` or `npx gigabrainctl sync-hosts export-brief` and paste/import manually where the product allows it.
+
 ## Claude memory surfaces vs Gigabrain
 
-Claude now has multiple memory/instruction surfaces, and `v0.6.x` treats them as complementary rather than interchangeable:
+Claude now has multiple memory/instruction surfaces, and `v0.7.x` treats them as complementary rather than interchangeable:
 
 - **Claude Desktop account/chat memory**: Anthropic's own memory for supported plans and clients. Gigabrain does not read, import, or synchronize those memories.
 - **Claude Code memory**: Claude Code loads `CLAUDE.md` and related local instruction files. Gigabrain integrates with that by managing a Gigabrain block and exposing MCP tools, but it does not replace Claude Code's own instruction loading.
-- **Claude Desktop Cowork**: Anthropic currently documents no memory across Cowork sessions. Gigabrain can still be used as the local memory layer if Cowork is operating in the same repo/config environment, but Cowork itself is not a first-class Gigabrain-native integration in `v0.6.x`.
+- **Claude Desktop Cowork**: Anthropic currently documents no memory across Cowork sessions. Gigabrain can still be used as the local memory layer if Cowork is operating in the same repo/config environment, but Cowork itself is not a first-class Gigabrain-native integration in `v0.7.x`.
 - **Gigabrain**: explicit, local-first project/user memory across hosts, with checkpoints, provenance, recall orchestration, maintenance, and a shared local store.
 
 ### Recommended stance
@@ -88,7 +111,7 @@ Claude now has multiple memory/instruction surfaces, and `v0.6.x` treats them as
 
 ## Cowork note
 
-- Cowork is compatibility-audited for the same repo/config path, but `v0.6.x` does not claim a dedicated Cowork memory integration.
+- Cowork is compatibility-audited for the same repo/config path, but `v0.7.x` does not claim a dedicated Cowork memory integration.
 - If you use Cowork and want durable continuity, keep Gigabrain configured in the same repo and rely on the shared local store rather than expecting Cowork session memory.
 
 ## Upgrading

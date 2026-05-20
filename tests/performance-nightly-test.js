@@ -32,7 +32,7 @@ const run = async () => {
   }
 
   const beforeHeap = process.memoryUsage().heapUsed;
-  const startedAt = Date.now();
+  const startedAt = process.hrtime.bigint();
   const maintenance = runMaintenance({
     dbPath: ws.dbPath,
     config,
@@ -50,7 +50,7 @@ const run = async () => {
     llm: { enabled: false, provider: 'none' },
   });
   assert.equal(audit.ok, true);
-  const elapsedMs = Date.now() - startedAt;
+  const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
   const afterHeap = process.memoryUsage().heapUsed;
   const heapDeltaMb = (afterHeap - beforeHeap) / (1024 * 1024);
 
