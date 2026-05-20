@@ -8,9 +8,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 import { createStandaloneCodexConfig } from '../lib/core/codex-project.js';
+import { SERVER_VERSION } from '../lib/core/codex-mcp.js';
 import { bootstrapStandaloneStore } from '../lib/core/codex-service.js';
 import { ensureProjectionStore } from '../lib/core/projection-store.js';
 import { ensureWorldModelStore } from '../lib/core/world-model.js';
+import packageJson from '../package.json' with { type: 'json' };
 
 const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 
@@ -31,6 +33,21 @@ const withTimeout = (promise, label, timeoutMs = 10_000) => {
       }, timeoutMs);
     }),
   ]);
+};
+
+const assertToolResponse = (response, label) => {
+  assert.notEqual(response.isError, true, `${label} should succeed`);
+  assert.equal(Boolean(response.structuredContent), true, `${label} should include structuredContent`);
+  const textBlock = response.content?.find((item) => item.type === 'text');
+  assert.equal(Boolean(textBlock), true, `${label} should include serialized JSON text fallback`);
+  assert.deepEqual(JSON.parse(textBlock.text), response.structuredContent, `${label} text fallback should match structuredContent`);
+};
+
+const assertToolAnnotations = (tool, expected) => {
+  assert.equal(Boolean(tool), true, `${expected.name} should be listed`);
+  assert.equal(tool.annotations?.readOnlyHint, expected.readOnlyHint, `${expected.name} readOnlyHint should match`);
+  assert.equal(tool.annotations?.destructiveHint, false, `${expected.name} should be non-destructive`);
+  assert.equal(tool.annotations?.openWorldHint, false, `${expected.name} should stay local/closed-world`);
 };
 
 const connectClient = async ({ configPath, stderrChunks, env = process.env }) => {
@@ -227,6 +244,7 @@ const run = async () => {
   writeJsonPretty(configPath, config);
   bootstrapStandaloneStore({ configPath });
   const projectScope = config.codex.projectScope;
+  assert.equal(SERVER_VERSION, packageJson.version, 'MCP server version should match package.json');
 
   const stderrChunks = [];
   const { client } = await connectClient({ configPath, stderrChunks });
@@ -234,6 +252,7 @@ const run = async () => {
   try {
     const tools = await withTimeout(client.listTools(), 'client.listTools');
     const toolNames = tools.tools.map((tool) => tool.name);
+    const toolByName = new Map(tools.tools.map((tool) => [tool.name, tool]));
     assert.equal(toolNames.includes('gigabrain_recall'), true, 'MCP should expose recall');
     assert.equal(toolNames.includes('gigabrain_remember'), true, 'MCP should expose remember');
     assert.equal(toolNames.includes('gigabrain_checkpoint'), true, 'MCP should expose checkpoint');
@@ -246,6 +265,18 @@ const run = async () => {
     assert.equal(toolNames.includes('gigabrain_entity'), true, 'MCP should expose entity detail');
     assert.equal(toolNames.includes('gigabrain_contradictions'), true, 'MCP should expose contradictions');
     assert.equal(toolNames.includes('gigabrain_relationships'), true, 'MCP should expose relationships');
+    assertToolAnnotations(toolByName.get('gigabrain_recall'), { name: 'gigabrain_recall', readOnlyHint: true });
+    assertToolAnnotations(toolByName.get('gigabrain_provenance'), { name: 'gigabrain_provenance', readOnlyHint: true });
+    assertToolAnnotations(toolByName.get('gigabrain_recent'), { name: 'gigabrain_recent', readOnlyHint: true });
+    assertToolAnnotations(toolByName.get('gigabrain_sources'), { name: 'gigabrain_sources', readOnlyHint: true });
+    assertToolAnnotations(toolByName.get('gigabrain_sync_status'), { name: 'gigabrain_sync_status', readOnlyHint: true });
+    assertToolAnnotations(toolByName.get('gigabrain_export_brief'), { name: 'gigabrain_export_brief', readOnlyHint: true });
+    assertToolAnnotations(toolByName.get('gigabrain_entity'), { name: 'gigabrain_entity', readOnlyHint: true });
+    assertToolAnnotations(toolByName.get('gigabrain_contradictions'), { name: 'gigabrain_contradictions', readOnlyHint: true });
+    assertToolAnnotations(toolByName.get('gigabrain_relationships'), { name: 'gigabrain_relationships', readOnlyHint: true });
+    assertToolAnnotations(toolByName.get('gigabrain_doctor'), { name: 'gigabrain_doctor', readOnlyHint: true });
+    assertToolAnnotations(toolByName.get('gigabrain_remember'), { name: 'gigabrain_remember', readOnlyHint: false });
+    assertToolAnnotations(toolByName.get('gigabrain_checkpoint'), { name: 'gigabrain_checkpoint', readOnlyHint: false });
 
     const remember = await withTimeout(client.callTool({
       name: 'gigabrain_remember',
@@ -258,6 +289,7 @@ const run = async () => {
       },
     }), 'gigabrain_remember');
     assert.notEqual(remember.isError, true, `MCP remember should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(remember, 'gigabrain_remember');
     assert.equal(remember.structuredContent?.ok, true, 'MCP remember should return ok');
     assert.equal(Boolean(remember.structuredContent?.memory_id), true, 'MCP remember should return a memory id');
 
@@ -271,6 +303,7 @@ const run = async () => {
       },
     }), 'gigabrain_remember_user');
     assert.notEqual(rememberUser.isError, true, `MCP remember(user) should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(rememberUser, 'gigabrain_remember_user');
     assert.equal(rememberUser.structuredContent?.ok, true, 'MCP remember(user) should return ok');
     assert.equal(rememberUser.structuredContent?.target, 'user', 'MCP remember(user) should write to the user store');
 
@@ -284,6 +317,7 @@ const run = async () => {
       },
     }), 'gigabrain_recall');
     assert.notEqual(recall.isError, true, `MCP recall should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(recall, 'gigabrain_recall');
     assert.equal(
       recall.structuredContent?.results?.some((row) => String(row.content || '').includes('Codex can use Gigabrain through MCP')),
       true,
@@ -301,6 +335,7 @@ const run = async () => {
       },
     }), 'gigabrain_recall_user');
     assert.notEqual(recallUser.isError, true, `MCP recall(user) should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(recallUser, 'gigabrain_recall_user');
     assert.equal(
       recallUser.structuredContent?.results?.some((row) => String(row.content || '').includes('very clear setup docs')),
       true,
@@ -316,6 +351,7 @@ const run = async () => {
       },
     }), 'gigabrain_provenance');
     assert.notEqual(provenance.isError, true, `MCP provenance should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(provenance, 'gigabrain_provenance');
     assert.equal(Boolean(provenance.structuredContent?.results?.[0]?.source_path), true, 'MCP provenance should include source paths');
 
     const checkpoint = await withTimeout(client.callTool({
@@ -331,6 +367,7 @@ const run = async () => {
       },
     }), 'gigabrain_checkpoint');
     assert.notEqual(checkpoint.isError, true, `MCP checkpoint should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(checkpoint, 'gigabrain_checkpoint');
     assert.equal(checkpoint.structuredContent?.ok, true, 'MCP checkpoint should return ok');
     assert.equal(checkpoint.structuredContent?.written_native, true, 'MCP checkpoint should write native session logs');
 
@@ -344,6 +381,7 @@ const run = async () => {
       },
     }), 'gigabrain_recall_after_checkpoint');
     assert.notEqual(checkpointRecall.isError, true, `MCP recall after checkpoint should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(checkpointRecall, 'gigabrain_recall_after_checkpoint');
     assert.equal(
       checkpointRecall.structuredContent?.results?.some((row) => String(row.content || '').includes('task-end checkpoints in Codex App')),
       true,
@@ -358,6 +396,7 @@ const run = async () => {
       },
     }), 'gigabrain_recent_user');
     assert.notEqual(recentUser.isError, true, `MCP recent(user) should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(recentUser, 'gigabrain_recent_user');
     assert.equal(
       recentUser.structuredContent?.results?.some((row) => row.origin === 'user'),
       true,
@@ -372,6 +411,7 @@ const run = async () => {
       },
     }), 'gigabrain_sources');
     assert.notEqual(sources.isError, true, `MCP sources should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(sources, 'gigabrain_sources');
     assert.equal(sources.structuredContent?.ok, true, 'MCP sources should return ok');
     assert.equal(Array.isArray(sources.structuredContent?.stores), true, 'MCP sources should include stores');
 
@@ -382,6 +422,7 @@ const run = async () => {
       },
     }), 'gigabrain_sync_status');
     assert.notEqual(syncStatus.isError, true, `MCP sync status should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(syncStatus, 'gigabrain_sync_status');
     assert.equal(syncStatus.structuredContent?.ok, true, 'MCP sync status should return ok');
     assert.equal(
       syncStatus.structuredContent?.stores?.[0]?.hosts?.some((row) => row.source_host === 'codex'),
@@ -399,7 +440,9 @@ const run = async () => {
       },
     }), 'gigabrain_export_brief');
     assert.notEqual(exportBrief.isError, true, `MCP export brief should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(exportBrief, 'gigabrain_export_brief');
     assert.equal(exportBrief.structuredContent?.ok, true, 'MCP export brief should return ok');
+    assert.equal(Number.isFinite(exportBrief.structuredContent?.omitted_secret_risks), true, 'MCP export brief schema should expose omitted secret risk count');
     assert.equal(exportBrief.structuredContent?.brief.includes('does not scrape'), true, 'MCP export brief should explain the closed-cloud boundary');
 
     const doctor = await withTimeout(client.callTool({
@@ -409,6 +452,7 @@ const run = async () => {
       },
     }), 'gigabrain_doctor');
     assert.notEqual(doctor.isError, true, `MCP doctor should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(doctor, 'gigabrain_doctor');
     assert.equal(doctor.structuredContent?.ok, true, 'MCP doctor should report a healthy setup');
     assert.equal(Array.isArray(doctor.structuredContent?.stores), true, 'MCP doctor should include store health');
     assert.equal(
@@ -427,6 +471,7 @@ const run = async () => {
       },
     }), 'gigabrain_entity');
     assert.notEqual(entityTool.isError, true, `MCP entity should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(entityTool, 'gigabrain_entity');
     assert.equal(entityTool.structuredContent?.entity?.display_name, 'Riley', 'MCP entity should return the requested entity');
     assert.equal(Array.isArray(entityTool.structuredContent?.beliefs), true, 'MCP entity should include beliefs');
     assert.equal(
@@ -443,6 +488,7 @@ const run = async () => {
       },
     }), 'gigabrain_contradictions');
     assert.notEqual(contradictionsTool.isError, true, `MCP contradictions should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(contradictionsTool, 'gigabrain_contradictions');
     assert.equal(contradictionsTool.structuredContent?.total >= 1, true, 'MCP contradictions should return the seeded contradiction');
     assert.equal(
       Boolean(contradictionsTool.structuredContent?.contradictions?.[0]?.suggestion?.suggested_resolution),
@@ -457,6 +503,7 @@ const run = async () => {
       },
     }), 'gigabrain_relationships');
     assert.notEqual(relationshipsTool.isError, true, `MCP relationships should succeed: ${stderrChunks.join('')}`);
+    assertToolResponse(relationshipsTool, 'gigabrain_relationships');
     assert.equal(relationshipsTool.structuredContent?.total >= 1, true, 'MCP relationships should return the stored relationship rows');
     assert.equal(
       relationshipsTool.structuredContent?.relationships?.some((row) => row.counterpart_entity?.display_name === 'Jordan'),
@@ -494,6 +541,7 @@ const run = async () => {
       },
     }), 'gigabrain_doctor_portable_path');
     assert.notEqual(portableDoctor.isError, true, `MCP doctor with portable config path should succeed: ${portableStderrChunks.join('')}`);
+    assertToolResponse(portableDoctor, 'gigabrain_doctor_portable_path');
     assert.equal(portableDoctor.structuredContent?.ok, true, 'MCP doctor should work with a home-relative standalone config path');
     assert.equal(portableDoctor.structuredContent?.config_path, portableConfigPath, 'MCP doctor should resolve the portable config path to the actual standalone config');
   } finally {
@@ -524,6 +572,7 @@ const run = async () => {
       },
     }), 'gigabrain_doctor_user_missing');
     assert.notEqual(doctorUser.isError, true, `MCP doctor(user) should return structured failure: ${brokenStderrChunks.join('')}`);
+    assertToolResponse(doctorUser, 'gigabrain_doctor_user_missing');
     assert.equal(doctorUser.structuredContent?.ok, false, 'MCP doctor(user) should fail when the user store is not configured');
     assert.equal(
       doctorUser.structuredContent?.stores?.some((row) => row.target === 'user' && String(row.error || '').includes("target store 'user' is not configured")),

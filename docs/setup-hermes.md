@@ -4,6 +4,8 @@ Gigabrain connects to Hermes through a standard stdio MCP server. Hermes keeps i
 
 For Nimbus, use the [Nimbus Memory Bridge Contract](nimbus-memory-bridge.md): Hermes native memory stays a compact hot cache, while Gigabrain is the authoritative long-term memory control plane.
 
+Current destination status is tracked in the [Destination Audit](audits/destination-audit-2026-05.md). A native Hermes memory-provider plugin is optional future work; MCP plus read-only Hermes memory sync is the supported v0.7.1 path.
+
 ## Install
 
 ```bash

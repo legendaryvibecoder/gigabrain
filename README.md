@@ -53,7 +53,7 @@ npx gigabrainctl sync-hosts --config ~/.gigabrain/config.json --host codex,claud
 npx gigabrainctl passport --config ~/.gigabrain/config.json --output-dir ./gigabrain-passport
 ```
 
-This gives Codex, Claude, and Hermes the same local project/user memory store, indexes visible local host memories read-only, then writes a static Memory Passport report plus handoff briefs under `./gigabrain-passport/`. See the [Memory Passport guide](docs/memory-passport.md), [Codex setup](docs/setup-codex.md#using-gigabrain-across-multiple-agents), [Claude setup](docs/setup-claude.md#using-gigabrain-across-multiple-agents), [Hermes setup](docs/setup-hermes.md), the [Nimbus Memory Bridge Contract](docs/nimbus-memory-bridge.md), and the [cross-memory pivot](docs/cross-memory-pivot-2026-04.md).
+This gives Codex, Claude, and Hermes the same local project/user memory store, indexes visible local host memories read-only, then writes a static Memory Passport report plus handoff briefs under `./gigabrain-passport/`. See the [Memory Passport guide](docs/memory-passport.md), [Codex setup](docs/setup-codex.md#using-gigabrain-across-multiple-agents), [Claude setup](docs/setup-claude.md#using-gigabrain-across-multiple-agents), [Hermes setup](docs/setup-hermes.md), the [Nimbus Memory Bridge Contract](docs/nimbus-memory-bridge.md), the [destination audit](docs/audits/destination-audit-2026-05.md), and the [cross-memory pivot](docs/cross-memory-pivot-2026-04.md).
 
 Manual cloud imports must be explicit:
 
@@ -158,6 +158,7 @@ Conversation (OpenClaw / Codex / Claude Code / Claude Desktop)
 | Subsystem | Description | Docs |
 |-----------|-------------|------|
 | Memory Passport | Static local audit report and handoff briefs | [docs/memory-passport.md](docs/memory-passport.md) |
+| Destination audit | Host-by-host integration status and gaps | [docs/audits/destination-audit-2026-05.md](docs/audits/destination-audit-2026-05.md) |
 | Launch kit | Positioning, pilot offer, X posts, and static marketing site | [docs/launch/gtm-brief.md](docs/launch/gtm-brief.md) |
 | Sharing model | Multi-host sharing modes and scope rules | [docs/sharing.md](docs/sharing.md) |
 | Cross-memory pivot | Why Gigabrain still matters when native memories exist | [docs/cross-memory-pivot-2026-04.md](docs/cross-memory-pivot-2026-04.md) |

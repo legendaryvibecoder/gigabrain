@@ -2,6 +2,23 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.7.1] — 2026-05-20
+
+### Added
+- Destination audit matrix covering OpenClaw, Hermes/Nimbus, Codex, Claude Code/Desktop, MCP clients, Cursor/Windsurf, manual cloud imports, and Memory Passport
+- v0.7.1 batchlog and release notes documenting the release path, npm-vs-pnpm decision, and remaining "OnePassword for Memory" vault-grade gaps
+- MCP tool annotations so clients can distinguish read-only recall/audit/status tools from additive write tools
+
+### Changed
+- MCP server version now follows `package.json` instead of advertising a stale standalone version
+- MCP source and sync-status output schemas are stricter while still allowing additive fields
+- README and Memory Passport docs now link the destination audit as the current host-support status surface
+- Dependencies updated to `@modelcontextprotocol/sdk@1.29.0` and `zod@4.4.3`
+
+### Fixed
+- MCP integration coverage now validates serialized JSON text fallback against `structuredContent` for every tool call, preventing output-schema drift like the prior export-brief mismatch
+- Audit-maintenance test timestamps are relative to the current date, avoiding stale fixed-date failures in future release runs
+
 ## [0.7.0] — 2026-04-24
 
 ### Added

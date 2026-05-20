@@ -41,11 +41,18 @@ const run = async () => {
   assert.equal(fs.existsSync(path.join(packageRoot, 'lib', 'core', 'host-memory-sync.js')), true, 'package should include host-memory-sync core');
   assert.equal(fs.existsSync(path.join(packageRoot, 'docs', 'cross-memory-pivot-2026-04.md')), true, 'package should include cross-memory docs');
   assert.equal(fs.existsSync(path.join(packageRoot, 'docs', 'nimbus-memory-bridge.md')), true, 'package should include Nimbus bridge contract docs');
+  assert.equal(fs.existsSync(path.join(packageRoot, 'docs', 'audits', 'destination-audit-2026-05.md')), true, 'package should include destination audit docs');
+  assert.equal(fs.existsSync(path.join(packageRoot, 'docs', 'release', 'v0.7.1-batchlog.md')), true, 'package should include v0.7.1 batchlog');
   assert.equal(fs.existsSync(path.join(packageRoot, 'release-notes', 'v0.7.0-cross-memory-pivot.md')), true, 'package should include v0.7 release notes');
+  assert.equal(fs.existsSync(path.join(packageRoot, 'release-notes', 'v0.7.1-destination-audit.md')), true, 'package should include v0.7.1 release notes');
   const bridgeContract = fs.readFileSync(path.join(packageRoot, 'docs', 'nimbus-memory-bridge.md'), 'utf8');
   assert.equal(bridgeContract.includes('Hermes native memory'), true, 'bridge contract should describe Hermes native memory');
   assert.equal(bridgeContract.includes('Gigabrain'), true, 'bridge contract should describe Gigabrain as the long-term layer');
   assert.equal(bridgeContract.includes('read-only'), true, 'bridge contract should preserve read-only host sync semantics');
+  const destinationAudit = fs.readFileSync(path.join(packageRoot, 'docs', 'audits', 'destination-audit-2026-05.md'), 'utf8');
+  assert.equal(destinationAudit.includes('OpenClaw'), true, 'destination audit should cover OpenClaw');
+  assert.equal(destinationAudit.includes('Hermes / Nimbus'), true, 'destination audit should cover Hermes/Nimbus');
+  assert.equal(destinationAudit.includes('OnePassword for Memory'), true, 'destination audit should name the vault-grade product direction');
 
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gb-packaged-sync-'));
   const homeRoot = path.join(root, 'home');

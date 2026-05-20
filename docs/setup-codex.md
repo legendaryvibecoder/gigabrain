@@ -2,6 +2,8 @@
 
 Standalone setup for Gigabrain with Codex App and Codex CLI. No OpenClaw required.
 
+Current destination status is tracked in the [Destination Audit](audits/destination-audit-2026-05.md). Codex native memories stay a local recall layer; required project rules should remain in `AGENTS.md` or checked-in docs.
+
 ## Install
 
 ```bash

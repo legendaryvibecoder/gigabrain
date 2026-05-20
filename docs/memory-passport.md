@@ -13,6 +13,8 @@ The Passport is not another hidden RAG store. It is the control plane above nati
 - a readiness verdict that separates launch blockers from cleanup work
 - Markdown handoff briefs for `AGENTS.md`, `CLAUDE.md`, ChatGPT, Claude.ai, Gemini, and Microsoft Copilot, with secret-risk rows omitted entirely
 
+For the current host-by-host integration status, see the [Destination Audit](audits/destination-audit-2026-05.md). v0.7.1 marks the Passport/control-plane layer as the current MVP of "OnePassword for Memory"; encrypted portable bundles, signed manifests, delete/tombstone flows, trust labels, and a review UI remain future vault-grade work.
+
 ## Quickstart
 
 ```bash
