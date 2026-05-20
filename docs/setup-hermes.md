@@ -2,6 +2,10 @@
 
 Gigabrain connects to Hermes through a standard stdio MCP server. Hermes keeps its built-in `~/.hermes/memories` active, while Gigabrain provides the shared cross-agent store, provenance, Passport reports, and OpenClaw/Nimbus backup imports.
 
+For Nimbus, use the [Nimbus Memory Bridge Contract](nimbus-memory-bridge.md): Hermes native memory stays a compact hot cache, while Gigabrain is the authoritative long-term memory control plane.
+
+Current destination status is tracked in the [Destination Audit](audits/destination-audit-2026-05.md). A native Hermes memory-provider plugin is optional future work; MCP plus read-only Hermes memory sync is the supported v0.7.1 path.
+
 ## Install
 
 ```bash
@@ -83,8 +87,10 @@ This imports readable text files from `~/.hermes/memories/` as `source_host=herm
 Add a short instruction to Hermes/Nimbus so it actually uses the MCP tools:
 
 ```markdown
-For personal, project, and continuity questions, call Gigabrain MCP recall first. After substantial completed work, write a Gigabrain checkpoint. Treat Hermes built-in memory as local scratch and Gigabrain as the shared cross-agent memory control plane.
+For personal, project, continuity, prior-work, migration, identity, and ops questions, call Gigabrain MCP recall first. After substantial completed work, write a Gigabrain checkpoint. Treat Hermes built-in memory as a compact hot cache and Gigabrain as the shared long-term memory control plane.
 ```
+
+Do not bulk-copy Gigabrain memories back into `~/.hermes/memories/`; use `sync-hosts --host hermes` to index Hermes native memory into Gigabrain read-only.
 
 ## Verify
 
@@ -93,4 +99,5 @@ hermes mcp test gigabrain
 hermes -z "Use gigabrain_doctor and summarize whether project and user stores are healthy"
 npx gigabrainctl doctor --config ~/.gigabrain/config.json --target both
 npx gigabrainctl sync-hosts status --config ~/.gigabrain/config.json
+hermes -z "Call gigabrain_recall with query '779443319 Telegram Nimbus' and answer with the first recalled memory content only."
 ```

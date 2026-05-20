@@ -2,6 +2,8 @@
 
 Full setup instructions for running Gigabrain as an OpenClaw plugin.
 
+Current destination status is tracked in the [Destination Audit](audits/destination-audit-2026-05.md). Gigabrain remains a first-class OpenClaw memory-slot plugin; OpenClaw Active Memory should be treated as an optional adjacent pre-reply adapter, not a replacement for the memory slot.
+
 ## Option A: npm install + setup wizard (recommended)
 
 Install:

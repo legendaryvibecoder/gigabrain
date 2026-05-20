@@ -1,5 +1,7 @@
 # Claude Code + Claude Desktop Setup Guide
 
+Current destination status is tracked in the [Destination Audit](audits/destination-audit-2026-05.md). Claude Code/Desktop use the shared Gigabrain standalone store and MCP-style tooling; native Claude memory files are imported read-only when visible.
+
 Standalone setup for Gigabrain with Claude Code and Claude Desktop. No OpenClaw required.
 
 ## Install
