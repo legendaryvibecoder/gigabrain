@@ -28,8 +28,8 @@ if (args.includes('--help') || args.includes('-h')) {
   process.exit(0);
 }
 
-const rawConfigPath = readFlag('--config', '');
-const rawMode = readFlag('--mode', '');
+const rawConfigPath = readFlag('--config', process.env.GIGABRAIN_CONFIG || process.env.GIGABRAIN_CONFIG_PATH || '');
+const rawMode = readFlag('--mode', process.env.GIGABRAIN_MODE || '');
 const runtimeConfig = resolveRuntimeStandaloneConfigPath(rawConfigPath);
 if (rawConfigPath && !runtimeConfig.attemptedPath) {
   console.error('Gigabrain MCP requires a valid standalone config path. Run gigabrain-codex-setup or gigabrain-claude-setup first.');
@@ -45,7 +45,7 @@ if (rawConfigPath && runtimeConfig.fallbackKind === 'missing') {
 
 const defaults = {
   configPath: runtimeConfig.resolvedPath,
-  workspaceRoot: readFlag('--workspace-root', ''),
+  workspaceRoot: readFlag('--workspace-root', process.env.GIGABRAIN_WORKSPACE_ROOT || ''),
   mode: rawMode || (rawConfigPath ? 'standalone' : ''),
 };
 

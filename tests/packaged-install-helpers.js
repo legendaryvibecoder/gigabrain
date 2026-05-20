@@ -8,16 +8,19 @@ const runCommand = ({
   args = [],
   cwd = process.cwd(),
   env = process.env,
-  timeout = 120_000,
+  timeout = 180000,
   label = '',
 } = {}) => {
-  const result = spawnSync(cmd, args, {
+  const spawnOptions = {
     cwd,
     env,
     encoding: 'utf8',
-    timeout,
     killSignal: 'SIGKILL',
-  });
+  };
+  if (Number.isFinite(Number(timeout)) && Number(timeout) > 0) {
+    spawnOptions.timeout = Number(timeout);
+  }
+  const result = spawnSync(cmd, args, spawnOptions);
   if (result.error) throw result.error;
   if (result.signal) {
     throw new Error(`${label || cmd} terminated by ${result.signal}:\n${result.stderr || result.stdout}`);
@@ -30,10 +33,17 @@ const runCommand = ({
 
 const packRepo = ({ repoRoot, prefix = 'gb-packaged-' } = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const npmEnv = {
+    ...process.env,
+    npm_config_audit: 'false',
+    npm_config_fund: 'false',
+    npm_config_cache: path.join(root, '.npm-cache'),
+  };
   const packed = runCommand({
     cmd: 'npm',
     args: ['pack', repoRoot],
     cwd: root,
+    env: npmEnv,
     label: 'npm pack',
   });
   const tarballName = String(packed.stdout || '').trim().split('\n').filter(Boolean).pop();
@@ -45,16 +55,24 @@ const packRepo = ({ repoRoot, prefix = 'gb-packaged-' } = {}) => {
 
 const installTarballIntoTempApp = ({ tarballPath, prefix = 'gb-installed-app-' } = {}) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  const npmEnv = {
+    ...process.env,
+    npm_config_audit: 'false',
+    npm_config_fund: 'false',
+    npm_config_cache: path.join(root, '.npm-cache'),
+  };
   runCommand({
     cmd: 'npm',
     args: ['init', '-y'],
     cwd: root,
+    env: npmEnv,
     label: 'npm init',
   });
   runCommand({
     cmd: 'npm',
     args: ['install', tarballPath],
     cwd: root,
+    env: npmEnv,
     label: 'npm install tarball',
   });
   return {

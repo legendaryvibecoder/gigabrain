@@ -10,6 +10,9 @@ import { loadResolvedConfig } from '../lib/core/config.js';
 import { runMaintenance } from '../lib/core/maintenance-service.js';
 import { runAudit, runAuditRestore, runAuditReport } from '../lib/core/audit-service.js';
 import { ensureProjectionStore, materializeProjectionFromMemories } from '../lib/core/projection-store.js';
+import { exportMemoryBrief, getSyncStatus, listMemorySources, syncHostMemories } from '../lib/core/host-memory-sync.js';
+import { importOpenClawRegistry } from '../lib/core/openclaw-import.js';
+import { buildMemoryPassport, writeMemoryPassport } from '../lib/core/memory-passport.js';
 import { captureSnapshotMetrics } from '../lib/core/metrics.js';
 import { buildVaultSurface, inspectVaultHealth, loadSurfaceSummary, syncVaultPull } from '../lib/core/vault-mirror.js';
 import { orchestrateRecall } from '../lib/core/orchestrator.js';
@@ -45,6 +48,9 @@ Commands:
   synthesis    Inspect or rebuild synthesis artifacts
   briefing     Print the latest generated briefing artifacts
   review       Inspect contradictions or open loops
+  sync-hosts   Sync local host memories into the cross-agent memory bus
+  import-openclaw Import a legacy OpenClaw/Gigabrain registry.sqlite with provenance
+  passport     Generate a static Memory Passport and handoff briefs
   vault        Build/report/doctor/pull the Obsidian memory surface
 
 Examples:
@@ -56,6 +62,10 @@ Examples:
   node scripts/gigabrainctl.js world rebuild --config ~/.openclaw/openclaw.json
   node scripts/gigabrainctl.js control apply --action replace --target-memory-id <id> --content "Liz moved to Graz" --scope nimbusmain
   node scripts/gigabrainctl.js orchestrator explain --query "Who is Liz?" --config ~/.openclaw/openclaw.json
+  node scripts/gigabrainctl.js sync-hosts --config ~/.gigabrain/config.json --host codex,claude_code
+  node scripts/gigabrainctl.js import-openclaw --config ~/.gigabrain/config.json --registry ~/.openclaw/gigabrain/memory/registry.sqlite --source-label nimbus-backup --dry-run
+  node scripts/gigabrainctl.js passport --config ~/.gigabrain/config.json --output-dir ./passport
+  node scripts/gigabrainctl.js sync-hosts export-brief --target-host claude_code --config ~/.gigabrain/config.json
   node scripts/gigabrainctl.js vault build --config ~/.openclaw/openclaw.json
   node scripts/gigabrainctl.js vault pull --host memory-host --remote-path /path/to/obsidian-vault --target ~/Documents/gigabrainvault
 `;
@@ -840,6 +850,250 @@ const commandReview = async () => {
   }
 };
 
+const parseHostList = (list = flags) => {
+  const raw = String(readFlag('--host', '', list) || readFlag('--hosts', '', list)).trim();
+  if (!raw) return [];
+  return raw.split(',').map((item) => item.trim()).filter(Boolean);
+};
+
+const SYNC_HOSTS_HELP = `Gigabrain sync-hosts
+
+Usage:
+  node scripts/gigabrainctl.js sync-hosts [flags]
+  node scripts/gigabrainctl.js sync-hosts sources [flags]
+  node scripts/gigabrainctl.js sync-hosts status [flags]
+  node scripts/gigabrainctl.js sync-hosts export-brief [flags]
+
+Commands:
+  sync-hosts            Index local host memories into Gigabrain
+  sync-hosts sources    Show synced source counts and optional local discovery
+  sync-hosts status     Show host sync diagnostics grouped by readiness
+  sync-hosts export-brief Generate an AGENTS.md/CLAUDE.md/manual-import brief
+
+Flags:
+  --config <path>       Gigabrain config path
+  --host <list>         Comma-separated hosts, for example codex,claude_code,cursor,windsurf
+  --scope <scope>       Target scope for imported memories
+  --codex-home <path>   Override Codex home containing memories/
+  --claude-home <path>  Override Claude home containing projects/
+  --hermes-home <path>  Override Hermes home containing memories/
+  --manual-import <path> Explicit manual cloud export file/folder
+  --manual-source-host <host> chatgpt_manual|gemini_manual|copilot_manual|claude_manual
+  --dry-run             Discover and parse without writing
+
+Examples:
+  node scripts/gigabrainctl.js sync-hosts --config ~/.gigabrain/config.json --host codex,claude_code
+  node scripts/gigabrainctl.js sync-hosts sources --config ~/.gigabrain/config.json --include-discovery
+  node scripts/gigabrainctl.js sync-hosts export-brief --config ~/.gigabrain/config.json --target-host claude_code
+`;
+
+const commandSyncHosts = async () => {
+  const action = ['sources', 'status', 'export-brief'].includes(String(flags[0] || '').trim().toLowerCase())
+    ? String(flags[0] || '').trim().toLowerCase()
+    : 'sync';
+  const syncFlags = action === 'sync' ? flags : flags.slice(1);
+  if (syncFlags.includes('--help') || syncFlags.includes('-h')) {
+    console.log(SYNC_HOSTS_HELP.trim());
+    return;
+  }
+  const { configPath, config, dbPath } = loadConfigAndDbPath();
+  ensureDir(path.dirname(dbPath));
+  const db = openDatabase(dbPath);
+  const requestedHostsForSync = parseHostList(syncFlags);
+  const manualImportPath = readFlag('--manual-import', '', syncFlags);
+  const manualSourceHost = readFlag('--manual-source-host', 'chatgpt_manual', syncFlags);
+  const effectiveHosts = requestedHostsForSync.length > 0
+    ? requestedHostsForSync
+    : (manualImportPath ? [manualSourceHost] : []);
+  const common = {
+    db,
+    config,
+    hosts: effectiveHosts,
+    codexHome: readFlag('--codex-home', '', syncFlags),
+    claudeHome: readFlag('--claude-home', '', syncFlags),
+    hermesHome: readFlag('--hermes-home', '', syncFlags),
+    workspaceRoot: readFlag('--workspace', '', syncFlags),
+  };
+  try {
+    ensureProjectionStore(db);
+    if (action === 'sources') {
+      console.log(JSON.stringify({
+        configPath,
+        dbPath,
+        ...listMemorySources({
+          ...common,
+          includeDiscovery: readBool('--include-discovery', false, syncFlags),
+          manualImportPath,
+          manualSourceHost,
+        }),
+      }, null, 2));
+      return;
+    }
+    if (action === 'status') {
+      console.log(JSON.stringify({
+        configPath,
+        dbPath,
+        ...getSyncStatus(common),
+      }, null, 2));
+      return;
+    }
+    if (action === 'export-brief') {
+      console.log(JSON.stringify({
+        configPath,
+        dbPath,
+        ...exportMemoryBrief({
+          db,
+          config,
+          targetHost: readFlag('--target-host', 'agents', syncFlags),
+          scope: readFlag('--scope', '', syncFlags),
+          limit: Number(readFlag('--limit', '25', syncFlags) || 25),
+        }),
+      }, null, 2));
+      return;
+    }
+    const result = syncHostMemories({
+      ...common,
+      scope: readFlag('--scope', '', syncFlags),
+      dryRun: readBool('--dry-run', false, syncFlags),
+      manualImportPath,
+      manualSourceHost,
+    });
+    console.log(JSON.stringify({
+      configPath,
+      dbPath,
+      ...result,
+    }, null, 2));
+  } finally {
+    db.close();
+  }
+};
+
+const IMPORT_OPENCLAW_HELP = `Gigabrain import-openclaw
+
+Usage:
+  node scripts/gigabrainctl.js import-openclaw --registry /path/to/registry.sqlite [flags]
+
+Flags:
+  --config <path>       Gigabrain config path
+  --db <path>           Target registry SQLite override
+  --registry <path>     Legacy OpenClaw/Gigabrain registry.sqlite
+  --memory-root <path>  Optional legacy memory folder for reporting/provenance
+  --source-host <host>  Source host label, usually openclaw
+  --source-label <name> Human label for this import, e.g. nimbus-backup-2026-02-12
+  --dry-run             Read and count without writing
+
+Examples:
+  node scripts/gigabrainctl.js import-openclaw --config ~/.gigabrain/config.json --registry ~/.openclaw/gigabrain/memory/registry.sqlite --source-label nimbus-backup --dry-run
+`;
+
+const commandImportOpenClaw = async () => {
+  if (flags.includes('--help') || flags.includes('-h')) {
+    console.log(IMPORT_OPENCLAW_HELP.trim());
+    return;
+  }
+  const registryPath = readFlag('--registry', '');
+  if (!registryPath) {
+    throw new Error('import-openclaw requires --registry /path/to/registry.sqlite');
+  }
+  const { configPath, dbPath } = loadConfigAndDbPath();
+  ensureDir(path.dirname(dbPath));
+  const db = openDatabase(dbPath);
+  try {
+    const result = importOpenClawRegistry({
+      db,
+      registryPath,
+      memoryRoot: readFlag('--memory-root', ''),
+      sourceHost: readFlag('--source-host', 'openclaw'),
+      sourceLabel: readFlag('--source-label', ''),
+      dryRun: readBool('--dry-run', false),
+    });
+    console.log(JSON.stringify({
+      configPath,
+      dbPath,
+      ...result,
+    }, null, 2));
+  } finally {
+    db.close();
+  }
+};
+
+const PASSPORT_HELP = `Gigabrain Memory Passport
+
+Usage:
+  node scripts/gigabrainctl.js passport [flags]
+
+Flags:
+  --config <path>       Gigabrain config path
+  --db <path>           Registry SQLite path override
+  --output-dir <path>   Directory for memory-passport.md/html/json and handoffs/
+  --format <list>       all|markdown|html|json|handoffs (comma-separated)
+  --scope <scope>       Limit report and handoff memories to a scope
+  --limit <n>           Max rows per audit section
+  --handoff-limit <n>   Max memories per generated handoff brief
+  --stale-days <n>      Mark memories stale when not updated within this many days
+  --host <list>         Optional host discovery filter, for example codex,claude_code
+  --codex-home <path>   Override Codex home containing memories/
+  --claude-home <path>  Override Claude home containing projects/
+  --workspace <path>    Workspace root for Cursor/Windsurf discovery
+  --skip-handoffs       Do not write handoff brief files
+
+Examples:
+  node scripts/gigabrainctl.js passport --config ~/.gigabrain/config.json
+  node scripts/gigabrainctl.js passport --config ~/.gigabrain/config.json --scope profile:user --output-dir ./passport
+`;
+
+const commandPassport = async () => {
+  const passportFlags = flags;
+  if (passportFlags.includes('--help') || passportFlags.includes('-h')) {
+    console.log(PASSPORT_HELP.trim());
+    return;
+  }
+  const { configPath, config, dbPath } = loadConfigAndDbPath();
+  ensureDir(path.dirname(dbPath));
+  const db = openDatabase(dbPath);
+  try {
+    ensureProjectionStore(db);
+    const count = db.prepare('SELECT COUNT(*) AS c FROM memory_current').get()?.c || 0;
+    if (Number(count) === 0) materializeProjectionFromMemories(db);
+    const outputDir = path.resolve(readFlag(
+      '--output-dir',
+      path.join(String(config?.runtime?.paths?.outputDir || process.cwd()), 'memory-passport'),
+      passportFlags,
+    ));
+    const requestedHostsForDiscovery = parseHostList(passportFlags);
+    const passport = buildMemoryPassport({
+      db,
+      config,
+      scope: readFlag('--scope', '', passportFlags),
+      limit: Number(readFlag('--limit', '50', passportFlags) || 50),
+      handoffLimit: Number(readFlag('--handoff-limit', '25', passportFlags) || 25),
+      staleDays: Number(readFlag('--stale-days', '180', passportFlags) || 180),
+      includeDiscovery: !passportFlags.includes('--skip-discovery'),
+      hosts: requestedHostsForDiscovery,
+      codexHome: readFlag('--codex-home', '', passportFlags),
+      claudeHome: readFlag('--claude-home', '', passportFlags),
+      workspaceRoot: readFlag('--workspace', '', passportFlags),
+    });
+    const files = writeMemoryPassport(passport, {
+      outputDir,
+      formats: readFlag('--format', 'all', passportFlags),
+      includeHandoffs: !passportFlags.includes('--skip-handoffs'),
+    });
+    console.log(JSON.stringify({
+      ok: true,
+      action: 'passport',
+      configPath,
+      dbPath,
+      outputDir,
+      files,
+      summary: passport.summary,
+      generated_at: passport.generated_at,
+    }, null, 2));
+  } finally {
+    db.close();
+  }
+};
+
 const commandVault = async () => {
   const action = String(flags[0] || 'build').trim().toLowerCase();
   const vaultFlags = flags.slice(1);
@@ -922,6 +1176,18 @@ const commandVault = async () => {
 };
 
 const main = async () => {
+  if (command === 'sync-hosts') {
+    await commandSyncHosts();
+    return;
+  }
+  if (command === 'import-openclaw') {
+    await commandImportOpenClaw();
+    return;
+  }
+  if (command === 'passport') {
+    await commandPassport();
+    return;
+  }
   if (['', 'help', '--help', '-h'].includes(command) || wantsHelp) {
     console.log(HELP.trim());
     return;

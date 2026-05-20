@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -9,6 +10,9 @@ const TEST_FILES = [
   'unit-bm25-test.js',
   'unit-eval-harness-test.js',
   'unit-projection-store-test.js',
+  'unit-host-memory-sync-test.js',
+  'unit-openclaw-import-test.js',
+  'unit-memory-passport-test.js',
   'unit-capture-service-test.js',
   'unit-recall-service-test.js',
   'unit-memory-actions-test.js',
@@ -36,6 +40,8 @@ const TEST_FILES = [
   'integration-standalone-path-resolution-test.js',
   'integration-packaged-codex-setup-test.js',
   'integration-packaged-claude-setup-test.js',
+  'integration-packaged-sync-hosts-test.js',
+  'integration-packaged-passport-test.js',
   'integration-claude-desktop-bundle-test.js',
   'integration-vault-cli-test.js',
   'integration-migration-and-api-test.js',
@@ -93,12 +99,12 @@ const run = async () => {
       elapsedMs,
     });
   }
-  console.log(JSON.stringify({
+  fs.writeSync(1, `${JSON.stringify({
     ok: true,
     suite: 'gigabrain-v3',
     filters,
     tests: results,
-  }, null, 2));
+  }, null, 2)}\n`);
 };
 
 run().catch((err) => {

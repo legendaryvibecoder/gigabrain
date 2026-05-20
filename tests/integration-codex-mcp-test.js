@@ -239,6 +239,9 @@ const run = async () => {
     assert.equal(toolNames.includes('gigabrain_checkpoint'), true, 'MCP should expose checkpoint');
     assert.equal(toolNames.includes('gigabrain_provenance'), true, 'MCP should expose provenance');
     assert.equal(toolNames.includes('gigabrain_recent'), true, 'MCP should expose recent');
+    assert.equal(toolNames.includes('gigabrain_sources'), true, 'MCP should expose memory sources');
+    assert.equal(toolNames.includes('gigabrain_sync_status'), true, 'MCP should expose host sync status');
+    assert.equal(toolNames.includes('gigabrain_export_brief'), true, 'MCP should expose memory brief export');
     assert.equal(toolNames.includes('gigabrain_doctor'), true, 'MCP should expose doctor');
     assert.equal(toolNames.includes('gigabrain_entity'), true, 'MCP should expose entity detail');
     assert.equal(toolNames.includes('gigabrain_contradictions'), true, 'MCP should expose contradictions');
@@ -360,6 +363,44 @@ const run = async () => {
       true,
       'MCP recent(user) should list user memories',
     );
+
+    const sources = await withTimeout(client.callTool({
+      name: 'gigabrain_sources',
+      arguments: {
+        target: 'project',
+        include_discovery: true,
+      },
+    }), 'gigabrain_sources');
+    assert.notEqual(sources.isError, true, `MCP sources should succeed: ${stderrChunks.join('')}`);
+    assert.equal(sources.structuredContent?.ok, true, 'MCP sources should return ok');
+    assert.equal(Array.isArray(sources.structuredContent?.stores), true, 'MCP sources should include stores');
+
+    const syncStatus = await withTimeout(client.callTool({
+      name: 'gigabrain_sync_status',
+      arguments: {
+        target: 'project',
+      },
+    }), 'gigabrain_sync_status');
+    assert.notEqual(syncStatus.isError, true, `MCP sync status should succeed: ${stderrChunks.join('')}`);
+    assert.equal(syncStatus.structuredContent?.ok, true, 'MCP sync status should return ok');
+    assert.equal(
+      syncStatus.structuredContent?.stores?.[0]?.hosts?.some((row) => row.source_host === 'codex'),
+      true,
+      'MCP sync status should list known host adapters',
+    );
+
+    const exportBrief = await withTimeout(client.callTool({
+      name: 'gigabrain_export_brief',
+      arguments: {
+        target: 'project',
+        target_host: 'agents',
+        scope: projectScope,
+        limit: 10,
+      },
+    }), 'gigabrain_export_brief');
+    assert.notEqual(exportBrief.isError, true, `MCP export brief should succeed: ${stderrChunks.join('')}`);
+    assert.equal(exportBrief.structuredContent?.ok, true, 'MCP export brief should return ok');
+    assert.equal(exportBrief.structuredContent?.brief.includes('does not scrape'), true, 'MCP export brief should explain the closed-cloud boundary');
 
     const doctor = await withTimeout(client.callTool({
       name: 'gigabrain_doctor',

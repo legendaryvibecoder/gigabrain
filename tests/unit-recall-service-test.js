@@ -96,6 +96,24 @@ const run = async () => {
         value_score: 0.6,
         value_label: 'situational',
       },
+      {
+        memory_id: 'telegram-chat-id',
+        type: 'PREFERENCE',
+        content: 'Chris: use numeric Telegram chat id 779443319 instead of @legendary_gainz to avoid chat not found.',
+        scope: 'shared',
+        confidence: 0.6,
+        value_score: 0,
+        value_label: 'situational',
+      },
+      {
+        memory_id: 'telegram-general',
+        type: 'CONTEXT',
+        content: 'Telegram is used for Nimbus staging and gateway status updates.',
+        scope: 'shared',
+        confidence: 0.98,
+        value_score: 0.9,
+        value_label: 'core',
+      },
     ]);
     ensurePersonStore(db);
     rebuildEntityMentions(db);
@@ -202,6 +220,19 @@ const run = async () => {
       multiEntityResult.results[0]?.memory_id,
       'chris-liz-together',
       'multi-entity reranking should boost memories that mention both selected entities instead of looking for opaque internal entity ids',
+    );
+
+    const numericExactResult = recallForQuery({
+      db,
+      config,
+      query: '779443319 Telegram Nimbus',
+      scope: 'shared',
+      strategyContext: { strategy: 'quick_context' },
+    });
+    assert.equal(
+      numericExactResult.results[0]?.memory_id,
+      'telegram-chat-id',
+      'recall should prioritize exact numeric identifier memories over general high-value context',
     );
   } finally {
     db.close();

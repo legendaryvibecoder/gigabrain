@@ -2,6 +2,33 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.7.0] — 2026-04-24
+
+### Added
+- Memory Passport launch surface via `gigabrainctl passport`, producing static Markdown/HTML/JSON reports with source inventory, readiness verdict, dedupe audit, contradiction audit, stale-memory audit, provenance gaps, secret-risk flags, and handoff briefs
+- Host-specific handoff briefs for `AGENTS.md`, `CLAUDE.md`, ChatGPT, Claude.ai, Gemini, and Microsoft Copilot manual paste/import
+- `docs/memory-passport.md` and `npm run demo:passport` for the launch demo flow
+- Launch kit with market positioning, pilot offer, X launch copy, and a static landing page under `site/`
+- Cross-agent host memory sync via `gigabrainctl sync-hosts`, with read-only local adapters for Codex memories, Claude Code memory folders, OpenClaw native memory, and Cursor/Windsurf rules or memories
+- Hermes Agent MCP setup via `gigabrain-hermes-setup`, plus read-only `sync-hosts --host hermes` support for `~/.hermes/memories`
+- Legacy OpenClaw/Gigabrain registry imports via `gigabrainctl import-openclaw`, preserving ids, scopes, statuses, confidence, timestamps, pinned markers, provenance links, and evidence snippets where available
+- Explicit manual cloud import flow for ChatGPT, Claude.ai, Gemini, and Microsoft Copilot exports, tagged as `manual_import` with `bidirectional_disallowed` sync policy
+- Additive source metadata on current and legacy memory rows: `source_host`, `source_kind`, and `sync_policy`
+- Source-link tracking for deduped host memories so the same memory can keep Codex, Claude, and manual import provenance at once
+- New MCP tools: `gigabrain_sources`, `gigabrain_sync_status`, and `gigabrain_export_brief`
+- `docs/cross-memory-pivot-2026-04.md` explaining why Gigabrain complements native product memories rather than replacing them
+
+### Changed
+- README and package metadata now position Gigabrain as a local-first Memory Passport/control plane for agents, with the cross-memory bus as the internal architecture
+- `gigabrainctl sync-hosts` now reports compact summary counts, source warnings, and grouped host readiness diagnostics
+- Published package contents now include the full `docs/` and `release-notes/` directories
+- Passport `--limit` now applies consistently across stale, provenance-gap, and secret-risk audit sections
+
+### Security
+- Updated transitive MCP HTTP dependencies, resolving current `fast-uri`, `hono`, `ip-address`, and `express-rate-limit` npm audit findings
+- Updated `memory_api`'s pinned `lxml` dependency to `6.1.0`
+- Handoff/export briefs now omit secret-risk memory rows entirely, including already-redacted markers such as `API_KEY=[REDACTED_SECRET]`
+
 ## [0.6.1] — 2026-03-18
 
 ### Changed

@@ -1,7 +1,7 @@
 # Gigabrain
 
 <p align="center">
-  <strong>Local-first memory for AI agents.</strong>
+  <strong>Local-first memory control plane for agents.</strong>
 </p>
 
 <p align="center">
@@ -22,9 +22,11 @@
 
 ---
 
-**Gigabrain** is a local-first memory stack for [OpenClaw](https://openclaw.ai) agents, Codex App, Codex CLI, Claude Code, and Claude Desktop. It converts conversations and native notes into durable, queryable memory, then injects the right context before each prompt so agents stay consistent across sessions.
+**Gigabrain** is the local-first Memory Passport and control plane for AI agents. It gives you one inspectable place to inventory, audit, deduplicate, and safely hand off memory across [OpenClaw](https://openclaw.ai), Codex App/CLI, Claude Code/Desktop, Hermes-style MCP/HTTP bridges, Cursor/Windsurf, and explicit manual imports from cloud products.
 
-Built for production use: SQLite-backed recall, deterministic dedupe/audit flows, native markdown sync, world model, Obsidian surface, and an optional web console for memory operations.
+The product face is **Memory Passport + Auditor + Handoff Layer**. The cross-memory bus is the architecture underneath: SQLite-backed recall, deterministic dedupe/audit flows, host-memory adapters, native markdown sync, world model, Obsidian surface, and an optional web console for memory operations.
+
+Gigabrain does not replace native memories. It connects, checks, deduplicates, exports, and audits them where the host exposes local files or the user provides an explicit export. Closed cloud memories such as ChatGPT, Claude.ai, Gemini, and Microsoft Copilot are manual import/export flows only.
 
 ## Supported clients
 
@@ -34,20 +36,35 @@ Built for production use: SQLite-backed recall, deterministic dedupe/audit flows
 | **Codex App / CLI** | `npm install` + setup | Shared project/user memory store, MCP tools, checkpoints, maintenance |
 | **Claude Code** | `npm install` + setup | Shared project/user memory store, MCP tools, managed `.mcp.json` wiring |
 | **Claude Desktop** | `claude:desktop:bundle` | Same MCP-backed memory store and tools as Claude Code |
+| **Hermes Agent** | `gigabrain-hermes-setup` | MCP tools plus read-only sync for Hermes built-in memory files |
+| **Local host memories** | `gigabrainctl sync-hosts` | Read-only local adapters for Codex memories, Claude Code memory, Hermes memory files, Cursor/Windsurf rules, plus explicit manual imports |
+| **Memory Passport** | `gigabrainctl passport` | Static Markdown/HTML audit report, readiness verdict, and safe AGENTS.md, CLAUDE.md, ChatGPT, Claude.ai, Gemini, and Copilot handoff briefs |
 
 ## Quickstart
 
-### OpenClaw
+### I use multiple agents
 
 ```bash
-openclaw plugins install @legendaryvibecoder/gigabrain
-cd ~/.openclaw/extensions/gigabrain && npm run setup -- --workspace /path/to/workspace
-npx gigabrainctl doctor --config ~/.openclaw/openclaw.json
+npm install @legendaryvibecoder/gigabrain
+npx gigabrain-codex-setup --project-root /path/to/repo
+npx gigabrain-claude-setup --project-root /path/to/repo
+npx gigabrain-hermes-setup --config ~/.gigabrain/config.json --workspace-root /path/to/repo
+npx gigabrainctl sync-hosts --config ~/.gigabrain/config.json --host codex,claude_code,hermes,cursor,windsurf
+npx gigabrainctl passport --config ~/.gigabrain/config.json --output-dir ./gigabrain-passport
 ```
 
-> [Full setup guide](docs/setup-openclaw.md)
+This gives Codex, Claude, and Hermes the same local project/user memory store, indexes visible local host memories read-only, then writes a static Memory Passport report plus handoff briefs under `./gigabrain-passport/`. See the [Memory Passport guide](docs/memory-passport.md), [Codex setup](docs/setup-codex.md#using-gigabrain-across-multiple-agents), [Claude setup](docs/setup-claude.md#using-gigabrain-across-multiple-agents), [Hermes setup](docs/setup-hermes.md), and the [cross-memory pivot](docs/cross-memory-pivot-2026-04.md).
 
-### Codex App / Codex CLI
+Manual cloud imports must be explicit:
+
+```bash
+npx gigabrainctl sync-hosts --config ~/.gigabrain/config.json \
+  --manual-import ./chatgpt-memory-export.md \
+  --manual-source-host chatgpt_manual
+npx gigabrainctl passport --config ~/.gigabrain/config.json --output-dir ./gigabrain-passport
+```
+
+### Codex only
 
 ```bash
 npm install @legendaryvibecoder/gigabrain
@@ -57,7 +74,7 @@ npx gigabrain-codex-setup --project-root /path/to/repo
 
 > [Full setup guide](docs/setup-codex.md)
 
-### Claude Code / Claude Desktop
+### Claude / OpenClaw
 
 ```bash
 npm install @legendaryvibecoder/gigabrain
@@ -65,7 +82,35 @@ npx gigabrain-claude-setup --project-root /path/to/repo
 .claude/actions/verify-gigabrain.sh
 ```
 
-> [Full setup guide](docs/setup-claude.md)
+For OpenClaw:
+
+```bash
+openclaw plugins install @legendaryvibecoder/gigabrain
+cd ~/.openclaw/extensions/gigabrain && npm run setup -- --workspace /path/to/workspace
+npx gigabrainctl doctor --config ~/.openclaw/openclaw.json
+```
+
+> Full guides: [Claude](docs/setup-claude.md), [OpenClaw](docs/setup-openclaw.md)
+
+### Hermes / Nimbus migration
+
+```bash
+npm install @legendaryvibecoder/gigabrain
+npx gigabrain-hermes-setup --config ~/.gigabrain/config.json --workspace-root /path/to/workspace --install --test
+hermes gateway restart
+```
+
+Import a legacy Nimbus/OpenClaw backup with provenance:
+
+```bash
+npx gigabrainctl import-openclaw \
+  --config ~/.gigabrain/config.json \
+  --registry /path/to/backup/clawd/memory/registry.sqlite \
+  --source-label nimbus-backup \
+  --dry-run
+```
+
+> Full guide: [Hermes setup](docs/setup-hermes.md)
 
 Upgrading? See the [upgrade guide](docs/upgrading.md).
 
@@ -81,6 +126,7 @@ Conversation (OpenClaw / Codex / Claude Code / Claude Desktop)
 ├──────────────────────────────────┤
 │  Capture ─► Policy ─► Registry  │
 │  Recall  ◄─ Orchestrator        │
+│  Host Sync ◄─ Codex/Claude/etc. │
 │  Native Sync ◄─► MEMORY.md      │
 │  World Model (entities/beliefs) │
 │  Vault Mirror ─► Obsidian       │
@@ -93,7 +139,9 @@ Conversation (OpenClaw / Codex / Claude Code / Claude Desktop)
 
 - **Capture** — hybrid model: explicit remember intent writes durable memory, Codex checkpoints write episodic session logs
 - **Recall** — orchestrator chooses between quick context, entity briefs, timeline briefs, and verification-oriented recall automatically
-- **MCP tools** — `gigabrain_recall`, `gigabrain_remember`, `gigabrain_checkpoint`, `gigabrain_provenance`, `gigabrain_recent`, `gigabrain_doctor`, `gigabrain_entity`, `gigabrain_contradictions`, `gigabrain_relationships`
+- **MCP tools** — `gigabrain_recall`, `gigabrain_remember`, `gigabrain_checkpoint`, `gigabrain_provenance`, `gigabrain_recent`, `gigabrain_sources`, `gigabrain_sync_status`, `gigabrain_export_brief`, `gigabrain_doctor`, `gigabrain_entity`, `gigabrain_contradictions`, `gigabrain_relationships`
+- **Memory Passport** — static Markdown/HTML source inventory, readiness verdict, dedupe audit, contradiction audit, stale-memory audit, provenance gaps, secret-risk flags, and safe handoff briefs that omit secret-risk rows entirely
+- **Host memory bus** — read-only local sync for Codex, Claude Code, Cursor/Windsurf, OpenClaw native memory, and bridge-friendly Hermes integrations
 - **Dedupe** — exact + hybrid semantic deduplication with type-aware thresholds
 - **Native sync** — indexes `MEMORY.md` and daily notes alongside the registry for unified recall
 - **World model** — entities, beliefs, episodes, open loops, contradictions, and syntheses
@@ -108,7 +156,10 @@ Conversation (OpenClaw / Codex / Claude Code / Claude Desktop)
 
 | Subsystem | Description | Docs |
 |-----------|-------------|------|
+| Memory Passport | Static local audit report and handoff briefs | [docs/memory-passport.md](docs/memory-passport.md) |
+| Launch kit | Positioning, pilot offer, X posts, and static marketing site | [docs/launch/gtm-brief.md](docs/launch/gtm-brief.md) |
 | Sharing model | Multi-host sharing modes and scope rules | [docs/sharing.md](docs/sharing.md) |
+| Cross-memory pivot | Why Gigabrain still matters when native memories exist | [docs/cross-memory-pivot-2026-04.md](docs/cross-memory-pivot-2026-04.md) |
 | Configuration | Full config reference (runtime, capture, recall, dedupe, LLM, vault, quality) | [docs/configuration.md](docs/configuration.md) |
 | Memory protocol | Capture tags, agent instructions, AGENTS.md | [docs/memory-protocol.md](docs/memory-protocol.md) |
 | Recall pipeline | 11-step orchestrated recall with strategy selection | [docs/recall.md](docs/recall.md) |
@@ -121,7 +172,7 @@ Conversation (OpenClaw / Codex / Claude Code / Claude Desktop)
 - **OpenClaw** >= 2026.2.15 (only for the plugin path)
 - **Python** >= 3.10 (only for the optional web console)
 - **Ollama** (optional, for local LLM review and semantic search)
-- **Obsidian** (recommended for the `v0.6.x` memory surface)
+- **Obsidian** (recommended for the memory surface)
 
 ## CLI
 
@@ -136,6 +187,10 @@ npx gigabrainctl orchestrator explain --query "…" # Explain recall strategy
 npx gigabrainctl synthesis build                  # Rebuild synthesis
 npx gigabrainctl review contradictions            # Inspect contradictions
 npx gigabrainctl review open-loops                # Inspect open loops
+npx gigabrainctl sync-hosts --host codex,claude_code # Index local host memories
+npx gigabrainctl sync-hosts sources               # Show source counts/freshness
+npx gigabrainctl sync-hosts export-brief          # Safe AGENTS.md/CLAUDE.md brief
+npx gigabrainctl passport --output-dir ./passport # Build Memory Passport + handoffs
 npx gigabrainctl vault build                      # Build Obsidian surface
 npx gigabrainctl vault doctor                     # Vault health check
 npx gigabrainctl vault report                     # Surface summary
@@ -171,6 +226,8 @@ npm run test:integration    # Integration tests
 npm run test:regression     # Regression tests
 npm run test:performance    # Performance tests
 npm run test:release-live   # Live Codex/OpenClaw smoke
+npm run audit:high          # npm audit gate for release
+npm run pack:dry-run        # Verify published package contents
 npm run eval:deep-recall    # Recall-routing evaluation
 ```
 
@@ -248,7 +305,7 @@ External contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) befo
 
 ## Release notes
 
-- [`v0.6.1`](release-notes/v0.6.1.md) · [`v0.6.0`](release-notes/v0.6.0.md) · [`v0.5.3`](release-notes/v0.5.3.md) · [`v0.5.2`](release-notes/v0.5.2.md) · [`v0.5.1`](release-notes/v0.5.1.md) · [Changelog](CHANGELOG.md)
+- [`v0.7.0`](release-notes/v0.7.0-cross-memory-pivot.md) · [`v0.6.1`](release-notes/v0.6.1.md) · [`v0.6.0`](release-notes/v0.6.0.md) · [`v0.5.3`](release-notes/v0.5.3.md) · [Changelog](CHANGELOG.md)
 
 ## License
 
