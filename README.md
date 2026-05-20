@@ -53,7 +53,7 @@ npx gigabrainctl sync-hosts --config ~/.gigabrain/config.json --host codex,claud
 npx gigabrainctl passport --config ~/.gigabrain/config.json --output-dir ./gigabrain-passport
 ```
 
-This gives Codex, Claude, and Hermes the same local project/user memory store, indexes visible local host memories read-only, then writes a static Memory Passport report plus handoff briefs under `./gigabrain-passport/`. See the [Memory Passport guide](docs/memory-passport.md), [Codex setup](docs/setup-codex.md#using-gigabrain-across-multiple-agents), [Claude setup](docs/setup-claude.md#using-gigabrain-across-multiple-agents), [Hermes setup](docs/setup-hermes.md), and the [cross-memory pivot](docs/cross-memory-pivot-2026-04.md).
+This gives Codex, Claude, and Hermes the same local project/user memory store, indexes visible local host memories read-only, then writes a static Memory Passport report plus handoff briefs under `./gigabrain-passport/`. See the [Memory Passport guide](docs/memory-passport.md), [Codex setup](docs/setup-codex.md#using-gigabrain-across-multiple-agents), [Claude setup](docs/setup-claude.md#using-gigabrain-across-multiple-agents), [Hermes setup](docs/setup-hermes.md), the [Nimbus Memory Bridge Contract](docs/nimbus-memory-bridge.md), and the [cross-memory pivot](docs/cross-memory-pivot-2026-04.md).
 
 Manual cloud imports must be explicit:
 
@@ -111,6 +111,7 @@ npx gigabrainctl import-openclaw \
 ```
 
 > Full guide: [Hermes setup](docs/setup-hermes.md)
+> Nimbus runtime policy: [Nimbus Memory Bridge Contract](docs/nimbus-memory-bridge.md)
 
 Upgrading? See the [upgrade guide](docs/upgrading.md).
 

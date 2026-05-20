@@ -111,10 +111,12 @@ const run = async () => {
     db.close();
   }
   fs.mkdirSync(path.dirname(config.runtime.paths.reviewQueuePath), { recursive: true });
+  const recentPendingAt = new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString();
+  const stalePendingAt = new Date(Date.now() - (8 * 24 * 60 * 60 * 1000)).toISOString();
   fs.writeFileSync(config.runtime.paths.reviewQueuePath, [
     {
-      timestamp: '2026-02-20T09:00:00.000Z',
-      queued_at: '2026-02-20T09:00:00.000Z',
+      timestamp: stalePendingAt,
+      queued_at: stalePendingAt,
       status: 'pending',
       reason: 'semantic_borderline',
       queued_reason: 'semantic_borderline',
@@ -130,8 +132,8 @@ const run = async () => {
       },
     },
     {
-      timestamp: '2026-03-13T09:00:00.000Z',
-      queued_at: '2026-03-13T09:00:00.000Z',
+      timestamp: recentPendingAt,
+      queued_at: recentPendingAt,
       status: 'pending',
       reason: 'semantic_borderline',
       queued_reason: 'semantic_borderline',
