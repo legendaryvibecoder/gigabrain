@@ -128,3 +128,7 @@ The expected upgrade order across all hosts:
 1. Re-run setup for the host surface you use.
 2. Run doctor or the generated verify script.
 3. Only then troubleshoot custom config by hand if something still looks wrong.
+
+## Source Workflows
+
+OpenClaw workspaces can pair Gigabrain with source plugins that gather fresh public context. For public X/Twitter monitoring, search, tweet replies, campaign notes, or giveaway draw audit notes, use the [TweetClaw public signal memory workflow](tweetclaw-source-memory.md) to keep raw TweetClaw exports out of memory while saving reviewed summaries, source identifiers, decisions, and next checks.

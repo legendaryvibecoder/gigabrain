@@ -161,6 +161,7 @@ Conversation (OpenClaw / Codex / Claude Code / Claude Desktop)
 | Destination audit | Host-by-host integration status and gaps | [docs/audits/destination-audit-2026-05.md](docs/audits/destination-audit-2026-05.md) |
 | Launch kit | Positioning, pilot offer, X posts, and static marketing site | [docs/launch/gtm-brief.md](docs/launch/gtm-brief.md) |
 | Sharing model | Multi-host sharing modes and scope rules | [docs/sharing.md](docs/sharing.md) |
+| TweetClaw source memory | Public X/Twitter signal workflow for OpenClaw agents | [docs/tweetclaw-source-memory.md](docs/tweetclaw-source-memory.md) |
 | Cross-memory pivot | Why Gigabrain still matters when native memories exist | [docs/cross-memory-pivot-2026-04.md](docs/cross-memory-pivot-2026-04.md) |
 | Configuration | Full config reference (runtime, capture, recall, dedupe, LLM, vault, quality) | [docs/configuration.md](docs/configuration.md) |
 | Memory protocol | Capture tags, agent instructions, AGENTS.md | [docs/memory-protocol.md](docs/memory-protocol.md) |
