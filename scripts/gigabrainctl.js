@@ -952,6 +952,7 @@ const commandSyncHosts = async () => {
           targetHost: readFlag('--target-host', 'agents', syncFlags),
           scope: readFlag('--scope', '', syncFlags),
           limit: Number(readFlag('--limit', '25', syncFlags) || 25),
+          allowAllScopes: readBool('--all-scopes', false, syncFlags),
         }),
       }, null, 2));
       return;
