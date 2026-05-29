@@ -36,6 +36,7 @@ scripts/obsidian-ingest-*.js
 data/
 
 # Run artifacts
+eval/deep-recall-eval-*
 bench/memorybench/data/runs/
 output/
 

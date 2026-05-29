@@ -35,6 +35,7 @@ const TEST_FILES = [
   'unit-memory-studio-test.js',
   'integration-audit-maintenance-test.js',
   'integration-eval-tools-test.js',
+  'integration-eval-gate-test.js',
   'integration-nightly-cli-test.js',
   'integration-setup-first-run-test.js',
   'integration-codex-setup-test.js',

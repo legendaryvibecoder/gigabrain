@@ -1,0 +1,12 @@
+{
+  "note": "Committed CI floor for the deep-recall eval (eval/run-deep-recall-eval.js). Deterministic: lexical recall + orchestrator over an in-fixture corpus, no embeddings/Ollama/network. minCasePassRate is the recall/orchestrator quality floor; maxScoreboard are hard security/quality ceilings (leaks must stay at 0). Loosen a floor only with a documented reason; tighten when the corpus or engine improves.",
+  "recordedCasePassRate": 0.9565,
+  "minCasePassRate": 0.9,
+  "maxScoreboard": {
+    "instruction_leaks": 0,
+    "junk_wrapper_leaks": 0,
+    "transcript_leaks": 0,
+    "memory_md_privacy_leaks": 0,
+    "provenance_leaks": 0
+  }
+}
