@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { pathToFileURL } from 'node:url';
 
 import { normalizeConfig } from '../lib/core/config.js';
 import { runMaintenance } from '../lib/core/maintenance-service.js';
@@ -431,7 +432,7 @@ const toMarkdown = (report) => {
   return `${lines.join('\n')}\n`;
 };
 
-const main = async () => {
+const runDeepRecallEval = async ({ writeFiles = true, log = true } = {}) => {
   const { db, config } = seedFixture();
   try {
     const recallResults = recallCases.map((testCase) => executeCase({ ...testCase, kind: 'recall' }, (query, scope) => recallForQuery({ db, config, query, scope })));
@@ -500,12 +501,40 @@ const main = async () => {
       results,
     };
 
-    fs.writeFileSync(OUTPUT_JSON, JSON.stringify(report, null, 2), 'utf8');
-    fs.writeFileSync(OUTPUT_MD, toMarkdown(report), 'utf8');
-    console.log(JSON.stringify({ ok: true, json: OUTPUT_JSON, md: OUTPUT_MD, summary: report.summary, scoreboard: report.scoreboard }, null, 2));
+    if (writeFiles) {
+      fs.writeFileSync(OUTPUT_JSON, JSON.stringify(report, null, 2), 'utf8');
+      fs.writeFileSync(OUTPUT_MD, toMarkdown(report), 'utf8');
+    }
+    if (log) {
+      console.log(JSON.stringify({ ok: true, json: writeFiles ? OUTPUT_JSON : null, md: writeFiles ? OUTPUT_MD : null, summary: report.summary, scoreboard: report.scoreboard }, null, 2));
+    }
+    return report;
   } finally {
     db.close();
   }
 };
 
-await main();
+// Committed CI floor for the deep-recall eval. Lives in eval/baseline.json so the
+// gate threshold is reviewable data, not a magic number buried in a test.
+const loadEvalBaseline = () => {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(path.join(process.cwd(), 'eval', 'baseline.json'), 'utf8'));
+    const out = {};
+    if (Number.isFinite(Number(parsed.minCasePassRate))) out.minCasePassRate = Number(parsed.minCasePassRate);
+    for (const [k, v] of Object.entries(parsed.maxScoreboard || {})) {
+      if (Number.isFinite(Number(v))) out[`max_${k}`] = Number(v);
+    }
+    out.raw = parsed;
+    return out;
+  } catch {
+    return { minCasePassRate: 0.9, raw: null };
+  }
+};
+
+// Only auto-run + process.exit when invoked directly, so importing the harness
+// in a test does not run or exit.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await runDeepRecallEval({ writeFiles: true, log: true });
+}
+
+export { runDeepRecallEval, loadEvalBaseline, seedFixture, recallCases, orchestratorCases };
