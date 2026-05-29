@@ -18,10 +18,10 @@ const run = async () => {
   // identical to the pre-change formula (confidence + recency + registry-layer)
   assert.ok(Math.abs(base - (0.7 + 0.08)) < 1e-9, 'score unchanged when no trust configured');
 
-  // --- Trust term is bounded and centered at 0.5 ---
+  // --- Trust term is bounded and centered at 0.5 (range [-0.1, +0.1]) ---
   configureBeliefTrust({ worldModel: { hostTrust: { trusted_host: 1, shady_host: 0, neutral_host: 0.5 } } });
-  assert.ok(Math.abs(beliefHostTrustBonus({ source_host: 'trusted_host' }) - 0.2) < 1e-9, 'max trust → +0.2');
-  assert.ok(Math.abs(beliefHostTrustBonus({ source_host: 'shady_host' }) + 0.2) < 1e-9, 'min trust → -0.2');
+  assert.ok(Math.abs(beliefHostTrustBonus({ source_host: 'trusted_host' }) - 0.1) < 1e-9, 'max trust → +0.1');
+  assert.ok(Math.abs(beliefHostTrustBonus({ source_host: 'shady_host' }) + 0.1) < 1e-9, 'min trust → -0.1');
   assert.equal(beliefHostTrustBonus({ source_host: 'neutral_host' }), 0, 'neutral trust → 0');
   assert.equal(beliefHostTrustBonus({ source_host: 'unknown_host' }), 0, 'unlisted host → 0 (neutral)');
   assert.equal(beliefHostTrustBonus({ source_agent: 'trusted_host' }), beliefHostTrustBonus({ source_host: 'trusted_host' }), 'falls back to source_agent');
