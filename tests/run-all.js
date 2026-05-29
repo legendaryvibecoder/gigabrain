@@ -21,6 +21,7 @@ const TEST_FILES = [
   'unit-native-promotion-test.js',
   'unit-person-service-test.js',
   'unit-world-model-test.js',
+  'unit-belief-trust-test.js',
   'unit-orchestrator-test.js',
   'unit-plugin-runtime-test.js',
   'unit-sqlite-test.js',
