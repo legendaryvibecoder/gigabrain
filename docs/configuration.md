@@ -88,7 +88,9 @@ OpenClaw mode keeps config under `plugins.entries.gigabrain.config` in `openclaw
     "topicEntities": {
       "mode": "strict_hidden",
       "exportToSurface": false
-    }
+    },
+    "customSlotRules": [],
+    "hostTrust": {}
   },
   "synthesis": {
     "enabled": true,
@@ -103,6 +105,48 @@ OpenClaw mode keeps config under `plugins.entries.gigabrain.config` in `openclaw
 - The orchestrator chooses a profile-first recall path and only allows deep lookup for source/date/wording verification or true low-confidence-no-brief cases
 - The world model projects atomic memories into internal entities, beliefs, episodes, contradictions, and syntheses without replacing the underlying registry
 - Syntheses generate reusable briefs for recall, current state, what changed, and session-start context
+
+### `worldModel.customSlotRules`
+
+Generic detectors already recognise common claim slots (relationship, location, role, preference, decision, birthday, identity). `customSlotRules` lets a deployment add durable slots for its own projects, people, or domain terms instead of hardcoding them. Each rule maps a regex over the memory text to a slot and is applied **before** the generic detectors, so a custom rule always wins for text it matches. Defaults to `[]` (generic detectors only). Invalid regexes are skipped rather than thrown.
+
+| Field | Required | Purpose |
+| --- | --- | --- |
+| `pattern` | yes | Regex matched against the memory content |
+| `flags` | no | Regex flags (default `i`) |
+| `slot` | yes | Dotted slot id, e.g. `project.apollo.status` |
+| `topic` | no | Coarse topic used by recall reranking |
+| `subtopic` | no | Finer label within the topic |
+| `value` | no | Fixed normalized value; omit to summarise the matched text |
+| `operation` | no | `update` (default) or `remember` |
+
+```json
+{
+  "worldModel": {
+    "customSlotRules": [
+      { "pattern": "acme rocket project", "slot": "project.acme.status", "topic": "project", "subtopic": "status" },
+      { "pattern": "prefers oxford commas", "slot": "preference.style.oxford", "topic": "preference", "subtopic": "style", "value": "oxford_comma:true" }
+    ]
+  }
+}
+```
+
+### `worldModel.hostTrust`
+
+When two agents write contradictory beliefs into the same claim slot, the winner is chosen by **confidence + recency + host trust**. `hostTrust` assigns each source host a trust weight in `[0, 1]` (default `0.5` = neutral; unlisted hosts stay neutral). Trust is a **tie-breaker, not a veto**: it maps to a bounded `[-0.1, +0.1]` score term — large enough that a high-trust source outranks a *fresher* low-trust belief (the cross-agent drift / memory-poisoning fix), but smaller than any substantial confidence gap, so a clearly better-supported belief still wins regardless of host. This mirrors the per-host trust applied at ingest, so the same signal flows from capture into belief resolution. Defaults to `{}` (no trust weighting; scoring is unchanged).
+
+```json
+{
+  "worldModel": {
+    "hostTrust": {
+      "codex": 0.8,
+      "claude_code": 0.8,
+      "cursor": 0.6,
+      "chatgpt_manual": 0.4
+    }
+  }
+}
+```
 
 ## Dedupe
 
