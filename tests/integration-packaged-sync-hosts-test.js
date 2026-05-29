@@ -307,6 +307,48 @@ const run = async () => {
   assert.equal(brief.omitted_secret_risks, 1, 'brief should report omitted secret-risk rows');
   assert.equal(brief.brief.includes('does not scrape'), true, 'brief should keep the closed-cloud boundary explicit');
 
+  // export-brief with no --scope selects every memory across all scopes, so it
+  // is denied by default; --all-scopes is the explicit opt-in (mirrors the
+  // deny-by-default exportMemoryBrief contract).
+  // runCommand throws on non-zero exit, so the throw IS the expected denial.
+  let denied = false;
+  try {
+    runCommand({
+      cmd: 'node',
+      args: [
+        path.join(packageRoot, 'scripts', 'gigabrainctl.js'),
+        'sync-hosts',
+        'export-brief',
+        '--config',
+        configPath,
+        '--target-host',
+        'agents',
+      ],
+      cwd: packageRoot,
+      env,
+      label: 'packaged sync-hosts export-brief deny',
+    });
+  } catch {
+    denied = true;
+  }
+  assert.equal(denied, true, 'packaged export-brief without --scope should be denied by default');
+
+  const allScopesBrief = runJsonCommand([
+    path.join(packageRoot, 'scripts', 'gigabrainctl.js'),
+    'sync-hosts',
+    'export-brief',
+    '--config',
+    configPath,
+    '--target-host',
+    'agents',
+    '--all-scopes',
+  ], {
+    cwd: packageRoot,
+    env,
+    label: 'packaged sync-hosts export-brief all-scopes',
+  });
+  assert.equal(allScopesBrief.ok, true, 'packaged export-brief --all-scopes should produce a brief across all scopes');
+
   const db = new DatabaseSync(dbPath);
   try {
     const sharedRows = db.prepare(`
