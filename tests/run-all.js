@@ -14,6 +14,7 @@ const TEST_FILES = [
   'unit-host-trust-test.js',
   'unit-openclaw-import-test.js',
   'unit-memory-passport-test.js',
+  'unit-passport-bundle-test.js',
   'unit-capture-service-test.js',
   'unit-recall-service-test.js',
   'unit-memory-actions-test.js',
