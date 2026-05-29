@@ -13,6 +13,7 @@ import { ensureProjectionStore, materializeProjectionFromMemories } from '../lib
 import { exportMemoryBrief, getSyncStatus, listMemorySources, syncHostMemories } from '../lib/core/host-memory-sync.js';
 import { importOpenClawRegistry } from '../lib/core/openclaw-import.js';
 import { buildMemoryPassport, writeMemoryPassport } from '../lib/core/memory-passport.js';
+import { exportPassportBundle, importPassportBundle } from '../lib/core/passport-bundle.js';
 import { captureSnapshotMetrics } from '../lib/core/metrics.js';
 import { buildVaultSurface, inspectVaultHealth, loadSurfaceSummary, syncVaultPull } from '../lib/core/vault-mirror.js';
 import { orchestrateRecall } from '../lib/core/orchestrator.js';
@@ -51,6 +52,8 @@ Commands:
   sync-hosts   Sync local host memories into the cross-agent memory bus
   import-openclaw Import a legacy OpenClaw/Gigabrain registry.sqlite with provenance
   passport     Generate a static Memory Passport and handoff briefs
+  export-bundle  Export a portable, re-importable memory bundle (versioned + integrity-hashed)
+  import-bundle  Import a memory bundle into this store (verifies integrity, rebuilds world model)
   vault        Build/report/doctor/pull the Obsidian memory surface
 
 Examples:
@@ -65,6 +68,8 @@ Examples:
   node scripts/gigabrainctl.js sync-hosts --config ~/.gigabrain/config.json --host codex,claude_code
   node scripts/gigabrainctl.js import-openclaw --config ~/.gigabrain/config.json --registry ~/.openclaw/gigabrain/memory/registry.sqlite --source-label nimbus-backup --dry-run
   node scripts/gigabrainctl.js passport --config ~/.gigabrain/config.json --output-dir ./passport
+  node scripts/gigabrainctl.js export-bundle --config ~/.gigabrain/config.json --out ./memory-passport-bundle.json
+  node scripts/gigabrainctl.js import-bundle --config ~/.gigabrain/config.json --in ./memory-passport-bundle.json
   node scripts/gigabrainctl.js sync-hosts export-brief --target-host claude_code --config ~/.gigabrain/config.json
   node scripts/gigabrainctl.js vault build --config ~/.openclaw/openclaw.json
   node scripts/gigabrainctl.js vault pull --host memory-host --remote-path /path/to/obsidian-vault --target ~/Documents/gigabrainvault
@@ -1186,6 +1191,14 @@ const main = async () => {
   }
   if (command === 'passport') {
     await commandPassport();
+    return;
+  }
+  if (command === 'export-bundle') {
+    await commandExportBundle();
+    return;
+  }
+  if (command === 'import-bundle') {
+    await commandImportBundle();
     return;
   }
   if (['', 'help', '--help', '-h'].includes(command) || wantsHelp) {

@@ -13,6 +13,7 @@ const TEST_FILES = [
   'unit-host-memory-sync-test.js',
   'unit-openclaw-import-test.js',
   'unit-memory-passport-test.js',
+  'unit-passport-bundle-test.js',
   'unit-capture-service-test.js',
   'unit-recall-service-test.js',
   'unit-memory-actions-test.js',
