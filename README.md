@@ -1,7 +1,7 @@
 # Gigabrain
 
 <p align="center">
-  <strong>Local-first memory control plane for agents.</strong>
+  <strong>Local-first memory governance &amp; trust control plane for multi-agent setups.</strong>
 </p>
 
 <p align="center">
@@ -22,11 +22,11 @@
 
 ---
 
-**Gigabrain** is the local-first Memory Passport and control plane for AI agents. It gives you one inspectable place to inventory, audit, deduplicate, and safely hand off memory across [OpenClaw](https://openclaw.ai), Codex App/CLI, Claude Code/Desktop, Hermes-style MCP/HTTP bridges, Cursor/Windsurf, and explicit manual imports from cloud products.
+**Gigabrain** is the local-first **memory governance & trust control plane** for people who run more than one AI agent. When you use Codex, Claude Code, Cursor/Windsurf, OpenClaw, and Hermes against the same work, each one quietly remembers different — and sometimes contradictory — things. Gigabrain gives you one inspectable place to see what they all remember, where each memory came from, what's stale, contradictory, or secret-leaking, and what is safe to hand to the next agent.
 
-The product face is **Memory Passport + Auditor + Handoff Layer**. The cross-memory bus is the architecture underneath: SQLite-backed recall, deterministic dedupe/audit flows, host-memory adapters, native markdown sync, world model, Obsidian surface, and an optional web console for memory operations.
+The product face is the **Memory Passport**: an audit report + safe handoff briefs. Underneath it is an event-sourced memory engine — SQLite-backed hybrid recall, deterministic dedupe/audit flows, read-only host-memory adapters, native markdown sync, a claim-slot **world model** with contradiction detection, an Obsidian surface, and an optional web console.
 
-Gigabrain does not replace native memories. It connects, checks, deduplicates, exports, and audits them where the host exposes local files or the user provides an explicit export. Closed cloud memories such as ChatGPT, Claude.ai, Gemini, and Microsoft Copilot are manual import/export flows only.
+Gigabrain does **not** replace native memories and does **not** claim to be a portable "carry your brain anywhere" bundle. It sits *above* native memory: it connects, checks, deduplicates, attributes, and audits the memory your agents already keep where the host exposes local files or you provide an explicit export, then writes safe briefs for the next host. Closed cloud memories (ChatGPT, Claude.ai, Gemini, Microsoft Copilot) are manual import/export only — no scraping, no hidden sync. Encrypted, signed, fully round-trippable export bundles are on the roadmap, not shipped today; see the [destination audit](docs/audits/destination-audit-2026-05.md).
 
 ## Supported clients
 

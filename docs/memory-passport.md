@@ -1,8 +1,8 @@
 # Memory Passport
 
-Gigabrain's launch product surface is the Memory Passport: a local-first report that shows what your AI agents remember, where those memories came from, what needs review, and what can be safely handed to another host.
+Gigabrain's launch product surface is the Memory Passport: the governance/audit artifact of the broader memory **trust control plane**. It is a local-first report that shows what your AI agents remember, where those memories came from, what needs review, and what can be safely handed to another host.
 
-The Passport is not another hidden RAG store. It is the control plane above native memories:
+The Passport is a **report + safe handoff pack**, not a portable re-importable bundle and not another hidden RAG store. It is the audit/trust layer above native memories:
 
 - source inventory by host
 - exact duplicate groups with retained provenance
@@ -13,7 +13,7 @@ The Passport is not another hidden RAG store. It is the control plane above nati
 - a readiness verdict that separates launch blockers from cleanup work
 - Markdown handoff briefs for `AGENTS.md`, `CLAUDE.md`, ChatGPT, Claude.ai, Gemini, and Microsoft Copilot, with secret-risk rows omitted entirely
 
-For the current host-by-host integration status, see the [Destination Audit](audits/destination-audit-2026-05.md). v0.7.1 marks the Passport/control-plane layer as the current MVP of "OnePassword for Memory"; encrypted portable bundles, signed manifests, delete/tombstone flows, trust labels, and a review UI remain future vault-grade work.
+For the current host-by-host integration status, see the [Destination Audit](audits/destination-audit-2026-05.md). v0.7.1 ships the Passport as a governance/audit + safe-handoff layer. The vault-grade pieces people associate with a "1Password for memory" — encrypted portable bundles, signed manifests, a re-importable round-trip, delete/tombstone flows, trust labels, and a review UI — are explicitly **future work, not shipped today**.
 
 ## Quickstart
 
