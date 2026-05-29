@@ -11,6 +11,7 @@ const TEST_FILES = [
   'unit-eval-harness-test.js',
   'unit-projection-store-test.js',
   'unit-host-memory-sync-test.js',
+  'unit-host-trust-test.js',
   'unit-openclaw-import-test.js',
   'unit-memory-passport-test.js',
   'unit-capture-service-test.js',
