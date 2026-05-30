@@ -29,6 +29,7 @@ const TEST_FILES = [
   'unit-runtime-guard-test.js',
   'unit-llm-router-test.js',
   'unit-review-queue-test.js',
+  'unit-audit-hardening-regression-test.js',
   'unit-http-routes-test.js',
   'unit-embedding-service-test.js',
   'unit-native-sync-query-test.js',
