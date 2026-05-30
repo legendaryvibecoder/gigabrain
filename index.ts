@@ -12,6 +12,8 @@ import { ensureNativeStore, syncNativeMemory } from './lib/core/native-sync.js';
 import { promoteNativeChunks } from './lib/core/native-promotion.js';
 import { ensurePersonStore, rebuildEntityMentions } from './lib/core/person-service.js';
 import { ensureWorldModelReady, ensureWorldModelStore, getSynthesis, rebuildWorldModel } from './lib/core/world-model.js';
+import { registerGigabrainMemoryCli, gigabrainMemoryCliDescriptors } from './lib/core/openclaw-memory-cli.js';
+import { gigabrainMemoryRuntime } from './lib/core/openclaw-memory-runtime.js';
 import { openDatabase } from './lib/core/sqlite.js';
 import { recordRecallLatency } from './lib/core/metrics.js';
 
@@ -29,6 +31,14 @@ type PluginApi = {
     auth?: 'gateway' | 'plugin';
     match?: 'exact' | 'prefix';
     handler: (req: any, res: any) => Promise<void> | void;
+  }) => void;
+  registerMemoryCapability?: (capability: {
+    runtime?: unknown;
+  }) => void;
+  registerMemoryRuntime?: (runtime: unknown) => void;
+  registerCli?: (registrar: (ctx: { program: any; config: any; workspaceDir?: string; logger: PluginLogger }) => void | Promise<void>, opts?: {
+    commands?: string[];
+    descriptors?: Array<{ name: string; description: string; hasSubcommands: boolean }>;
   }) => void;
 };
 
@@ -56,6 +66,13 @@ const resolveGatewayAuthToken = (raw: unknown): string => {
 const parseAgentIdFromSessionKey = (sessionKey: string): string => {
   const parts = String(sessionKey || '').split(':');
   return String(parts[1] || 'shared').trim() || 'shared';
+};
+
+const normalizeResolvedScope = (value: string): string => {
+  const scope = String(value || '').trim();
+  if (!scope) return '';
+  if (scope === 'main') return 'profile:main';
+  return scope;
 };
 
 const slugifyScopeToken = (value: string): string => {
@@ -176,19 +193,19 @@ const sanitizeCandidateQuery = (input: string): string => {
 };
 
 const resolveScopeForEvent = (event: any): string => {
-  const explicit = String(event?.scope || event?.agentId || '').trim();
+  const explicit = normalizeResolvedScope(String(event?.scope || event?.agentId || '').trim());
   if (explicit) return explicit;
 
   const sessionKey = String(event?.sessionKey || event?.meta?.sessionKey || '').trim();
   if (sessionKey) {
-    const parsedAgentId = parseAgentIdFromSessionKey(sessionKey);
+    const parsedAgentId = normalizeResolvedScope(parseAgentIdFromSessionKey(sessionKey));
     if (parsedAgentId && parsedAgentId !== 'shared') return parsedAgentId;
   }
 
   const workspaceScope = deriveScopeFromWorkspaceDir(String(event?.workspaceDir || '').trim());
   if (workspaceScope) return workspaceScope;
   if (!sessionKey) return 'shared';
-  return parseAgentIdFromSessionKey(sessionKey);
+  return normalizeResolvedScope(parseAgentIdFromSessionKey(sessionKey));
 };
 
 const mergeEventWithCtx = (event: any, ctx: any) => {
@@ -422,6 +439,17 @@ const gigabrainPlugin = {
     fs.mkdirSync(path.dirname(dbPath), { recursive: true });
     logger.info?.(`[gigabrain] v3 startup db=${dbPath}`);
 
+    api.registerMemoryCapability?.({
+      runtime: gigabrainMemoryRuntime,
+    });
+    if (!api.registerMemoryCapability && api.registerMemoryRuntime) {
+      api.registerMemoryRuntime(gigabrainMemoryRuntime);
+    }
+    api.registerCli?.(registerGigabrainMemoryCli, {
+      commands: ['memory'],
+      descriptors: gigabrainMemoryCliDescriptors,
+    });
+
     withDb(dbPath, config, () => undefined);
     withDb(dbPath, config, (db) => {
       if (config.native.enabled === false) return;
@@ -486,7 +514,7 @@ const gigabrainPlugin = {
       }
     }
 
-    api.on('before_agent_start', async (event: any, ctx: any) => {
+    const handlePromptRecall = async (event: any, ctx: any) => {
       try {
         const resolvedEvent = mergeEventWithCtx(event, ctx);
         const baseQuery = extractUserQuery(resolvedEvent);
@@ -552,7 +580,10 @@ const gigabrainPlugin = {
         logger.warn?.(`[gigabrain] recall hook error: ${err instanceof Error ? err.message : String(err)}`);
         return;
       }
-    });
+    };
+
+    api.on('before_prompt_build', handlePromptRecall);
+    api.on('before_agent_start', handlePromptRecall);
 
     api.on('agent_end', async (event: any, ctx: any) => {
       if (config.capture.enabled === false) return;

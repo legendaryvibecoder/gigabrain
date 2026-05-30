@@ -1,6 +1,11 @@
 {
   "id": "gigabrain",
   "kind": "memory",
+  "activation": {
+    "onCommands": [
+      "memory"
+    ]
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
@@ -179,6 +184,26 @@
                 "default": 0.25
               }
             }
+          },
+          "semanticRerankEnabled": {
+            "type": "boolean",
+            "default": false
+          },
+          "semanticRerankAlpha": {
+            "type": "number",
+            "default": 0.7
+          },
+          "ollamaUrl": {
+            "type": "string",
+            "default": "http://127.0.0.1:11434"
+          },
+          "embeddingModel": {
+            "type": "string",
+            "default": "bge-m3"
+          },
+          "embeddingTimeoutMs": {
+            "type": "number",
+            "default": 5000
           }
         }
       },
