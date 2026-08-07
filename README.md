@@ -1,7 +1,7 @@
 # Gigabrain
 
 <p align="center">
-  <strong>One memory your AI assistants can share — and you can control.</strong>
+  <strong>One shared memory for your AI assistants, under your control.</strong>
 </p>
 
 <p align="center">
@@ -24,24 +24,24 @@
 
 ## Why this exists
 
-If you use more than one AI assistant — one for writing, one for code, another inside your editor — you also have more than one memory of your work. Each assistant mostly remembers what it has seen. They cannot compare notes, so you repeat yourself, and sometimes one confidently acts on information another knows is out of date.
+Each AI assistant keeps a separate memory of your work, so one assistant can miss a decision that you made with another. You then explain the same facts again. Old information can also guide new work.
 
-Imagine this: in January you tell Claude Code that your app charges customers through Stripe. In March, while working in Codex, you switch the project to Paddle. In April you ask Claude Code to update the billing page — and it writes Stripe code, because as far as it knows, nothing changed. Both assistants did their jobs. Their memories simply never met.
+When a Codex session moves an app from Stripe to Paddle, Claude Code can still hold the old Stripe record. A later billing change can then use Stripe code.
 
 ## What Gigabrain does
 
-Gigabrain gives supported AI assistants one shared, longer-term memory that lives on your own computer.
+Gigabrain keeps one local record for supported AI assistants.
 
-- **It gathers what your assistants already know.** Where an assistant keeps supported memory files on your machine, Gigabrain can read them and add what it finds to one shared record. These imports are read-only: the original memory files are never changed.
-- **It remembers where everything came from.** Every remembered fact keeps its source and dates, so you can check who recorded it and when.
-- **It notices disagreements.** When two memories conflict — Stripe versus Paddle — Gigabrain makes the conflict visible, favors better-supported and newer information, and keeps a reviewable history of the decision.
-- **It stays yours.** Your memory is stored locally by default. No Gigabrain cloud account is required, and optional connections are enabled only when you choose them.
+- **Read supported memory files.** Gigabrain adds the facts that it finds to the shared record. It keeps each source file unchanged.
+- **Keep the source and dates.** You can check where a fact came from and when it entered the store.
+- **Show conflicts.** Gigabrain applies documented rules when two records disagree about the same fact. It gives more weight to strong support and recent evidence, then keeps the decision history.
+- **Store data on your computer.** The default memory store stays on your computer. You choose each optional connection.
 
-Your assistants keep their own built-in memories, and those stay useful. Gigabrain does not replace them; it adds a shared record that you can inspect, correct, and move deliberately.
+Gigabrain works beside each assistant's built-in memory as a shared record that you can inspect or correct. Use an export when you want to move it.
 
 ## Quickstart
 
-The first two commands install Gigabrain and connect it to a project. The next two check the setup and create a report you can review. Supported imports remain read-only throughout this setup.
+These commands install the package, connect a project, check the setup, and write an audit report. All supported imports stay read-only.
 
 ```bash
 npm install @legendaryvibecoder/gigabrain
@@ -51,20 +51,18 @@ npx gigabrainctl handoff --config ~/.gigabrain/config.json \
   --output-dir ./gigabrain-memory-audit
 ```
 
-`init` writes your configuration to `~/.gigabrain/config.json`; later commands and assistant setups use that same file. Setup can discover supported local memory files and import them read-only — review the generated audit before enabling any optional features described in the [configuration guide](docs/configuration.md).
+`init` writes the configuration to `~/.gigabrain/config.json`. The other commands and assistant setups use this file. Read the audit report before you enable a feature from the [configuration guide](docs/configuration.md).
 
-Then choose the guide for the assistant you use: [Codex](docs/setup-codex.md) · [Claude Code](docs/setup-claude.md) · [OpenClaw](docs/setup-openclaw.md).
+Open the guide for your assistant: [Codex](docs/setup-codex.md) · [Claude Code](docs/setup-claude.md) · [OpenClaw](docs/setup-openclaw.md).
 
-## What Gigabrain will not do
+## Limits and safeguards
 
-- **It cannot reach into online accounts.** Memories held inside ChatGPT, Claude.ai, Gemini, or Copilot stay there. If you export them yourself, Gigabrain can import the supported files.
-- **It does not silently merge two computers.** Installing Gigabrain on a laptop and a desktop creates two separate stores. They remain separate unless you explicitly move data or configure a connection between them. See the [sharing guide](docs/sharing.md).
-- **It does not declare automatic truth.** Gigabrain shows sources and keeps its decision history so you can review, correct, or overrule it.
-- **Local does not mean risk-free.** The memory store can contain sensitive information, so protect the computer it lives on and review exports before moving them. Read the [privacy guide](docs/public/privacy-model.md).
+- Memories in ChatGPT, Claude.ai, Gemini, and Copilot stay in those accounts. Gigabrain can import a supported file after you export it.
+- A laptop and a desktop use separate stores. Use a reviewed bundle or a configured connection when you want to move data between them. See the [sharing guide](docs/sharing.md).
+- Gigabrain ranks evidence with documented rules and lets you inspect or change the result.
+- The local store can contain sensitive data. Protect the computer and review every export before you move it. Read the [privacy guide](docs/public/privacy-model.md).
 
-Every setting and optional feature is described in the [configuration guide](docs/configuration.md).
-
-That is the whole idea. Everything below is the technical reference for readers who want the architecture, exact interfaces, commands, and security boundaries.
+The [configuration guide](docs/configuration.md) describes every setting and optional feature.
 
 ---
 
@@ -72,19 +70,19 @@ That is the whole idea. Everything below is the technical reference for readers 
 
 ## Core behavior
 
-- **Shared recall, explicit scope** — project facts and stable user preferences can be shared by Codex, Claude Code, Hermes, and OpenClaw when they point at the same Gigabrain config.
-- **Provenance for every claim** — source host, source path, trust tier, evidence, timestamps, and status stay inspectable.
-- **Contradiction handling** — competing claims are resolved by a deterministic trust → corroboration → recency policy, with an append-only adjudication record.
-- **Bi-temporal memory** — a fact can have both a content time and a validity window; expired and superseded rows are excluded from normal recall.
-- **Recovery and audit** — optional transcript harvesting, secret-risk filtering, review queues, Handoff Records, and a human-readable memory wiki.
-- **Local-first operation** — SQLite, lexical recall, policy checks, and the default setup work without a cloud memory backend.
+- **Shared recall with clear scope:** Codex, Claude Code, Hermes, and OpenClaw can share project facts and stable user preferences when they use the same Gigabrain configuration.
+- **Source record:** Each claim keeps its source host, path, evidence, time data, status, and trust tier.
+- **Conflict rules:** Gigabrain checks source trust first. It then checks independent support. Recency resolves the final tie. An append-only record keeps each decision.
+- **Time model:** A fact can have a content time and a validity window. Normal recall skips expired or superseded rows.
+- **Audit tools:** Optional tools can recover transcripts, filter secret risks, manage review queues, write Handoff Records, and build a memory wiki.
+- **Local operation:** The default setup runs locally, where SQLite stores the data and lexical search finds it. Policy checks control each result. A cloud memory service is optional.
 
 ## Processing flow
 
-1. **Ingest** supported local memory files, explicit checkpoints, and manual exports into a local event store.
-2. **Project** the latest state into SQLite, preserving source and validity metadata.
-3. **Arbitrate** duplicates and contradictions with reviewable rules; destructive uncertainty goes to a queue.
-4. **Recall** through MCP, CLI, or authenticated HTTP with lexical search and optional loopback-only Ollama embeddings.
+1. **Ingest:** Add supported local memory files, explicit checkpoints, and manual exports to a local event store.
+2. **Build the current view:** Write the latest state to SQLite and keep its source and validity data.
+3. **Resolve conflicts:** Apply reviewable rules to duplicate or conflicting claims. A queue holds uncertain changes that can remove data.
+4. **Serve recall:** Use lexical search through MCP, the CLI, or authenticated HTTP. Loopback Ollama embeddings are optional.
 
 ```
    Codex   Claude   Cursor   OpenClaw   Hermes   manual exports
@@ -92,49 +90,49 @@ That is the whole idea. Everything below is the technical reference for readers 
                               │   (supported imports are read-only)
                               ▼
                     ┌────────────────────┐
-                    │      Gigabrain     │   capture · arbitrate · recall
+                    │      Gigabrain     │   capture · resolve · recall
                     │ arbitration ledger │   MCP · CLI · HTTP
                     └─────────┬──────────┘
-                              │  de-conflicted, source-stamped recall
+                              │  recall with sources after conflict checks
                               ▼
-                  any configured agent, via gigabrain_recall
+                  any configured agent uses gigabrain_recall
 ```
 
 ## Release highlights
 
 | | What it means for you |
 | --- | --- |
-| **Answer-shaped recall** | Duration, completion, and certification questions now favor evidence that can actually answer the question while demoting unrelated preferences. |
-| **Immediate arbitration** | Contradictions are evaluated during ingest as well as maintenance, with uncertain destructive changes routed to review. |
-| **Host-memory adapters** | Codex, Claude Code, Hermes, Cursor, and Windsurf local surfaces can be inspected and imported with source attribution. |
-| **Portable handoff** | Integrity-hashed export/import bundles support deliberate movement between stores without implying background sync. |
-| **Public-release privacy gate** | Git files and the real npm pack inventory are scanned completely; unknown binary files fail closed and findings are redacted. |
-| **Hardened local console** | Authentication, scope enforcement, bounded upload/fetch paths, security headers, and dependency audits are covered by runtime tests. |
+| **Answer-focused recall** | Recall selects evidence that can answer questions about duration, completion, or certification. Unrelated preferences rank lower. |
+| **Conflict checks during import** | Gigabrain checks conflicts during import and during maintenance. Risky changes wait for review. |
+| **Local host imports** | Gigabrain can inspect and import supported local data from Codex, Claude Code, Hermes, Cursor, and Windsurf. Each imported fact keeps its source. |
+| **Portable handoff** | Export and import bundles use integrity hashes. Data moves only when you run the export and import commands. |
+| **Privacy check for releases** | The release check scans Git files and the npm package contents. It blocks unknown binary files and redacts each finding. |
+| **Secured local console** | Runtime tests cover authentication, scope rules, path limits, security headers, and dependency checks. |
 
-The cloud-inbox drop folder, transcript harvesting, git wiki, Obsidian reference corpus, remote bridge, and URL importer are opt-in. Review [configuration](docs/configuration.md) and the [privacy model](docs/public/privacy-model.md) before enabling additional data sources or networked providers.
+The cloud inbox, transcript recovery, Git wiki, Obsidian reference set, remote bridge, and URL importer start disabled. Read the [configuration guide](docs/configuration.md) and [privacy model](docs/public/privacy-model.md) before you add a data source or network provider.
 
 ## Supported clients
 
-| Host surface | Install | What Gigabrain owns |
+| Host surface | Install | What Gigabrain handles |
 | --- | --- | --- |
-| **OpenClaw** | `openclaw plugins install` | Optional memory-slot provider, registry, recall, arbitration, maintenance |
-| **Codex desktop / CLI / IDE** | `npm install` + setup | Local project/user store and MCP tools on the configured Codex host |
-| **Claude Code** | `npm install` + setup | Same standalone store when configured identically, MCP tools, `.mcp.json` wiring |
-| **Claude Desktop** | `claude:desktop:bundle` | Same MCP-backed memory store and tools as Claude Code |
-| **Hermes Agent** | `gigabrain-hermes-setup` | MCP tools plus read-only import of local Hermes memory files |
-| **Cursor / Windsurf** | `gigabrainctl sync-hosts` | Read-only import adapter for local project rules/memory; no native write-back |
-| **Cloud assistants** | explicit file import | Manual ChatGPT, Gemini, or Copilot exports parsed locally; no account scraping |
+| **OpenClaw** | `openclaw plugins install` | Provides an optional memory slot, registry, recall, conflict checks, and maintenance |
+| **Codex desktop, CLI, or IDE** | `npm install` and setup | Keeps the local project and user store on the configured Codex host. It also provides MCP tools. |
+| **Claude Code** | `npm install` and setup | Uses the same standalone store when its configuration matches. Setup adds MCP tools and `.mcp.json` entries. |
+| **Claude Desktop** | `claude:desktop:bundle` | Uses the same MCP-backed memory store and tools as Claude Code |
+| **Hermes Agent** | `gigabrain-hermes-setup` | Adds MCP tools and imports local Hermes memory files in read-only mode |
+| **Cursor or Windsurf** | `gigabrainctl sync-hosts` | Imports local project rules and memory in read-only mode |
+| **Cloud assistants** | Explicit file import | Parses supported ChatGPT, Gemini, or Copilot files after you export them |
 
 ## Privacy model
 
-- The default standalone store is local SQLite under `~/.gigabrain/`; no hosted Gigabrain backend is required.
-- The default LLM provider is `none`. Optional semantic embeddings are sent only to a loopback Ollama endpoint.
-- Raw transcript extraction is permitted only with a local provider or an explicitly injected local hook. Cloud audit review skips credential-risk rows, masks supported PII shapes locally, and omits the original scope; cloud providers do not receive raw transcripts through capture.
-- Native host stores are imported read-only. Account-level cloud memories are outside scope unless you export them explicitly.
-- Network features are explicit: the remote bridge is opt-in; the Python console's URL import is disabled by default and requires an exact host allowlist.
-- The release gate scans tracked and untracked publishable files, npm package contents, Git metadata, and GitHub metadata without printing matched values.
+- Gigabrain keeps the standalone SQLite store under `~/.gigabrain/`. A hosted Gigabrain service is optional.
+- The default LLM provider setting is `none`. Optional semantic embeddings go only to a loopback Ollama endpoint.
+- Gigabrain extracts raw transcripts through a local provider or a local hook that you add. A cloud audit excludes rows that can contain credentials. Before data leaves the computer, Gigabrain masks supported PII patterns and removes the original scope.
+- Native host stores use read-only import. To add a supported memory file from a cloud account, export it first.
+- Enable each network feature before use. The remote bridge is opt-in. For URL import, the Python console requires an exact host allowlist and an explicit setting.
+- The release gate scans all publishable files, the npm package contents, Git data, and GitHub data. Its output hides matched values.
 
-Local-first does not mean risk-free: the SQLite store and generated Markdown can contain sensitive memory. Protect the host account, use disk encryption, restrict file permissions, and review exports before moving them. Full boundary: [docs/public/privacy-model.md](docs/public/privacy-model.md).
+The SQLite store and generated Markdown can contain sensitive memory. Protect the host account, use disk encryption, restrict file permissions, and review each export before you move it. Read the full boundary in the [privacy model](docs/public/privacy-model.md).
 
 ## How it works under the hood
 
@@ -158,42 +156,42 @@ Conversation (OpenClaw / Codex / Claude Code / Claude Desktop)
          SQLite + FTS5 + optional local embeddings
 ```
 
-- **Capture** — explicit `remember` calls, checkpoints, host imports, and optional transcript recovery become append-only events.
-- **Recall** — FTS5/BM25 works without a model. When local embeddings are available, Gigabrain fuses lexical and dense rankings, then applies scope, status, answer-shape, provenance, and arbitration policy.
-- **Arbitration** — a claim-slot world model records competing beliefs and applies trust tier → corroboration → recency with clock-skew and source-independence defenses.
-- **Audit + Handoff Records** — static Markdown/HTML/JSON reports show readiness, source coverage, contradictions, stale rows, and secret-risk omissions.
+- **Capture:** Explicit `remember` calls, checkpoints, host imports, and optional transcript recovery become append-only events.
+- **Recall:** FTS5 and BM25 search text directly. When local embeddings are available, Gigabrain combines lexical and dense rankings. It then applies scope, status, answer fit, source data, and conflict rules.
+- **Conflict review:** The world model records competing beliefs for each claim slot and ranks them by trust tier. It next checks independent support. Recency resolves any remaining tie. Clock-skew and source-independence checks protect the result.
+- **Audit reports:** Static Markdown, HTML, and JSON reports show readiness, source coverage, conflicts, stale rows, and omitted secret risks.
 
-Gigabrain does not claim state of the art. The published evidence is a small development regression set, not a held-out industry benchmark; see [benchmark evidence](docs/public/benchmark-evidence.md).
+The published evidence comes from a small development regression set. The [benchmark evidence](docs/public/benchmark-evidence.md) page describes its limits.
 
 ## Why use it when native memory exists?
 
-Native memory is now real and useful: [Codex has local memories](https://learn.chatgpt.com/docs/customization/memories), [Claude Code has auto memory](https://code.claude.com/docs/en/memory), [Cursor has project-scoped memories](https://docs.cursor.com/en/context/memories), and [OpenClaw has hybrid memory search](https://docs.openclaw.ai/concepts/memory-search). Their documented boundaries differ, and several stores remain machine- or product-local.
+Several assistants provide useful native memory. [Codex has local memories](https://learn.chatgpt.com/docs/customization/memories), [Claude Code has auto memory](https://code.claude.com/docs/en/memory), [Cursor has project memories](https://docs.cursor.com/en/context/memories), and [OpenClaw has hybrid memory search](https://docs.openclaw.ai/concepts/memory-search). Each product documents a different scope. Some stores stay on one machine or inside one product.
 
-Gigabrain's job is not to pretend those features do not exist. Its job is to provide cross-product provenance, explicit project/user scopes, deterministic contradiction handling, bi-temporal validity, portable exports, and one protocol surface that you can audit independently. See [the detailed comparison](docs/public/why-gigabrain.md).
+Gigabrain keeps source data across products and separates project facts from user preferences. Fixed rules resolve conflicts. Validity dates control when each fact applies. You can move the record with an export and audit the protocol independently. The [detailed comparison](docs/public/why-gigabrain.md) maps these features to native memory.
 
 ## MCP tools
 
 `gigabrain_recall` · `gigabrain_remember` · `gigabrain_checkpoint` · `gigabrain_provenance` · `gigabrain_recent` · `gigabrain_sources` · `gigabrain_sync_status` · `gigabrain_export_brief` · `gigabrain_entity` · `gigabrain_relationships` · `gigabrain_contradictions` · `gigabrain_arbitrate` · `gigabrain_adjudications` · `gigabrain_beliefs_as_of` · `gigabrain_review_queue` · `gigabrain_doctor`
 
-The core memory surfaces are mapped across agents (MCP), operators (CLI), and the optional HTTP app — see the [coverage matrix](docs/coverage-matrix.md) for the exact coverage of each action.
+The [coverage matrix](docs/coverage-matrix.md) lists each action and its available interface.
 
 ## CLI
 
 ```bash
-npx gigabrainctl init                       # auto-detect + wire installed agents
-npx gigabrainctl handoff --output-dir ./out # Memory Audit + safe Handoff Records
-npx gigabrainctl nightly                     # full nightly pipeline (ingest, arbitrate, audit)
-npx gigabrainctl doctor                      # health check
-npx gigabrainctl inventory                   # memory stats
-npx gigabrainctl review contradictions       # inspect cross-agent contradictions
-npx gigabrainctl sync-hosts --host codex,claude_code  # force a host re-ingest
-npx gigabrainctl vault sync|status           # read-only Obsidian reference corpus
-npx gigabrainctl transcript sync|status      # raw-rollout harvester
-npx gigabrainctl wiki project|reconcile|status  # git-versioned memory wiki
-npx gigabrainctl watch --install-hook --kind=session  # auto-capture on session end
+npx gigabrainctl init                       # Find and connect installed agents
+npx gigabrainctl handoff --output-dir ./out # Write a memory audit and safe Handoff Records
+npx gigabrainctl nightly                    # Run the nightly import, conflict check, and audit
+npx gigabrainctl doctor                     # Check system health
+npx gigabrainctl inventory                  # Show memory statistics
+npx gigabrainctl review contradictions      # Review conflicts across agents
+npx gigabrainctl sync-hosts --host codex,claude_code  # Import a host again
+npx gigabrainctl vault sync|status          # Use the read-only Obsidian reference set
+npx gigabrainctl transcript sync|status     # Recover raw local transcripts
+npx gigabrainctl wiki project|reconcile|status  # Manage the Git versioned memory wiki
+npx gigabrainctl watch --install-hook --kind=session  # Capture at the end of a session
 npx gigabrainctl export-bundle --out ./memory-bundle.json
 npx gigabrainctl import-bundle --in ./memory-bundle.json
-npx gigabrainctl migrate legacy-drop --dry-run  # containment-gated legacy cleanup
+npx gigabrainctl migrate legacy-drop --dry-run  # Preview legacy cleanup
 ```
 
 All commands accept `--config <path>` and are also available as `npm run` scripts.
@@ -222,7 +220,7 @@ All commands accept `--config <path>` and are also available as `npm run` script
 | `POST` | `/gb/recall/explain` | Token | Recall diagnostics and routing explanation |
 | `POST` | `/gb/suggestions` | Token | **Mutating:** validate and ingest structured suggestions |
 
-`/gb` and `/gb/health` expose only landing/health information. Data routes accept `X-GB-Token`, `X-OpenClaw-Token`, or a Bearer token and fail closed when no token is configured. `GB_ALLOW_NO_AUTH=1` is an explicit, dangerous development escape hatch: it bypasses the Node route checks only when no token is configured, emits a warning, and must never be used beyond a loopback-only disposable environment. OpenClaw gateway authentication can still add an outer auth layer.
+`/gb` and `/gb/health` return service status only. Every data route accepts `X-GB-Token`, `X-OpenClaw-Token`, or a Bearer token. A route denies access when its configuration has no token. The dangerous development setting `GB_ALLOW_NO_AUTH=1` can bypass Node route checks only when no token is configured. It prints a warning. Use this setting only in a disposable loopback environment. OpenClaw gateway authentication can add an outer layer.
 
 ## Key subsystems
 
@@ -241,34 +239,34 @@ All commands accept `--config <path>` and are also available as `npm run` script
 
 ## Prerequisites
 
-- **Node.js** >= 22.18.0 (uses `node:sqlite` and built-in TypeScript type stripping)
-- **Ollama** (optional, for local fact extraction + semantic search)
-- **OpenClaw** >= 2026.2.15 (only for the plugin path)
-- **Python** >= 3.10 (only for the optional web console)
+- **Node.js** 22.18.0 or later. Gigabrain uses `node:sqlite` and built-in TypeScript type stripping.
+- **Ollama** is optional. It provides local fact extraction and semantic search.
+- **OpenClaw** 2026.2.15 or later is required for the plugin path.
+- **Python** 3.10 or later is required for the optional web console.
 
 ## Testing
 
 ```bash
-node tests/run-all.js     # repository suite
-node scripts/package-smoke.js  # packaged runtime smoke test
-npm run pack:dry-run     # verify published package contents
+node tests/run-all.js     # Run the repository tests
+node scripts/package-smoke.js  # Test the packaged runtime
+npm run pack:dry-run     # Check the published package contents
 node scripts/check-no-pii.mjs
-node scripts/check-public-mirror.mjs --require-single-commit  # public mirror only
-npm run audit:github-metadata -- --repo owner/repository     # after remote creation
+node scripts/check-public-mirror.mjs --require-single-commit  # Check the public mirror
+npm run audit:github-metadata -- --repo owner/repository     # Check a new remote
 ```
 
 ## Security
 
-- By default, all data-bearing Node HTTP endpoints require timing-safe token auth. The Node token grants access to that configured store; scope is a recall/query filter there, while scoped-token isolation and id-existence concealment are enforced by the optional FastAPI console. The development-only `GB_ALLOW_NO_AUTH=1` escape hatch above is unsafe for network exposure.
-- The optional web console is documented for loopback binding, adds security headers, bounds uploads and extracted PDF text, and disables URL import by default.
-- Release dependencies are checked with `npm audit` and `pip-audit`; the dated result and residual risks are in the [security review](docs/public/security-review.md).
-- The public mirror is created from an explicit allowlist as a new single-commit history; the private engineering repository is never flipped public in place.
+- Node HTTP endpoints that carry data require a token by default. The code compares tokens with timing-safe logic. A Node token grants access to its configured store, where scope filters recall and queries. The optional FastAPI console isolates scoped tokens and conceals whether an ID exists. Limit `GB_ALLOW_NO_AUTH=1` to the development use described above.
+- The optional web console listens on loopback as documented. It sets security headers and limits uploads. Extracted PDF text also has a size limit. URL import starts disabled.
+- Release checks run `npm audit` and `pip-audit` against dependencies. The [security review](docs/public/security-review.md) gives the date, result, and remaining risks.
+- An explicit allowlist creates the public mirror with a new single-commit history. The private engineering repository stays private.
 
-Do not open public issues for vulnerabilities — use the private flow in [SECURITY.md](SECURITY.md).
+Report vulnerabilities through the private process in [SECURITY.md](SECURITY.md).
 
 ## Contributing
 
-External contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first. Open Issues for concrete bugs, Discussions for design/usage. Never post secrets, private paths, or runtime artifacts.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before you send a change. Report a concrete bug in Issues, or use Discussions for design and usage questions. Remove private data from every post, including secrets, local paths, identifiers, and runtime files.
 
 ## License
 
