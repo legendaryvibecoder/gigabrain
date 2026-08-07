@@ -1,7 +1,7 @@
 # Gigabrain
 
 <p align="center">
-  <strong>A local memory control plane for the agents you already use.</strong>
+  <strong>One memory your AI assistants can share — and you can control.</strong>
 </p>
 
 <p align="center">
@@ -22,11 +22,11 @@
 
 ---
 
-Codex, Claude Code, Cursor, and OpenClaw now have useful native memory. That is good. It also means one project can accumulate several machine-local stores with different scopes, retention rules, provenance, and ideas about what is current.
+If you use more than one AI assistant — one for writing, another for code, a third in your editor — each one remembers different things about you and your work. Those memories stay separate. They can repeat themselves, miss important context, or disagree about what is still current.
 
-**Gigabrain adds a neutral layer above those stores.** It imports supported local memories read-only, keeps a provenance ledger, de-duplicates claims, surfaces contradictions, suppresses superseded facts, and exposes one auditable recall interface over MCP and CLI.
+**Gigabrain brings supported memories together in one place you control.** It reads them without changing the originals, remembers where each piece came from, and points out when information conflicts or has been replaced by something newer.
 
-It is designed for the gap between products and machines: native memory remains the fast, product-specific layer; Gigabrain is the portable governance and continuity layer you control.
+Your AI assistants keep their own built-in memory for speed. Gigabrain gives them a shared, longer-term record that stays local by default and that you can review at any time.
 
 ## What it does
 
