@@ -22,13 +22,55 @@
 
 ---
 
-If you use more than one AI assistant — one for writing, another for code, a third in your editor — each one remembers different things about you and your work. Those memories stay separate. They can repeat themselves, miss important context, or disagree about what is still current.
+## Why this exists
 
-**Gigabrain brings supported memories together in one place you control.** It reads them without changing the originals, remembers where each piece came from, and points out when information conflicts or has been replaced by something newer.
+If you use more than one AI assistant — one for writing, one for code, another inside your editor — you also have more than one memory of your work. Each assistant mostly remembers what it has seen. They cannot compare notes, so you repeat yourself, and sometimes one confidently acts on information another knows is out of date.
 
-Your AI assistants keep their own built-in memory for speed. Gigabrain gives them a shared, longer-term record that stays local by default and that you can review at any time.
+Imagine this: in January you tell Claude Code that your app charges customers through Stripe. In March, while working in Codex, you switch the project to Paddle. In April you ask Claude Code to update the billing page — and it writes Stripe code, because as far as it knows, nothing changed. Both assistants did their jobs. Their memories simply never met.
 
-## What it does
+## What Gigabrain does
+
+Gigabrain gives supported AI assistants one shared, longer-term memory that lives on your own computer.
+
+- **It gathers what your assistants already know.** Where an assistant keeps supported memory files on your machine, Gigabrain can read them and add what it finds to one shared record. These imports are read-only: the original memory files are never changed.
+- **It remembers where everything came from.** Every remembered fact keeps its source and dates, so you can check who recorded it and when.
+- **It notices disagreements.** When two memories conflict — Stripe versus Paddle — Gigabrain makes the conflict visible, favors better-supported and newer information, and keeps a reviewable history of the decision.
+- **It stays yours.** Your memory is stored locally by default. No Gigabrain cloud account is required, and optional connections are enabled only when you choose them.
+
+Your assistants keep their own built-in memories, and those stay useful. Gigabrain does not replace them; it adds a shared record that you can inspect, correct, and move deliberately.
+
+## Quickstart
+
+The first two commands install Gigabrain and connect it to a project. The next two check the setup and create a report you can review. Supported imports remain read-only throughout this setup.
+
+```bash
+npm install @legendaryvibecoder/gigabrain
+npx gigabrainctl init --project-root /path/to/repo
+npx gigabrainctl doctor --config ~/.gigabrain/config.json --target both
+npx gigabrainctl handoff --config ~/.gigabrain/config.json \
+  --output-dir ./gigabrain-memory-audit
+```
+
+`init` writes your configuration to `~/.gigabrain/config.json`; later commands and assistant setups use that same file. Setup can discover supported local memory files and import them read-only — review the generated audit before enabling any optional features described in the [configuration guide](docs/configuration.md).
+
+Then choose the guide for the assistant you use: [Codex](docs/setup-codex.md) · [Claude Code](docs/setup-claude.md) · [OpenClaw](docs/setup-openclaw.md).
+
+## What Gigabrain will not do
+
+- **It cannot reach into online accounts.** Memories held inside ChatGPT, Claude.ai, Gemini, or Copilot stay there. If you export them yourself, Gigabrain can import the supported files.
+- **It does not silently merge two computers.** Installing Gigabrain on a laptop and a desktop creates two separate stores. They remain separate unless you explicitly move data or configure a connection between them. See the [sharing guide](docs/sharing.md).
+- **It does not declare automatic truth.** Gigabrain shows sources and keeps its decision history so you can review, correct, or overrule it.
+- **Local does not mean risk-free.** The memory store can contain sensitive information, so protect the computer it lives on and review exports before moving them. Read the [privacy guide](docs/public/privacy-model.md).
+
+Every setting and optional feature is described in the [configuration guide](docs/configuration.md).
+
+That is the whole idea. Everything below is the technical reference for readers who want the architecture, exact interfaces, commands, and security boundaries.
+
+---
+
+## Technical reference
+
+## Core behavior
 
 - **Shared recall, explicit scope** — project facts and stable user preferences can be shared by Codex, Claude Code, Hermes, and OpenClaw when they point at the same Gigabrain config.
 - **Provenance for every claim** — source host, source path, trust tier, evidence, timestamps, and status stay inspectable.
@@ -37,9 +79,7 @@ Your AI assistants keep their own built-in memory for speed. Gigabrain gives the
 - **Recovery and audit** — optional transcript harvesting, secret-risk filtering, review queues, Handoff Records, and a human-readable memory wiki.
 - **Local-first operation** — SQLite, lexical recall, policy checks, and the default setup work without a cloud memory backend.
 
-Gigabrain does **not** scrape account-level memories from ChatGPT, Claude.ai, Gemini, or Copilot. It does **not** silently synchronize two computers. It does **not** turn memory into an unquestionable source of truth. It gives you an inspectable system for deciding what should be recalled and why.
-
-## How it works
+## Processing flow
 
 1. **Ingest** supported local memory files, explicit checkpoints, and manual exports into a local event store.
 2. **Project** the latest state into SQLite, preserving source and validity metadata.
@@ -59,24 +99,6 @@ Gigabrain does **not** scrape account-level memories from ChatGPT, Claude.ai, Ge
                               ▼
                   any configured agent, via gigabrain_recall
 ```
-
-## Quickstart
-
-```bash
-npm install @legendaryvibecoder/gigabrain
-npx gigabrainctl init --project-root /path/to/repo
-npx gigabrainctl doctor --config ~/.gigabrain/config.json --target both
-npx gigabrainctl handoff --config ~/.gigabrain/config.json \
-  --output-dir ./gigabrain-memory-audit
-```
-
-`init` writes the canonical standalone config to `~/.gigabrain/config.json`. Use that same config for later commands and MCP registrations. Setup can discover supported local memory files and import them read-only; review the generated audit before enabling broader capture.
-
-Choose the host guide: [Codex](docs/setup-codex.md) · [Claude Code](docs/setup-claude.md) · [OpenClaw](docs/setup-openclaw.md).
-
-### Two computers are two stores unless you connect them
-
-Installing the same package version on a MacBook and a Mac Studio does not make their memories identical. Code parity, config parity, and data parity are separate checks. Use a reviewed `export-bundle` / `import-bundle` workflow or configure the optional authenticated remote bridge; Gigabrain never enables cross-host transport silently. See [sharing](docs/sharing.md).
 
 ## Release highlights
 
