@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gigabrain.local/schemas/checkpoint.1.schema.json",
+  "title": "Gigabrain checkpoint episode",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "checkpoint_id",
+    "session_id",
+    "parent_checkpoint_id",
+    "created_at",
+    "scope",
+    "source",
+    "repo",
+    "summary",
+    "outcome_status",
+    "source_ref",
+    "legacy_untyped",
+    "decisions",
+    "open_loops",
+    "touched_files",
+    "durable_candidates",
+    "evidence",
+    "proposal_ids",
+    "payload",
+    "record_hash"
+  ],
+  "properties": {
+    "schema_version": { "const": "checkpoint.1" },
+    "checkpoint_id": { "type": "string", "pattern": "^cp_(?:[0-9a-f-]+|legacy_[0-9a-f]+)$" },
+    "session_id": { "type": "string", "minLength": 1 },
+    "parent_checkpoint_id": { "type": ["string", "null"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "scope": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent", "client", "host"],
+      "properties": {
+        "agent": { "type": "string", "minLength": 1 },
+        "client": { "type": "string", "minLength": 1 },
+        "host": { "type": "string", "minLength": 1 }
+      }
+    },
+    "repo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["root", "branch", "commit", "dirty"],
+      "properties": {
+        "root": { "type": "string" },
+        "branch": { "type": "string" },
+        "commit": { "type": "string" },
+        "dirty": { "type": "boolean" }
+      }
+    },
+    "summary": { "type": "string" },
+    "outcome_status": { "type": "string", "minLength": 1 },
+    "source_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "line", "kind"],
+      "properties": {
+        "path": { "type": "string" },
+        "line": { "type": ["integer", "null"], "minimum": 1 },
+        "kind": { "type": "string" }
+      }
+    },
+    "legacy_untyped": { "type": "boolean" },
+    "decisions": { "$ref": "#/$defs/items" },
+    "open_loops": { "$ref": "#/$defs/items" },
+    "touched_files": { "$ref": "#/$defs/items" },
+    "durable_candidates": { "$ref": "#/$defs/items" },
+    "evidence": { "$ref": "#/$defs/items" },
+    "proposal_ids": { "type": "array", "items": { "type": "string" } },
+    "payload": { "type": "object" },
+    "record_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "$defs": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["item_id", "checkpoint_id", "kind", "position", "content", "evidence_refs", "payload", "record_hash"],
+        "properties": {
+          "item_id": { "type": "string" },
+          "checkpoint_id": { "type": "string" },
+          "kind": { "enum": ["decision", "open_loop", "touched_file", "durable_candidate", "evidence"] },
+          "position": { "type": "integer", "minimum": 0 },
+          "content": { "type": "string", "minLength": 1 },
+          "evidence_refs": { "type": "array", "items": { "type": "string" } },
+          "payload": { "type": "object" },
+          "record_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    }
+  }
+}

@@ -4,11 +4,15 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const PUBLIC_TEST_FILES = [
+  'integration-remote-mcp-test.js',
   'unit-bitemporal-test.js',
   'unit-bm25-test.js',
   'unit-capture-service-test.js',
+  'unit-checkpoint-migration-test.js',
+  'unit-claim-promotion-auth-test.js',
   'unit-cloud-inbox-test.js',
   'unit-config-test.js',
+  'unit-control-plane-test.js',
   'unit-event-store-test.js',
   'unit-git-wiki-test.js',
   'unit-handoff-pii-redaction-test.js',
@@ -21,6 +25,7 @@ const PUBLIC_TEST_FILES = [
   'unit-projection-store-test.js',
   'unit-public-mirror-test.js',
   'unit-recall-service-test.js',
+  'unit-remote-mcp-auth-test.js',
   'unit-runtime-guard-test.js',
   'unit-safe-boundaries-test.js',
   'unit-sqlite-test.js',

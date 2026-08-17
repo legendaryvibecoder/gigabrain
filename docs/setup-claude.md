@@ -53,6 +53,8 @@ npm run claude:desktop:bundle
 - Claude Code reads the local Gigabrain MCP server from `.mcp.json`
 - `CLAUDE.md` teaches Claude how to use `gigabrain_recall`, `gigabrain_remember`, `gigabrain_checkpoint`, and `gigabrain_provenance`
 - The Claude path uses the same shared project/user memory model as the Codex standalone path
+- `gigabrain_checkpoint` writes an immutable episode. Any durable candidates remain reviewable claims until an authorized decision promotes them.
+- `gigabrain_checkpoint_list` and `gigabrain_checkpoint_get` provide exact episode enumeration when semantic recall is not complete enough.
 - There is still no hidden background capture; checkpoints stay explicit and task-end driven
 
 ## Claude Desktop behavior
@@ -94,7 +96,7 @@ npx gigabrainctl sync-hosts --config ~/.gigabrain/config.json \
   --manual-source-host claude_manual
 ```
 
-Gigabrain does not scrape ChatGPT, Claude.ai, Gemini, or Microsoft Copilot memory. For those products, use `gigabrain_export_brief` or `npx gigabrainctl sync-hosts export-brief` and paste/import manually where the product allows it.
+Gigabrain does not scrape ChatGPT, Claude.ai, Gemini, or Microsoft Copilot memory. Manual imports remain explicit. For approved live access from Claude or ChatGPT, use the separate self-hosted [Remote MCP](setup-remote-mcp.md) profile; it does not synchronize native account memory.
 
 ## Claude memory surfaces vs Gigabrain
 
@@ -103,7 +105,8 @@ Claude has multiple memory/instruction surfaces. Treat them as complementary rat
 - **Claude account memory**: hosted product memory is outside Gigabrain's local import boundary.
 - **Claude Code instructions**: `CLAUDE.md` and `.claude/rules/` provide required project guidance. Gigabrain setup manages only its marked integration block and preserves unrelated content.
 - **Claude Code auto memory**: Claude writes project-scoped Markdown under its local project memory directory. Anthropic documents this as machine-local and not shared across machines or cloud environments. Gigabrain can import visible files read-only.
-- **Gigabrain**: explicit, local-first project/user memory across hosts, with checkpoints, provenance, recall orchestration, maintenance, and a shared local store.
+- **Gigabrain local**: explicit project/user memory across hosts, with immutable checkpoints, reviewed claim promotion, provenance, recall orchestration, maintenance, and a shared local store.
+- **Gigabrain remote MCP**: an optional self-hosted, OAuth-protected `/mcp` endpoint for Claude web. It is read-only by default and does not synchronize Claude's native account memory.
 
 ### Recommended stance
 

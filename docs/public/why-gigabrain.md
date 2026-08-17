@@ -13,7 +13,7 @@ This comparison was checked against official product documentation on 2026-08-06
 | [Cursor](https://docs.cursor.com/en/context/memories) | Memories are generated from chat, require approval, and are scoped to a project. | Read-only import into a vendor-neutral ledger; no claim of native write-back or account synchronization. |
 | [OpenClaw](https://docs.openclaw.ai/concepts/memory) | Markdown memory plus a strong per-agent memory engine with lexical/vector search, promotion, and optional advanced backends. | Cross-product/host governance and a portable event/adjudication layer. OpenClaw users may not need Gigabrain if one native store already covers their workflow. |
 
-MCP makes one local tool surface available to multiple clients, but MCP by itself does not merge databases, resolve contradictions, define trust, or synchronize two machines. Gigabrain uses MCP as an access protocol; the memory policy remains explicit and inspectable.
+MCP makes one tool surface available to multiple clients, but MCP by itself does not merge databases, resolve contradictions, define trust, or synchronize two machines. Gigabrain uses MCP as an access protocol; the memory policy remains explicit and inspectable. The optional remote profile adds OAuth-protected access for a self-hosted Claude or ChatGPT connector, but it remains read-only by default and does not turn Gigabrain into a managed cloud service.
 
 ## The problem it is built for
 
@@ -30,9 +30,10 @@ The problem is no longer “does any agent remember?” It is:
 - which fact applies to this repo, this user, and this time?
 - is the newer statement actually more trustworthy?
 - what was superseded, and can the decision be audited?
+- which checkpoint candidates were merely proposed, and who was authorized to accept them as durable claims?
 - how can another client recall the result without copying a giant prompt file?
 
-Gigabrain models those questions directly with scoped event records, source links, validity windows, contradiction slots, adjudication receipts, and bounded recall.
+Gigabrain models those questions directly with scoped event records, immutable checkpoint episodes, defeasible claim proposals, source links, validity windows, contradiction slots, policy-versioned receipts, and bounded recall.
 
 ## When it is useful
 
@@ -41,6 +42,8 @@ Gigabrain models those questions directly with scoped event records, source link
 - you need source attribution or a reviewable contradiction trail
 - you move deliberately between computers or isolated environments
 - you need an MCP and CLI contract independent of one vendor's UI
+- you need checkpoints to remain reviewable evidence instead of silently becoming remembered facts
+- you want an operator-controlled OAuth connector for remote reads without exposing broad memory writes
 - you want local deterministic recall even when no model provider is configured
 
 ## When it is probably unnecessary

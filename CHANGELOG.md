@@ -2,6 +2,38 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.10.1] — 2026-08-17
+
+### Added
+- Append-only `checkpoint.1`, `claim.1`, and `receipt.1` control-plane records with stable IDs, session lineage, repository state, evidence references, policy versions, and database-level immutability triggers.
+- Exact MCP checkpoint list/get, claim propose/review/decide, and receipt write/get tools. Checkpoint durable candidates remain non-recallable proposals until an explicit terminal decision.
+- Deterministic `migrate legacy-checkpoints` dry-run/apply flow that rejects unsafe files, detects source drift, creates `legacy_untyped` episodes, and never promotes historical text.
+- Read-only-by-default Streamable HTTP MCP at `/mcp` for self-hosted Claude and ChatGPT connectors, with OAuth protected-resource metadata, JWT/JWKS verification, exact memory-scope intersection, path redaction, Host/Origin controls, and rate limiting.
+- Sealed 12-case control-plane engineering evaluation covering 13 property groups: authorized recall, cross-project and profile/user/shared overlay isolation, exact recent/direct-ID reads, checkpoint isolation, non-promotion, authority spoofing, query hashing, and local-path redaction.
+
+### Changed
+- Remote writes are disabled by default and separated into checkpoint, propose, commit, and receipt OAuth scopes; broad `gigabrain_remember` is never remotely exposed.
+- Recall, provenance, recent, remember, checkpoint, claim, receipt, and export paths now share explicit allowed-scope enforcement. Remote reads disable the local profile/shared overlays, skip unauthorized stores, and require an explicit scope when a token carries several.
+- Updated Hono, Node server, URL parsing, IP parsing, body parsing, and MCP transport dependencies; current `npm audit` reports zero known vulnerabilities.
+
+### Fixed
+- Recall hydration now preserves `source_agent` for selected non-native rows even when `source_host` is already present.
+- Authenticated authority cannot be overridden by a claim-decision tool argument.
+- Cross-scope checkpoint parents, checkpoint-item references, direct memory IDs, and receipts fail closed without returning protected content.
+- Deduplicated promotion binds the terminal decision to the existing committed memory ID.
+- Authenticated recall and control-plane reads no longer sync native files or rebuild the world model; exact-scope native twins retain the authorized scope label; SQLite connections and test helpers enforce foreign keys; legacy checkpoint IDs validate against the published schema; and only the namespaced `gigabrain_authority` JWT claim can grant decision authority.
+- Native search and direct-ID provenance now share one effective-scope rule: linked registry scope wins, source-kind defaults remain explicit, and unscoped rows never inherit the caller's authorization.
+- Explicit `--enable-writes=false` and `--allow-no-auth=false` values now override environment defaults instead of being treated as absent CLI flags.
+
+### Security
+
+- Remote MCP is read-only by default. Optional writes use separate OAuth scopes, and broad `gigabrain_remember` is not exposed remotely.
+- Authenticated reads use exact scope intersection, redact local paths, and fail closed on ambiguous or unauthorized access.
+
+### Evaluation note
+- The control-plane fixture is engineering verification only, not a human-memory or state-of-the-art benchmark.
+- The existing nightly performance test exceeded its 20-second local ceiling at 27-29 seconds on this branch and approximately 27.5 seconds on the untouched baseline in the same environment; the threshold was not weakened.
+
 ## [0.9.0] — 2026-08-07
 
 ### Added

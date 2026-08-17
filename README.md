@@ -74,6 +74,7 @@ The [configuration guide](docs/configuration.md) describes every setting and opt
 - **Source record:** Each claim keeps its source host, path, evidence, time data, status, and trust tier.
 - **Conflict rules:** Gigabrain checks source trust first. It then checks independent support. Recency resolves the final tie. An append-only record keeps each decision.
 - **Time model:** A fact can have a content time and a validity window. Normal recall skips expired or superseded rows.
+- **Checkpoint control plane:** A checkpoint is an immutable episode, not automatically a durable fact. Durable candidates stay as reviewable claims until an authorized decision promotes them.
 - **Audit tools:** Optional tools can recover transcripts, filter secret risks, manage review queues, write Handoff Records, and build a memory wiki.
 - **Local operation:** The default setup runs locally, where SQLite stores the data and lexical search finds it. Policy checks control each result. A cloud memory service is optional.
 
@@ -102,6 +103,8 @@ The [configuration guide](docs/configuration.md) describes every setting and opt
 
 | | What it means for you |
 | --- | --- |
+| **Checkpoint control plane** | Checkpoints become immutable episodes. Durable candidates remain reviewable proposals, and decisions can produce policy-versioned receipts. |
+| **Remote MCP beta** | A self-hosted Streamable HTTP connector can serve approved tools to Claude and ChatGPT. It verifies OAuth JWTs, enforces exact memory scopes, redacts local paths, and enables no writes by default. |
 | **Answer-focused recall** | Recall selects evidence that can answer questions about duration, completion, or certification. Unrelated preferences rank lower. |
 | **Conflict checks during import** | Gigabrain checks conflicts during import and during maintenance. Risky changes wait for review. |
 | **Local host imports** | Gigabrain can inspect and import supported local data from Codex, Claude Code, Hermes, Cursor, and Windsurf. Each imported fact keeps its source. |
@@ -119,6 +122,7 @@ The cloud inbox, transcript recovery, Git wiki, Obsidian reference set, remote b
 | **Codex desktop, CLI, or IDE** | `npm install` and setup | Keeps the local project and user store on the configured Codex host. It also provides MCP tools. |
 | **Claude Code** | `npm install` and setup | Uses the same standalone store when its configuration matches. Setup adds MCP tools and `.mcp.json` entries. |
 | **Claude Desktop** | `claude:desktop:bundle` | Uses the same MCP-backed memory store and tools as Claude Code |
+| **Claude web or ChatGPT web** | Self-hosted remote MCP | Connects to an OAuth-protected, read-only-by-default `/mcp` endpoint. See the [remote setup guide](docs/setup-remote-mcp.md). |
 | **Hermes Agent** | `gigabrain-hermes-setup` | Adds MCP tools and imports local Hermes memory files in read-only mode |
 | **Cursor or Windsurf** | `gigabrainctl sync-hosts` | Imports local project rules and memory in read-only mode |
 | **Cloud assistants** | Explicit file import | Parses supported ChatGPT, Gemini, or Copilot files after you export them |
@@ -130,6 +134,7 @@ The cloud inbox, transcript recovery, Git wiki, Obsidian reference set, remote b
 - Gigabrain extracts raw transcripts through a local provider or a local hook that you add. A cloud audit excludes rows that can contain credentials. Before data leaves the computer, Gigabrain masks supported PII patterns and removes the original scope.
 - Native host stores use read-only import. To add a supported memory file from a cloud account, export it first.
 - Enable each network feature before use. The remote bridge is opt-in. For URL import, the Python console requires an exact host allowlist and an explicit setting.
+- Remote MCP is an explicit self-hosted service. It reads the configured Gigabrain store while running; it does not upload or replicate that store by itself, and writes stay disabled unless separately enabled and authorized.
 - The release gate scans all publishable files, the npm package contents, Git data, and GitHub data. Its output hides matched values.
 
 The SQLite store and generated Markdown can contain sensitive memory. Protect the host account, use disk encryption, restrict file permissions, and review each export before you move it. Read the full boundary in the [privacy model](docs/public/privacy-model.md).
@@ -156,7 +161,7 @@ Conversation (OpenClaw / Codex / Claude Code / Claude Desktop)
          SQLite + FTS5 + optional local embeddings
 ```
 
-- **Capture:** Explicit `remember` calls, checkpoints, host imports, and optional transcript recovery become append-only events.
+- **Capture:** Explicit `remember` calls, host imports, and optional transcript recovery become append-only events. Checkpoints additionally create immutable episodes; durable candidates become reviewable claims rather than silent memories.
 - **Recall:** FTS5 and BM25 search text directly. When local embeddings are available, Gigabrain combines lexical and dense rankings. It then applies scope, status, answer fit, source data, and conflict rules.
 - **Conflict review:** The world model records competing beliefs for each claim slot and ranks them by trust tier. It next checks independent support. Recency resolves any remaining tie. Clock-skew and source-independence checks protect the result.
 - **Audit reports:** Static Markdown, HTML, and JSON reports show readiness, source coverage, conflicts, stale rows, and omitted secret risks.
@@ -171,9 +176,12 @@ Gigabrain keeps source data across products and separates project facts from use
 
 ## MCP tools
 
-`gigabrain_recall` · `gigabrain_remember` · `gigabrain_checkpoint` · `gigabrain_provenance` · `gigabrain_recent` · `gigabrain_sources` · `gigabrain_sync_status` · `gigabrain_export_brief` · `gigabrain_entity` · `gigabrain_relationships` · `gigabrain_contradictions` · `gigabrain_arbitrate` · `gigabrain_adjudications` · `gigabrain_beliefs_as_of` · `gigabrain_review_queue` · `gigabrain_doctor`
+`gigabrain_recall` · `gigabrain_remember` · `gigabrain_checkpoint` · `gigabrain_checkpoint_list` · `gigabrain_checkpoint_get` · `gigabrain_claim_propose` · `gigabrain_claim_review` · `gigabrain_claim_decide` · `gigabrain_receipt_write` · `gigabrain_receipt_get` · `gigabrain_provenance` · `gigabrain_recent` · `gigabrain_sources` · `gigabrain_sync_status` · `gigabrain_export_brief` · `gigabrain_entity` · `gigabrain_relationships` · `gigabrain_contradictions` · `gigabrain_arbitrate` · `gigabrain_adjudications` · `gigabrain_beliefs_as_of` · `gigabrain_review_queue` · `gigabrain_doctor`
 
-The [coverage matrix](docs/coverage-matrix.md) lists each action and its available interface.
+Local and remote surfaces are intentionally asymmetric: broad writes stay local,
+while remote MCP exposes a reviewed read allowlist and narrow opt-in writes. See
+the [checkpoint control plane](docs/checkpoint-control-plane.md), [remote connector
+guide](docs/setup-remote-mcp.md), and [coverage matrix](docs/coverage-matrix.md).
 
 ## CLI
 
@@ -226,6 +234,8 @@ All commands accept `--config <path>` and are also available as `npm run` script
 
 | Subsystem | Docs |
 |-----------|------|
+| Checkpoint / claim / receipt control plane | [docs/checkpoint-control-plane.md](docs/checkpoint-control-plane.md) |
+| Remote MCP for Claude and ChatGPT | [docs/setup-remote-mcp.md](docs/setup-remote-mcp.md) |
 | Memory Audit + Handoff Records | [docs/handoff-record.md](docs/handoff-record.md) |
 | Surface coverage matrix (MCP / CLI / HTTP) | [docs/coverage-matrix.md](docs/coverage-matrix.md) |
 | Configuration reference | [docs/configuration.md](docs/configuration.md) |

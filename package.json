@@ -1,6 +1,6 @@
 {
   "name": "@legendaryvibecoder/gigabrain",
-  "version": "0.9.0",
+  "version": "0.10.1",
   "type": "module",
   "description": "Local-first memory control plane for agents — cross-host recall, provenance, dedupe, audit, native sync",
   "author": "Legendary Vibecoder",
@@ -109,6 +109,7 @@
     "scripts/package-smoke.js",
     "scripts/privacy-policy.mjs",
     "scripts/setup-first-run.js",
+    "docs/checkpoint-control-plane.md",
     "docs/configuration.md",
     "docs/coverage-matrix.md",
     "docs/handoff-record.md",
@@ -123,9 +124,13 @@
     "docs/public/security-review.md",
     "docs/public/why-gigabrain.md",
     "docs/recall.md",
+    "docs/schemas/checkpoint.1.schema.json",
+    "docs/schemas/claim.1.schema.json",
+    "docs/schemas/receipt.1.schema.json",
     "docs/setup-claude.md",
     "docs/setup-codex.md",
     "docs/setup-openclaw.md",
+    "docs/setup-remote-mcp.md",
     "docs/sharing.md",
     "docs/upgrading.md",
     "docs/world-model-custom-slots.md",
@@ -138,6 +143,11 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "jose": "^6.2.1"
+  },
+  "devDependencies": {
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1"
   }
 }

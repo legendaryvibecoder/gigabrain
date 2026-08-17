@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gigabrain.local/schemas/receipt.1.schema.json",
+  "title": "Gigabrain operation receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "created_at",
+    "receipt_type",
+    "status",
+    "scope",
+    "actor",
+    "session_id",
+    "policy_version",
+    "ledger_snapshot",
+    "input_refs",
+    "output_refs",
+    "evidence_refs",
+    "summary",
+    "payload",
+    "receipt_hash"
+  ],
+  "properties": {
+    "schema_version": { "const": "receipt.1" },
+    "receipt_id": { "type": "string", "pattern": "^rcpt_[0-9a-f-]+$" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "receipt_type": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "minLength": 1 },
+    "scope": { "type": "string", "minLength": 1 },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "host"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "host": { "type": "string", "minLength": 1 }
+      }
+    },
+    "session_id": { "type": ["string", "null"] },
+    "policy_version": { "type": "string", "minLength": 1 },
+    "ledger_snapshot": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "input_refs": { "type": "array", "items": { "type": "string" } },
+    "output_refs": { "type": "array", "items": { "type": "string" } },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "summary": { "type": "string" },
+    "payload": { "type": "object" },
+    "receipt_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

@@ -25,6 +25,7 @@ import { installSessionHook, uninstallSessionHook, resolveSessionSettingsPath } 
 import { runAdaptiveTrust } from '../lib/core/adaptive-trust.js';
 import { proposeToVaultInbox } from '../lib/core/vault-inbox.js';
 import { atomicWriteFileSync, readFileIfExistsSync } from '../lib/core/safe-fs.js';
+import { migrateLegacyCheckpoints } from '../lib/core/checkpoint-migration.js';
 import {
   ensureWorldModelReady,
   getEntityDetail,
@@ -59,7 +60,7 @@ Commands:
   synthesis    Inspect or rebuild synthesis artifacts
   briefing     Print the latest generated briefing artifacts
   review       Inspect contradictions, open loops, adjudications, the review queue, beliefs as of a timestamp, or adaptive host trust (trust)
-  migrate      Run a containment-gated migration (legacy-drop: drop the deprecated 'memories' table)
+  migrate      Run a migration (legacy-checkpoints: typed immutable backfill; legacy-drop: deprecated table removal)
   vault        Sync or report on READ-ONLY Obsidian vault reference corpora (sync|status; never becomes a belief)
   wiki         Git-versioned LLM-wiki projection of the ledger (project|reconcile|status; human edits round-trip + win arbitration)
   sync-hosts   Sync local host memories into the cross-agent memory bus
@@ -81,6 +82,8 @@ Examples:
   node scripts/gigabrainctl.js review queue --status pending --reason-code capture_contradiction_durable_tie
   node scripts/gigabrainctl.js migrate legacy-drop --dry-run --db ~/.openclaw/gigabrain/memory/registry.sqlite
   node scripts/gigabrainctl.js migrate legacy-drop --snapshot ./memories-pre-drop.sqlite --db ~/.openclaw/gigabrain/memory/registry.sqlite
+  node scripts/gigabrainctl.js migrate legacy-checkpoints --dry-run --config ~/.gigabrain/config.json
+  node scripts/gigabrainctl.js migrate legacy-checkpoints --config ~/.gigabrain/config.json
   node scripts/gigabrainctl.js vault status --config ~/.gigabrain/config.json
   node scripts/gigabrainctl.js vault sync --dry-run --config ~/.gigabrain/config.json
   node scripts/gigabrainctl.js transcript status --config ~/.gigabrain/config.json
@@ -783,11 +786,14 @@ const commandMigrate = async () => {
   if (!subcommand || subcommand === '--help' || subcommand === '-h') {
     console.log(JSON.stringify({
       ok: true,
-      usage: 'node scripts/gigabrainctl.js migrate legacy-drop [--dry-run] [--snapshot <path>] [--db <path>] [--config <path>]',
+      usage: [
+        'node scripts/gigabrainctl.js migrate legacy-checkpoints [--dry-run] [--memory-root <path>] [--scope <scope>] [--include-today] [--db <path>] [--config <path>]',
+        'node scripts/gigabrainctl.js migrate legacy-drop [--dry-run] [--snapshot <path>] [--db <path>] [--config <path>]',
+      ],
     }, null, 2));
     return;
   }
-  if (subcommand !== 'legacy-drop') {
+  if (!['legacy-checkpoints', 'legacy-drop'].includes(subcommand)) {
     throw new Error(`unknown migrate subcommand: ${subcommand}`);
   }
   const migrateFlags = flags.slice(1);
@@ -798,6 +804,24 @@ const commandMigrate = async () => {
   const { config, dbPath } = loadConfigAndDbPath();
   const db = openDatabase(dbPath);
   try {
+    if (subcommand === 'legacy-checkpoints') {
+      const result = migrateLegacyCheckpoints(db, {
+        memoryRoot: readFlag('--memory-root', config.runtime.paths.memoryRoot, migrateFlags),
+        defaultScope: readFlag(
+          '--scope',
+          config?.codex?.defaultProjectScope || config?.codex?.projectScope || 'project:workspace',
+          migrateFlags,
+        ),
+        dryRun,
+        includeToday: readBool('--include-today', false, migrateFlags),
+      });
+      console.log(JSON.stringify({
+        command: 'migrate',
+        subcommand: 'legacy-checkpoints',
+        ...result,
+      }, null, 2));
+      return;
+    }
     // Dry-run: containment report only — never drops, never snapshots.
     if (dryRun) {
       const containment = checkLegacyContainment(db);
@@ -1252,31 +1276,6 @@ const commandNightly = async () => {
       maintain,
       dryRun,
     });
-    // An optional companion probe can add recall-quality diagnostics to the
-    // nightly summary. Public installs do not ship the optional fixture, so
-    // absence is a supported state rather than a synthetic probe failure.
-    const probeScript = path.join(THIS_DIR, 'dogfood-probes.js');
-    let dogfoodProbes = null;
-    if (!dryRun && fs.existsSync(probeScript)) {
-      try {
-        const probeRun = spawnSync(process.execPath, [
-          probeScript,
-          '--config', configPath,
-          '--json',
-        ], { encoding: 'utf8', timeout: 600000 });
-        if (probeRun.status === 0) {
-          dogfoodProbes = JSON.parse(String(probeRun.stdout || '{}')).summary || null;
-        } else {
-          dogfoodProbes = { error: `probe run exited ${probeRun.status}: ${String(probeRun.stderr || '').slice(0, 300)}` };
-        }
-      } catch (error) {
-        dogfoodProbes = { error: String(error?.message || error) };
-      }
-      try {
-        const probesOutPath = path.join(config.runtime.paths.outputDir, `dogfood-probes-${new Date().toISOString().slice(0, 10)}.json`);
-        fs.writeFileSync(probesOutPath, `${JSON.stringify({ generated_at: new Date().toISOString(), summary: dogfoodProbes }, null, 2)}\n`);
-      } catch { /* artifact write is best-effort; summary still prints below */ }
-    }
     console.log(JSON.stringify({
       ok: true,
       command: 'nightly',
@@ -1287,7 +1286,6 @@ const commandNightly = async () => {
       audit,
       review_purge: reviewPurge,
       verification,
-      dogfood_probes: dogfoodProbes,
     }, null, 2));
   } finally {
     releaseNightlyLock(lock);

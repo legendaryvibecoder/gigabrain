@@ -74,7 +74,7 @@ npx gigabrainctl sync-hosts --config ~/.gigabrain/config.json \
   --manual-source-host chatgpt_manual
 ```
 
-Gigabrain does not scrape ChatGPT, Claude.ai, Gemini, or Microsoft Copilot memory. For those products, use `gigabrain_export_brief` or `npx gigabrainctl sync-hosts export-brief` and paste/import manually where the product allows it.
+Gigabrain does not scrape ChatGPT, Claude.ai, Gemini, or Microsoft Copilot memory. Manual imports remain explicit. A self-hosted, OAuth-protected remote MCP connector can provide approved live tools to Claude or ChatGPT without scraping native memory; see [Remote MCP](setup-remote-mcp.md).
 
 ## Current standalone defaults
 
@@ -92,7 +92,8 @@ Gigabrain does not scrape ChatGPT, Claude.ai, Gemini, or Microsoft Copilot memor
 - Codex local memories and Gigabrain are separate stores. Gigabrain can import visible Codex memory files read-only, but it does not edit or synchronize Codex's generated memory state.
 - `gigabrain_remember` with `target=user` is for stable personal preferences and facts that should follow you across repos.
 - `gigabrain_remember` with `target=project` is for repo-specific decisions, conventions, and active project context.
-- `gigabrain_checkpoint` is for task-end session capture into `~/.gigabrain/memory/YYYY-MM-DD.md` by default on fresh standalone installs.
+- `gigabrain_checkpoint` writes the familiar task-end Markdown handoff plus an immutable `checkpoint.1` episode. Durable candidates become reviewable proposals and are not silently promoted.
+- `gigabrain_checkpoint_list` and `gigabrain_checkpoint_get` provide exact episode enumeration; use them instead of semantic recall when completeness matters.
 - `gigabrain_checkpoint` remains repo-scoped by default and uses the derived `project:<repo>:<hash>` scope for the current workspace.
 - `gigabrainctl maintain` is a manual consolidation step when you want promotion and cleanup.
 - There is no hidden background transcript logging in Codex mode.

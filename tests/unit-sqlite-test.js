@@ -29,6 +29,17 @@ const run = async () => {
 
   const ws = makeTempWorkspace('gb-v3-unit-sqlite-');
   const setupDb = openDatabase(ws.dbPath);
+  assert.equal(
+    Number(setupDb.prepare('PRAGMA foreign_keys').get()?.foreign_keys || 0),
+    1,
+    'production database connections must enforce declared foreign keys',
+  );
+  setupDb.exec('CREATE TABLE fk_parent(id INTEGER PRIMARY KEY); CREATE TABLE fk_child(parent_id INTEGER REFERENCES fk_parent(id))');
+  assert.throws(
+    () => setupDb.prepare('INSERT INTO fk_child(parent_id) VALUES (?)').run(404),
+    /FOREIGN KEY constraint failed/i,
+    'orphan control-plane records must fail at the database boundary',
+  );
   setupDb.exec('CREATE TABLE IF NOT EXISTS lock_probe(id INTEGER PRIMARY KEY, value TEXT)');
   setupDb.close();
 

@@ -19,12 +19,15 @@ Supported host-memory adapters read local source files and import normalized rec
 | Host-memory import | On during setup/maintenance when sources are enabled | Reads supported local memory files into the local store |
 | Cloud-inbox import | Off | Reads only files the operator places in the local inbox |
 | Remote bridge | Off | Recall query, scope, and returned context to/from the configured authenticated endpoint |
+| Remote MCP connector | Off | OAuth bearer metadata, recall query, one exact selected memory scope, and the authorized response between a client and the operator's self-hosted endpoint; returned local paths are redacted |
 | Obsidian findings inbox | Off | A bounded contradiction digest and bearer token to a verified loopback HTTPS Local REST API; a custom CA file can be configured |
 | Handoff/export bundle | Manual | Only the generated artifact the operator chooses to move |
 | Python URL import | Off | Bounded HTTP(S) request to an explicitly allowlisted host; the public address is validated once and pinned for the connection |
 | Python web console UI | Optional | Same-origin API calls only; browser assets are local and no third-party CDN is contacted. The single-file console CSP permits its own inline script and style blocks but no external origin. |
 
-The code does not provide a hosted Gigabrain service, telemetry collector, or hidden account-memory scraper.
+Remote MCP is an access profile, not database synchronization. It binds to loopback by default. A shared deployment requires TLS ingress and an OAuth authorization server chosen by the operator. Token scopes are intersected with a server-side memory-scope allowlist before tool discovery or reads. Broad `gigabrain_remember` is never exposed remotely, and all remote writes remain disabled unless the operator enables them and grants the corresponding narrow OAuth scope.
+
+The code does not provide a hosted Gigabrain service, OAuth authorization server, TLS ingress, telemetry collector, or hidden account-memory scraper.
 
 ## What is stored
 
@@ -43,7 +46,7 @@ Source paths and memory content can themselves be sensitive. Do not publish a li
 
 A MacBook and a Mac Studio have separate state unless the operator deliberately connects them. Matching Git commits or package versions do not imply matching configs or memory databases.
 
-Supported deliberate transfer paths are integrity-checked export/import bundles and the optional authenticated remote bridge. File synchronization can also be operated externally, but the database must not be concurrently written by two hosts. Gigabrain does not silently enable cross-host sync.
+Supported deliberate transfer paths are integrity-checked export/import bundles and the optional authenticated remote bridge. Remote MCP lets another authorized client query one operator-hosted store; it does not replicate that store. File synchronization can also be operated externally, but the database must not be concurrently written by two hosts. Gigabrain does not silently enable cross-host sync.
 
 ## Secret handling
 
@@ -68,6 +71,8 @@ The release gate checks:
 - enable full-disk encryption and protect the local user account
 - keep config files, tokens, stores, exports, and backups out of source control
 - bind local HTTP services only to interfaces you intend to expose
+- put TLS and a real OAuth authorization server in front of any network-facing remote MCP deployment; keep exact issuer, audience/resource, JWKS, Host, Origin, and memory-scope allowlists
+- never use remote MCP's `--allow-no-auth` development mode outside a loopback-only, disposable test
 - use separate scoped tokens where different clients should see different projects
 - never use the Node-only `GB_ALLOW_NO_AUTH=1` development bypass on a network-facing or persistent process
 - review provider settings before enabling any cloud or remote feature
@@ -76,4 +81,4 @@ The release gate checks:
 
 ## Out of scope
 
-Gigabrain does not guarantee that a remembered claim is true, that every contradiction is detectable, that every PII shape will be recognized, or that a compromised local account cannot read the store. It is a control and audit layer, not an identity provider, secrets manager, encrypted vault, or compliance certification.
+Gigabrain does not guarantee that a remembered claim is true, that every contradiction is detectable, that every PII shape will be recognized, or that a compromised local account cannot read the store. It is a control and audit layer, not an identity provider, OAuth provider, TLS gateway, secrets manager, encrypted vault, or compliance certification.

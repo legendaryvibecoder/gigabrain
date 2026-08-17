@@ -220,6 +220,7 @@ const writeConfigFile = (configPath, payload) => {
 
 const openDb = (dbPath) => {
   const db = new DatabaseSync(dbPath);
+  db.exec('PRAGMA foreign_keys = ON;');
   ensureProjectionStore(db);
   ensureEventStore(db);
   return db;

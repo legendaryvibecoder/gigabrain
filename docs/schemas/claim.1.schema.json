@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gigabrain.local/schemas/claim.1.schema.json",
+  "title": "Gigabrain claim proposal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "created_at",
+    "checkpoint_id",
+    "checkpoint_item_id",
+    "scope",
+    "claim_type",
+    "content",
+    "evidence_class",
+    "evidence_refs",
+    "source",
+    "ancestry_cluster",
+    "confidence",
+    "valid_window",
+    "status",
+    "memory_id",
+    "events",
+    "payload",
+    "record_hash"
+  ],
+  "properties": {
+    "schema_version": { "const": "claim.1" },
+    "proposal_id": { "type": "string", "pattern": "^clm_[0-9a-f-]+$" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "checkpoint_id": { "type": ["string", "null"] },
+    "checkpoint_item_id": { "type": ["string", "null"] },
+    "scope": { "type": "string", "minLength": 1 },
+    "claim_type": { "type": "string", "minLength": 1 },
+    "content": { "type": "string", "minLength": 1 },
+    "evidence_class": {
+      "enum": ["owner_assertion", "project_decision", "operational_observation", "evaluation_result", "agent_inference", "external_reference"]
+    },
+    "evidence_refs": { "type": "array", "items": { "type": "string" } },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent", "host"],
+      "properties": {
+        "agent": { "type": "string", "minLength": 1 },
+        "host": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ancestry_cluster": { "type": "string", "minLength": 1 },
+    "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "valid_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "until"],
+      "properties": {
+        "from": { "type": ["string", "null"] },
+        "until": { "type": ["string", "null"] }
+      }
+    },
+    "status": { "enum": ["proposed", "accepted", "rejected", "superseded"] },
+    "memory_id": { "type": ["string", "null"] },
+    "events": { "type": "array", "items": { "type": "object" } },
+    "payload": { "type": "object" },
+    "record_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

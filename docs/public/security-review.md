@@ -1,7 +1,7 @@
 # Public security review
 
-Review date: 2026-08-07
-Release candidate: `0.9.0`
+Review date: 2026-08-17
+Release candidate: `0.10.1`
 
 This is a point-in-time engineering review, not a certification or warranty.
 
@@ -13,9 +13,10 @@ This is a point-in-time engineering review, not a certification or warranty.
 | Python dependency audit | 0 known vulnerabilities after updating `lxml-html-clean` to `0.4.5` and `lxml` to `6.1.1` |
 | Gitleaks, current release tree | 0 findings |
 | PII/secret scanner, current release tree + npm inventory | 0 findings; the source-private release policy checks blocked identifiers, while the public scanner ships generic path/IP/device/contact/email/secret detectors and synthetic identifier tests. Private identifier hashes and matched values are absent from the public package and failure output |
+| Checkpoint and remote-MCP tests | Deterministic tests cover immutable checkpoint records, proposal/decision authority, exact-scope isolation, OAuth JWT/JWKS validation, audience/resource checks, tool discovery, path redaction, rate limits, and read-only defaults. The protected pull request must rerun them before merge |
 | Bandit, optional Python console | 0 high-severity findings |
 | Python runtime security tests | Authentication, route coverage, headers, TTL parsing, DNS-pinned SSRF defenses, bounded upload/URL/JSON-body reads, bounded collection fields, token-rotation-resistant rate keys, pagination bounds, scope-id concealment, connection cleanup, loopback-only recall proxying, duplicate-id conflict handling, audit heuristics, hashed document identifiers, and atomic document writes pass |
-| CodeQL | A first private release-candidate run surfaced 29 actionable or review-required data-flow findings. The fixes are present in this review tree; the fresh pre-visibility hosted rerun remains required before publication |
+| CodeQL | The public repository reported zero open alerts before this candidate. Branch protection requires fresh JavaScript/TypeScript and Python analyses on the candidate before merge |
 
 Bandit reports 19 medium-severity and 14 low-severity heuristic findings. One medium finding is the literal `0.0.0.0` in a private-host rejection check, not a server bind. The other medium findings are SQL strings assembled from fixed clause lists, fixed table allowlists, or generated `?` placeholders; user-controlled values remain parameterized. The low findings cover similarly reviewed hardening heuristics. They were reviewed and are retained without suppressing the scanner output.
 
@@ -28,6 +29,7 @@ Bandit reports 19 medium-severity and 14 low-severity heuristic findings. One me
 - URL import is disabled by default. Enabling it also requires an exact host allowlist. Redirects and ambient proxy variables are disabled, nonstandard ports and userinfo are rejected, private/unverifiable peers fail closed, one validated public address is pinned for the request socket, TLS still verifies the original hostname, and response bytes are streamed through a cap.
 - The recall-diagnostics proxy accepts only literal loopback hosts and disables ambient proxy variables, so the console or gateway token is never forwarded to an operator-supplied off-host URL.
 - Networked LLM and remote-bridge endpoints reject remote plaintext HTTP; Ollama accepts only canonical loopback hosts. Cloud audit review skips credential-risk rows before transport, masks supported PII shapes locally, and strips the original memory scope.
+- Remote MCP binds to loopback by default, is read-only by default, and requires an exact server-side memory-scope allowlist. Production tokens are verified against a configured issuer/JWKS and checked for expiry, subject, audience/resource, OAuth permissions, and memory scopes. Host and browser Origin controls, request-size limits, per-peer/per-subject rate limits, and response path redaction are applied before authorized tools return data. `--allow-no-auth` remains a loopback-only development mode.
 - Sensitive local inputs use no-follow regular-file reads with explicit size limits. Generated state and reports use exclusive unpredictable staging files, private modes, flush-before-rename behavior, and atomic replacement.
 - The optional Obsidian findings inbox is disabled by default, restricts note targets to bounded relative paths, accepts only verified loopback HTTPS, and supports an operator-provided CA instead of disabling certificate validation.
 - Security headers deny framing, MIME sniffing, referrer leakage, and unnecessary browser permissions.
@@ -48,6 +50,8 @@ The release process therefore creates a new repository history containing only r
 - Local memory content is not an encrypted vault; another process or account with filesystem access can read it.
 - A memory can be wrong, malicious, or privacy-sensitive without matching a secret signature.
 - Optional models and remote bridges expand the trust boundary to infrastructure chosen by the operator.
+- A remote MCP deployment adds the operator's TLS ingress, OAuth provider, connector configuration, and network perimeter to the trust boundary. Gigabrain does not supply or certify those components.
+- Passing the protocol tests does not replace a real-client conformance test in Claude or ChatGPT; product connector behavior can change independently of this release.
 - URL allowlisting plus address pinning blocks the reviewed rebinding path but cannot make an operator-controlled remote site or its response trustworthy.
 - SQLite is not a distributed multi-writer database; external file sync must not create concurrent writers.
 - Dependencies and advisories change after this dated review.

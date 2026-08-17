@@ -17,7 +17,8 @@ A public Gigabrain release is allowed only when every gate below is green on the
 11. independent review by a different model family, with a machine-readable GO/NO-GO verdict
 12. GitHub metadata audit after repository creation and before visibility changes
 13. branch protection, secret scanning, push protection, dependency alerts, and private vulnerability reporting enabled
-14. post-publish install, MCP initialization, doctor, recall, and package-provenance smoke tests
+14. post-publish install, local MCP initialization, doctor, recall, package-provenance, and remote-MCP OAuth/scope smoke tests
+15. a real-client Claude or ChatGPT connector conformance check before describing that client as production-ready
 
 ## Hard stops
 
