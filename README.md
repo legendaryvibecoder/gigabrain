@@ -70,7 +70,7 @@ The [configuration guide](docs/configuration.md) describes every setting and opt
 
 ## Core behavior
 
-- **Shared recall with clear scope:** Codex, Claude Code, Hermes, and OpenClaw can share project facts and stable user preferences when they use the same Gigabrain configuration.
+- **Shared recall with clear scope:** Codex, Claude Code, Grok CLI, Hermes, and OpenClaw can share project facts and stable user preferences when they use the same Gigabrain configuration.
 - **Source record:** Each claim keeps its source host, path, evidence, time data, status, and trust tier.
 - **Conflict rules:** Gigabrain checks source trust first. It then checks independent support. Recency resolves the final tie. An append-only record keeps each decision.
 - **Time model:** A fact can have a content time and a validity window. Normal recall skips expired or superseded rows.
@@ -124,6 +124,7 @@ The cloud inbox, transcript recovery, Git wiki, Obsidian reference set, remote b
 | **Claude Desktop** | `claude:desktop:bundle` | Uses the same MCP-backed memory store and tools as Claude Code |
 | **Claude web or ChatGPT web** | Self-hosted remote MCP | Connects to an OAuth-protected, read-only-by-default `/mcp` endpoint. See the [remote setup guide](docs/setup-remote-mcp.md). |
 | **Hermes Agent** | `gigabrain-hermes-setup` | Adds MCP tools and imports local Hermes memory files in read-only mode |
+| **Grok CLI** | `grok mcp add` | Provides the same local MCP tools and shared store as Codex and Claude Code. Wiring is manual and Grok's own memory files are not imported. See the [Grok setup guide](docs/setup-grok.md). |
 | **Cursor or Windsurf** | `gigabrainctl sync-hosts` | Imports local project rules and memory in read-only mode |
 | **Cloud assistants** | Explicit file import | Parses supported ChatGPT, Gemini, or Copilot files after you export them |
 

@@ -2,8 +2,9 @@
 
 Gigabrain exposes its memory engine through four surfaces:
 
-- **Local MCP** — the `gigabrain_*` tools registered for Codex / Claude / Hermes
-  (`lib/core/codex-mcp.js`).
+- **Local MCP** — the `gigabrain_*` tools registered for Codex / Claude / Hermes /
+  Grok CLI (`lib/core/codex-mcp.js`). Grok is wired by hand with `grok mcp add`;
+  see [Grok setup](setup-grok.md).
 - **Remote MCP** — the read-only-by-default Streamable HTTP profile for Claude
   and ChatGPT (`lib/core/remote-mcp.js`).
 - **CLI** — the `gigabrainctl` verbs (`scripts/gigabrainctl.js`).
