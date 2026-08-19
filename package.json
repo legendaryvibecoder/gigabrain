@@ -129,6 +129,7 @@
     "docs/schemas/receipt.1.schema.json",
     "docs/setup-claude.md",
     "docs/setup-codex.md",
+    "docs/setup-grok.md",
     "docs/setup-openclaw.md",
     "docs/setup-remote-mcp.md",
     "docs/sharing.md",
