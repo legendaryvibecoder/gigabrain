@@ -21,6 +21,8 @@ The published schemas are [`checkpoint.1`](schemas/checkpoint.1.schema.json),
 
 - Checkpoint, checkpoint-item, proposal, proposal-event, and receipt rows are
   append-only at the SQLite boundary. Update and delete triggers fail closed.
+- A stable `session_id` is bounded to one checkpoint. A repeated teardown or retry returns the existing checkpoint plus a `deduplicated` receipt and does not rewrite the native note.
+- One checkpoint write groups its summary and typed items into one contiguous native block.
 - A checkpoint write may create `agent_inference` proposals, but never a
   durable memory.
 - Legacy Markdown migration creates `legacy_untyped` episodes and zero

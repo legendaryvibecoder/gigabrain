@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
 import { runCheckpoint } from '../lib/core/codex-service.js';
 
 const HELP = `Gigabrain session checkpoint
@@ -13,11 +14,13 @@ Flags:
   --scope <scope>               Optional scope override (default: project:main)
   --surface <surface>           Optional host surface hint (codex|claude|openclaw|agent)
   --session-label <label>       Optional short label for the session checkpoint
+  --session-id <id>            Stable host session id (enforces one checkpoint per session)
   --summary <text>              Short summary of the completed work
   --decision <text>             Repeatable decision entry
   --open-loop <text>            Repeatable open loop entry
   --touched-file <path>         Repeatable touched file entry
   --durable-candidate <text>    Repeatable durable candidate entry
+  --claude-hook-input          Read bounded Claude hook JSON from stdin
   --help                        Print this help
 `;
 
@@ -46,6 +49,38 @@ const readMultiFlag = (name) => {
   }
   return out;
 };
+const MAX_CLAUDE_HOOK_INPUT_BYTES = 64 * 1024;
+
+const readClaudeHookInput = () => {
+  if (!args.includes('--claude-hook-input')) return null;
+  const buffer = Buffer.allocUnsafe(MAX_CLAUDE_HOOK_INPUT_BYTES + 1);
+  let offset = 0;
+  while (offset < buffer.length) {
+    const bytesRead = fs.readSync(0, buffer, offset, buffer.length - offset, null);
+    if (bytesRead === 0) break;
+    offset += bytesRead;
+  }
+  if (offset > MAX_CLAUDE_HOOK_INPUT_BYTES) {
+    throw new Error(`Claude hook input exceeds ${MAX_CLAUDE_HOOK_INPUT_BYTES} bytes`);
+  }
+  const raw = buffer.toString('utf8', 0, offset).trim();
+  if (!raw) throw new Error('Claude hook input is required');
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error('Claude hook input must be valid JSON');
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Claude hook input must be a JSON object');
+  }
+  return parsed;
+};
+
+const hookSessionId = (input) => {
+  const value = input?.session_id ?? input?.conversation_id ?? '';
+  return typeof value === 'string' ? value.trim().slice(0, 256) : '';
+};
 
 if (args.includes('--help') || args.includes('-h')) {
   process.stdout.write(`${HELP.trim()}\n`);
@@ -53,6 +88,12 @@ if (args.includes('--help') || args.includes('-h')) {
 }
 
 try {
+  const hookInput = readClaudeHookInput();
+  const sessionId = readFlag(
+    '--session-id',
+    process.env.GIGABRAIN_SESSION_ID || process.env.CLAUDE_SESSION_ID || hookSessionId(hookInput),
+  );
+  if (hookInput && !sessionId) throw new Error('Claude hook input requires session_id or conversation_id');
   const result = runCheckpoint({
     configPath: readFlag('--config', ''),
     workspaceRoot: readFlag('--workspace-root', ''),
@@ -60,7 +101,8 @@ try {
     scope: readFlag('--scope', ''),
     surface: readFlag('--surface', ''),
     sessionLabel: readFlag('--session-label', ''),
-    summary: readFlag('--summary', ''),
+    sessionId,
+    summary: readFlag('--summary', hookInput ? 'Claude lifecycle checkpoint.' : ''),
     decisions: readMultiFlag('--decision'),
     openLoops: readMultiFlag('--open-loop'),
     touchedFiles: readMultiFlag('--touched-file'),

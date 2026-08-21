@@ -46,9 +46,9 @@ Gigabrain uses a hybrid memory model.
 - Native markdown (`MEMORY.md` and `memory/YYYY-MM-DD.md`) is the human-readable layer.
 - The Gigabrain registry is the structured recall layer built on top.
 - In Codex App and Claude standalone mode, the shared store usually lives under `~/.gigabrain/` on fresh installs, while `~/.codex/gigabrain/` remains supported for legacy setups.
-- Use `gigabrain_recall` first for continuity in Codex App sessions, usually with the repo-specific scope your setup generated for this workspace.
+- Recall on demand only when prior decisions, continuity, or explicit preferences matter. Use the exact repo scope generated for the workspace.
 - Use `gigabrain_remember` only for explicit durable saves.
-- Use `gigabrain_checkpoint` at task end after substantial implementation, debugging, planning, or compaction-style summaries.
+- Write at most one `gigabrain_checkpoint` for completed substantial work, with a stable `session_id`. Skip trivial, aborted, read-only audit, and planning-only sessions.
 - Do not grep Gigabrain store files directly unless the MCP server is unavailable.
 
 ### Memory Note Protocol

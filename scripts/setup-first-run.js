@@ -13,6 +13,7 @@ import { projectArbitrationBeliefRows } from '../lib/core/world-model.js';
 import { loadResolvedConfig } from '../lib/core/config.js';
 import { installSessionHook, resolveSessionSettingsPath } from '../lib/core/lifecycle-hooks.js';
 import { atomicWriteFileSync, readFileIfExistsSync } from '../lib/core/safe-fs.js';
+import { createAgentMemoryPolicyBody } from '../lib/core/agent-memory-policy.js';
 
 const HELP = `Gigabrain first-run setup
 
@@ -27,9 +28,9 @@ Flags:
   --agents-path <path>  AGENTS.md path (default: <workspace>/AGENTS.md)
   --skip-agents         Do not add/update AGENTS.md memory protocol block
   --skip-restart        Do not run 'openclaw gateway restart'
-  --no-session-hook     Do NOT install the Claude Code SessionEnd auto-flush hook
-                        (it is installed by default — OPT-OUT — as the safety net
-                        for the lost-facts hole when a session dies with no flush)
+  --session-hook        Install the Claude Code lifecycle checkpoint hook
+                        (disabled by default; explicit checkpoints are safer)
+  --no-session-hook     Explicitly keep the lifecycle hook disabled
   --session-settings <path>  Explicit settings.json target for the session hook
   --help                Print this help
 `;
@@ -37,16 +38,7 @@ Flags:
 const START_MARKER = '<!-- GIGABRAIN_MEMORY_PROTOCOL_START -->';
 const END_MARKER = '<!-- GIGABRAIN_MEMORY_PROTOCOL_END -->';
 const MEMORY_BLOCK = `${START_MARKER}
-## Memory
-
-Gigabrain uses a hybrid memory model.
-
-- Native markdown (\`MEMORY.md\` and \`memory/YYYY-MM-DD.md\`) is the human-readable layer.
-- The Gigabrain registry is the structured recall layer built on top.
-- Gigabrain is the primary memory layer for normal recall answers in this workspace.
-- Use injected Gigabrain context first before reaching for deeper verification tools.
-- Only use \`memory_search\` / \`memory_get\` for explicit verification, exact source, exact wording, or exact date questions.
-- Do not mention provenance, file paths, line numbers, memory ids, or source mechanics unless the user explicitly asks.
+${createAgentMemoryPolicyBody().trim()}
 
 ### Remember Behavior
 
@@ -72,9 +64,9 @@ When the user does NOT explicitly ask to save memory:
 - Do NOT emit \`<memory_note>\` tags.
 - Normal conversation does not trigger memory capture.
 
-When answering normal memory questions:
-- Prefer the already injected Gigabrain memory context first.
-- Treat \`memory_search\` / \`memory_get\` as verification tools, not as the default first step.
+When answering a question that depends on prior context:
+- Recall on demand with the exact workspace scope.
+- Treat recalled rows as candidate evidence and verify consequential claims.
 - If the user asks "where is that written?", "what is the exact wording?", or "what exact date was that?", verification tools are appropriate.
 
 Never include secrets, credentials, tokens, or API keys in memory notes.
@@ -245,7 +237,7 @@ const main = () => {
   const requestedWorkspace = readFlag('--workspace', '');
   const skipAgents = hasFlag('--skip-agents');
   const skipRestart = hasFlag('--skip-restart');
-  const skipSessionHook = hasFlag('--no-session-hook');
+  const installSessionHookFlag = hasFlag('--session-hook') && !hasFlag('--no-session-hook');
 
   const openclawConfig = readJson(configPath, {});
   if (!openclawConfig || typeof openclawConfig !== 'object' || Array.isArray(openclawConfig)) {
@@ -377,12 +369,10 @@ const main = () => {
     agentsResult = upsertAgentsBlock(agentsPath);
   }
 
-  // Idea #4: install the Claude Code SessionEnd auto-flush hook OPT-OUT — this is
-  // the safety net for the lost-facts hole (a session that dies with no flush
-  // turn loses untagged facts). BEST-EFFORT: a refusal (foreign hook), a missing
-  // home dir, or any write error must NEVER fail setup.
-  let sessionHook = 'skipped';
-  if (!skipSessionHook) {
+  // Lifecycle checkpointing is opt-in. Explicit, receipted checkpoints avoid
+  // duplicate teardown writes and keep startup/teardown behavior observable.
+  let sessionHook = 'disabled';
+  if (installSessionHookFlag) {
     try {
       const settingsPath = resolveSessionSettingsPath({
         explicit: readFlag('--session-settings', ''),

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import type { DatabaseSync } from 'node:sqlite';
 
 import { V3_CONFIG_SCHEMA, normalizeConfig } from './lib/core/config.js';
 import { GIGABRAIN_HTTP_ROUTES, createMemoryHttpHandler } from './lib/core/http-routes.js';
@@ -361,7 +362,7 @@ const markSessionBriefed = (cache: Map<string, number>, sessionKey: string) => {
   }
 };
 
-const withDb = <T,>(dbPath: string, config: PluginConfig, fn: (db: any) => T): T => {
+const withDb = <T,>(dbPath: string, config: PluginConfig, fn: (db: DatabaseSync) => T): T => {
   // Reuse the shared SQLite opener so transient writer contention waits instead of failing fast.
   const db = openDatabase(dbPath);
   try {
@@ -375,6 +376,15 @@ const withDb = <T,>(dbPath: string, config: PluginConfig, fn: (db: any) => T): T
       materializeProjectionFromMemories(db);
     }
     ensureWorldModelReady({ db, config });
+    return fn(db);
+  } finally {
+    db.close();
+  }
+};
+
+const withReadDb = <T,>(dbPath: string, fn: (db: DatabaseSync) => T): T => {
+  const db = openDatabase(dbPath, { readOnly: true });
+  try {
     return fn(db);
   } finally {
     db.close();
@@ -496,6 +506,7 @@ const gigabrainPlugin = {
     }
 
     api.on('before_agent_start', async (event: any, ctx: any) => {
+      if (config.recall?.autoInjectEnabled !== true) return;
       try {
         const resolvedEvent = mergeEventWithCtx(event, ctx);
         const baseQuery = extractUserQuery(resolvedEvent);
@@ -504,13 +515,14 @@ const gigabrainPlugin = {
         if (shouldSkipRecall(query)) return;
         const scope = resolveScopeForEvent(resolvedEvent);
         const sessionKey = resolveSessionKey(resolvedEvent);
-        const { recall, sessionPrelude } = withDb(dbPath, config, (db) => {
+        const { recall, sessionPrelude } = withReadDb(dbPath, (db) => {
           const recallStartMs = performance.now();
           const orchestrated = orchestrateRecall({
             db,
             config,
             query,
             scope,
+            scopeVisibility: { allowMaintenance: false },
           });
           const recallElapsedMs = Math.round(performance.now() - recallStartMs);
           const recallChars = String(orchestrated?.injection || '').length;

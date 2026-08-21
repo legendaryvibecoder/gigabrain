@@ -525,9 +525,8 @@ Flags:
                       an ADVISORY git pre-push hook into the current repo (warns
                       about new findings and NEVER blocks a push). --kind=session
                       writes a Claude Code SessionEnd (+ PreCompact) hook into the
-                      project (or user) settings.json that auto-runs a Gigabrain
-                      checkpoint when a session ends — the safety net for the
-                      lost-facts hole (crash / /clear / OOM with no flush turn).
+                      project or user settings. The hook records one structured,
+                      deduplicated lifecycle checkpoint per stable host session.
   --uninstall-hook    Remove the hook --install-hook wrote (honors --kind; refuses
                       to touch a hook Gigabrain did not install)
   --kind <kind>       pre-push (default) | session
@@ -654,11 +653,9 @@ const commandWatchUninstallHook = () => {
   console.log(JSON.stringify({ ok: true, action: 'watch_uninstall_hook', removed: true, hookPath }, null, 2));
 };
 
-// Idea #4: auto-flush via REAL host lifecycle hooks. The git pre-push hook above
-// fires on a `git push`; the session hook fires on the host's own lifecycle
-// (Claude Code SessionEnd + PreCompact) — the safety net for the lost-facts hole
-// (crash / /clear / OOM with no flush turn). All ownership/refusal/merge safety
-// lives in lib/core/lifecycle-hooks.js and mirrors the pre-push hook exactly.
+// The git pre-push hook above fires on `git push`; the optional session hook
+// records a structured checkpoint on Claude Code SessionEnd and PreCompact.
+// Ownership, refusal, and merge safety live in lib/core/lifecycle-hooks.js.
 const commandSessionInstallHook = () => {
   const settingsPath = resolveSessionSettingsPath({ explicit: readFlag('--settings', '') });
   const result = installSessionHook({

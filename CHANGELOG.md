@@ -2,6 +2,29 @@
 
 All notable changes to Gigabrain are documented in this file.
 
+## [0.11.0] - 2026-08-21
+
+### Added
+- One canonical on-demand memory policy shared by generated Codex and Claude project instructions.
+- Regression coverage for cross-store rank fusion, exact scope isolation, read-only recall, bounded checkpoints, private-profile filtering, and MCP shutdown on stdin EOF.
+
+### Changed
+- Automatic recall injection and session preludes are off by default.
+- Claude SessionEnd and PreCompact checkpoint hooks are opt-in through `--session-hook`.
+- Checkpoints are grouped into one contiguous native block and deduplicated by stable `session_id`.
+- Recall queries with at least four informative tokens require two token matches unless dense cosine is at least 0.65; shorter queries require one.
+
+### Fixed
+- Cross-store results now use reciprocal-rank fusion instead of comparing pool-relative raw scores.
+- Explicit project scopes no longer query the personal store or expose profile rows from the project database.
+- Recall no longer syncs native files, rebuilds the world model, or runs maintenance as a read side effect.
+- Stdio MCP processes shut down when their client closes stdin or their parent process exits.
+- Opt-in Claude lifecycle hooks now consume bounded host hook input, preserve the stable session id, and write a valid structured checkpoint.
+
+### Security
+- Technical project recall no longer admits unrelated profile/private rows by default.
+- Generated agent policy requires provenance checks before consequential reliance and prohibits profile memory in public artifacts.
+
 ## [0.10.1] — 2026-08-17
 
 ### Added

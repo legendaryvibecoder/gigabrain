@@ -119,8 +119,8 @@ The cloud inbox, transcript recovery, Git wiki, Obsidian reference set, remote b
 | Host surface | Install | What Gigabrain handles |
 | --- | --- | --- |
 | **OpenClaw** | `openclaw plugins install` | Provides an optional memory slot, registry, recall, conflict checks, and maintenance |
-| **Codex desktop, CLI, or IDE** | `npm install` and setup | Keeps the local project and user store on the configured Codex host. It also provides MCP tools. |
-| **Claude Code** | `npm install` and setup | Uses the same standalone store when its configuration matches. Setup adds MCP tools and `.mcp.json` entries. |
+| **Codex desktop, CLI, or IDE** | `npm install` and setup | Provides explicit, on-demand project and user recall through MCP tools. |
+| **Claude Code** | `npm install` and setup | Uses the same standalone store when its configuration matches. Automatic prelude and teardown hooks remain opt-in. |
 | **Claude Desktop** | `claude:desktop:bundle` | Uses the same MCP-backed memory store and tools as Claude Code |
 | **Claude web or ChatGPT web** | Self-hosted remote MCP | Connects to an OAuth-protected, read-only-by-default `/mcp` endpoint. See the [remote setup guide](docs/setup-remote-mcp.md). |
 | **Hermes Agent** | `gigabrain-hermes-setup` | Adds MCP tools and imports local Hermes memory files in read-only mode |
@@ -138,6 +138,15 @@ The cloud inbox, transcript recovery, Git wiki, Obsidian reference set, remote b
 - The release gate scans all publishable files, the npm package contents, Git data, and GitHub data. Its output hides matched values.
 
 The SQLite store and generated Markdown can contain sensitive memory. Protect the host account, use disk encryption, restrict file permissions, and review each export before you move it. Read the full boundary in the [privacy model](docs/public/privacy-model.md).
+
+## Safe defaults
+
+- Recall is observational: it never imports files, rebuilds projections, or runs maintenance.
+- Automatic session-prelude injection is off. Agents recall only when a task needs prior decisions or an explicit preference.
+- An exact project scope does not search the personal store or profile rows.
+- `target: "both"` is for questions that intentionally span project and personal context.
+- Checkpoints require completed substantive work and are bounded to one record per stable `session_id`.
+- Host sync, maintenance, session hooks, and other write paths stay explicit.
 
 ## How it works under the hood
 
@@ -162,7 +171,7 @@ Conversation (OpenClaw / Codex / Claude Code / Claude Desktop)
 ```
 
 - **Capture:** Explicit `remember` calls, host imports, and optional transcript recovery become append-only events. Checkpoints additionally create immutable episodes; durable candidates become reviewable claims rather than silent memories.
-- **Recall:** FTS5 and BM25 search text directly. When local embeddings are available, Gigabrain combines lexical and dense rankings. It then applies scope, status, answer fit, source data, and conflict rules.
+- **Recall:** FTS5 and BM25 search text directly. When local embeddings are available, Gigabrain combines lexical and dense rankings. Cross-store results use reciprocal-rank fusion, then exact scope, relevance, status, source, and conflict rules.
 - **Conflict review:** The world model records competing beliefs for each claim slot and ranks them by trust tier. It next checks independent support. Recency resolves any remaining tie. Clock-skew and source-independence checks protect the result.
 - **Audit reports:** Static Markdown, HTML, and JSON reports show readiness, source coverage, conflicts, stale rows, and omitted secret risks.
 
@@ -196,7 +205,7 @@ npx gigabrainctl sync-hosts --host codex,claude_code  # Import a host again
 npx gigabrainctl vault sync|status          # Use the read-only Obsidian reference set
 npx gigabrainctl transcript sync|status     # Recover raw local transcripts
 npx gigabrainctl wiki project|reconcile|status  # Manage the Git versioned memory wiki
-npx gigabrainctl watch --install-hook --kind=session  # Capture at the end of a session
+npx gigabrainctl watch --install-hook --kind=session  # Optional opt-in teardown checkpoint hook
 npx gigabrainctl export-bundle --out ./memory-bundle.json
 npx gigabrainctl import-bundle --in ./memory-bundle.json
 npx gigabrainctl migrate legacy-drop --dry-run  # Preview legacy cleanup

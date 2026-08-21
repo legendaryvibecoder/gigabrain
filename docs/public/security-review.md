@@ -1,7 +1,7 @@
 # Public security review
 
-Review date: 2026-08-17
-Release candidate: `0.10.1`
+Review date: 2026-08-21
+Release candidate: `0.11.0`
 
 This is a point-in-time engineering review, not a certification or warranty.
 
@@ -14,6 +14,7 @@ This is a point-in-time engineering review, not a certification or warranty.
 | Gitleaks, current release tree | 0 findings |
 | PII/secret scanner, current release tree + npm inventory | 0 findings; the source-private release policy checks blocked identifiers, while the public scanner ships generic path/IP/device/contact/email/secret detectors and synthetic identifier tests. Private identifier hashes and matched values are absent from the public package and failure output |
 | Checkpoint and remote-MCP tests | Deterministic tests cover immutable checkpoint records, proposal/decision authority, exact-scope isolation, OAuth JWT/JWKS validation, audience/resource checks, tool discovery, path redaction, rate limits, and read-only defaults. The protected pull request must rerun them before merge |
+| Utility-memory hardening tests | Deterministic tests cover opt-in session injection, observational recall, project/personal scope rejection, relevance floors, rank-fused cross-store ordering, one checkpoint per stable session, and clean MCP shutdown on stdin EOF |
 | Bandit, optional Python console | 0 high-severity findings |
 | Python runtime security tests | Authentication, route coverage, headers, TTL parsing, DNS-pinned SSRF defenses, bounded upload/URL/JSON-body reads, bounded collection fields, token-rotation-resistant rate keys, pagination bounds, scope-id concealment, connection cleanup, loopback-only recall proxying, duplicate-id conflict handling, audit heuristics, hashed document identifiers, and atomic document writes pass |
 | CodeQL | The public repository reported zero open alerts before this candidate. Branch protection requires fresh JavaScript/TypeScript and Python analyses on the candidate before merge |
@@ -23,6 +24,9 @@ Bandit reports 19 medium-severity and 14 low-severity heuristic findings. One me
 ## Manual review areas
 
 - Every FastAPI data route declares `require_token`; scoped tokens are filtered before row return or proxy recall, and inaccessible per-id memories return the same `404` as missing ids.
+- Automatic session recall injection and synthesized session preludes are disabled by default. Explicit project scopes exclude shared and personal-profile stores, observational recall cannot trigger sync or world-model rebuilds, and explicit scope/target mismatches fail closed.
+- Cross-store recall uses reciprocal-rank fusion with an absolute-quality factor instead of comparing backend-specific raw scores. Queries below the configured lexical or dense-similarity floor return no result.
+- Checkpoint writes group native sections atomically and deduplicate by stable session id, preventing repeated teardown events from rewriting the same checkpoint.
 - Node HTTP data routes use timing-safe token checks, bounded bodies, input validation, bounded per-peer rate-limit state, and authentication-failure limits for every registered protected route. Expensive benchmark, recall, control, and suggestion routes have explicit budgets. Landing and health routes contain no memory data. The unsafe `GB_ALLOW_NO_AUTH=1` development bypass is explicit, warned, and documented as loopback-only.
 - Uploads read at most `MAX_UPLOAD_BYTES + 1`; stored raw-file extensions are allowlisted; PDF page and extracted-text limits are enforced.
 - JSON and multipart bodies are rejected above configurable hard byte caps before validation or multipart parsing; duplicate Content-Length headers fail closed; and document metadata, tag collections, and merge-id collections have count or per-item bounds.

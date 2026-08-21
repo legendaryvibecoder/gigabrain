@@ -63,6 +63,7 @@ const run = async () => {
     assert.equal(seGroups[0].hooks[0].type, 'command', 'hook is a command hook');
     assert.equal(cmd.includes('gigabrain-codex-checkpoint'), true, 'SessionEnd invokes the checkpoint CLI');
     assert.equal(cmd.includes("'/synthetic/config.json'"), true, 'config path is passed through, shell-quoted');
+    assert.equal(cmd.includes('--claude-hook-input'), true, 'hook command consumes bounded Claude hook JSON');
     // PreCompact too.
     assert.equal(ownedGroups(settings, 'PreCompact').length, 1, 'PreCompact also gets a Gigabrain group');
   }
@@ -148,45 +149,71 @@ const run = async () => {
     assert.equal(fs.readFileSync(settingsPath, 'utf8'), '{ this is : not json', 'corrupt file is left untouched');
   }
 
-  // ----- (5) setup installs the hook OPT-OUT (and --no-session-hook skips it) -----
+  // ----- (5) setup keeps auto-flush off by default and supports explicit opt-in -----
   {
-    // (5a) default install (opt-out): setup writes the SessionEnd entry.
-    const ws = makeTempWorkspace('gb-lifecycle-setup-');
+    const ws = makeTempWorkspace('gb-lifecycle-setup-default-');
     fs.writeFileSync(ws.configPath, '{}\n', 'utf8');
-    const sessionSettingsPath = path.join(ws.workspace, 'synthetic.claude', 'settings.json');
-    const installed = spawnSync(process.execPath, [
+    const defaultSettingsPath = path.join(ws.workspace, 'synthetic.claude', 'settings.json');
+    const defaultRun = spawnSync(process.execPath, [
       'scripts/setup-first-run.js',
       '--config', ws.configPath,
       '--workspace', ws.workspace,
       '--agents-path', path.join(ws.workspace, 'AGENTS.md'),
-      '--session-settings', sessionSettingsPath,
+      '--session-settings', defaultSettingsPath,
       '--skip-restart',
       '--skip-agents',
     ], { cwd: repoRoot, encoding: 'utf8', env: process.env });
-    assert.equal(installed.status, 0, `setup should exit 0:\n${installed.stderr}`);
-    const installedSummary = JSON.parse(String(installed.stdout || '{}'));
-    assert.equal(installedSummary.sessionHook, `installed:${sessionSettingsPath}`, 'setup installs the hook by default (opt-out)');
-    const written = readJson(sessionSettingsPath);
-    assert.equal(ownedGroups(written, 'SessionEnd').length, 1, 'setup wrote a marker-owned SessionEnd entry');
+    assert.equal(defaultRun.status, 0, `setup should exit 0:\n${defaultRun.stderr}`);
+    const defaultSummary = JSON.parse(String(defaultRun.stdout || '{}'));
+    assert.equal(defaultSummary.sessionHook, 'disabled', 'setup must not install an implicit teardown checkpoint hook');
+    assert.equal(fs.existsSync(defaultSettingsPath), false, 'default setup writes no session settings');
 
-    // (5b) --no-session-hook opts out: setup writes NO settings.json.
-    const ws2 = makeTempWorkspace('gb-lifecycle-setup-optout-');
+    const ws2 = makeTempWorkspace('gb-lifecycle-setup-optin-');
     fs.writeFileSync(ws2.configPath, '{}\n', 'utf8');
-    const optOutSettingsPath = path.join(ws2.workspace, 'synthetic.claude', 'settings.json');
-    const optedOut = spawnSync(process.execPath, [
+    const optInSettingsPath = path.join(ws2.workspace, 'synthetic.claude', 'settings.json');
+    const optedIn = spawnSync(process.execPath, [
       'scripts/setup-first-run.js',
       '--config', ws2.configPath,
       '--workspace', ws2.workspace,
       '--agents-path', path.join(ws2.workspace, 'AGENTS.md'),
-      '--session-settings', optOutSettingsPath,
-      '--no-session-hook',
+      '--session-settings', optInSettingsPath,
+      '--session-hook',
       '--skip-restart',
       '--skip-agents',
     ], { cwd: repoRoot, encoding: 'utf8', env: process.env });
-    assert.equal(optedOut.status, 0, `setup --no-session-hook should exit 0:\n${optedOut.stderr}`);
-    const optOutSummary = JSON.parse(String(optedOut.stdout || '{}'));
-    assert.equal(optOutSummary.sessionHook, 'skipped', '--no-session-hook skips the install');
-    assert.equal(fs.existsSync(optOutSettingsPath), false, '--no-session-hook writes no settings.json');
+    assert.equal(optedIn.status, 0, `setup --session-hook should exit 0:\n${optedIn.stderr}`);
+    const optInSummary = JSON.parse(String(optedIn.stdout || '{}'));
+    assert.equal(optInSummary.sessionHook, `installed:${optInSettingsPath}`, '--session-hook installs the owned hook');
+    const written = readJson(optInSettingsPath);
+    assert.equal(ownedGroups(written, 'SessionEnd').length, 1, 'opt-in setup wrote a marker-owned SessionEnd entry');
+    const hookCommand = ownedGroups(written, 'SessionEnd')[0].hooks[0].command;
+    const hookRun = spawnSync('/bin/sh', ['-c', hookCommand], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: process.env,
+      input: JSON.stringify({
+        hook_event_name: 'SessionEnd',
+        session_id: 'synthetic-claude-session',
+      }),
+    });
+    assert.equal(hookRun.status, 0, `installed hook should write a checkpoint:\n${hookRun.stderr}`);
+    const checkpoint = JSON.parse(String(hookRun.stdout || '{}'));
+    assert.equal(checkpoint.ok, true, 'installed hook should report a successful checkpoint');
+    assert.equal(checkpoint.session_id, 'synthetic-claude-session', 'hook should preserve the host session id');
+    assert.equal(checkpoint.written_native, true, 'hook should write one native checkpoint block');
+    const missingSession = spawnSync(process.execPath, [
+      'scripts/gigabrain-codex-checkpoint.js',
+      '--config', ws2.configPath,
+      '--surface', 'claude',
+      '--claude-hook-input',
+    ], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      env: process.env,
+      input: '{}',
+    });
+    assert.equal(missingSession.status, 1, 'hook input without a stable session id must fail closed');
+    assert.match(String(missingSession.stderr || ''), /requires session_id or conversation_id/);
   }
 };
 

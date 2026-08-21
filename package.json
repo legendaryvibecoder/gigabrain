@@ -1,6 +1,6 @@
 {
   "name": "@legendaryvibecoder/gigabrain",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "type": "module",
   "description": "Local-first memory control plane for agents — cross-host recall, provenance, dedupe, audit, native sync",
   "author": "Legendary Vibecoder",
@@ -122,6 +122,7 @@
     "docs/public/privacy-model.md",
     "docs/public/release-readiness.md",
     "docs/public/security-review.md",
+    "docs/public/v0.11.0.md",
     "docs/public/why-gigabrain.md",
     "docs/recall.md",
     "docs/schemas/checkpoint.1.schema.json",

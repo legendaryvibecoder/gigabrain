@@ -13,6 +13,7 @@ const PUBLIC_TEST_FILES = [
   'unit-cloud-inbox-test.js',
   'unit-config-test.js',
   'unit-control-plane-test.js',
+  'unit-cross-store-merge-test.js',
   'unit-event-store-test.js',
   'unit-git-wiki-test.js',
   'unit-handoff-pii-redaction-test.js',
@@ -31,6 +32,7 @@ const PUBLIC_TEST_FILES = [
   'unit-sqlite-test.js',
   'unit-standalone-client-test.js',
   'unit-transcript-harvester-test.js',
+  'unit-utility-hardening-test.js',
 ];
 
 const root = path.dirname(fileURLToPath(import.meta.url));

@@ -137,6 +137,10 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "autoInjectEnabled": {
+            "type": "boolean",
+            "default": false
+          },
           "topK": {
             "type": "number",
             "default": 8
@@ -339,7 +343,7 @@
               },
               "includeSessionPrelude": {
                 "type": "boolean",
-                "default": true
+                "default": false
               }
             }
           }

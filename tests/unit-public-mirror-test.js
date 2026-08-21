@@ -504,7 +504,7 @@ const testReleaseManifestStaysNarrow = () => {
     new URL('../public-release-manifest.json', import.meta.url),
     'utf8',
   )));
-  assert.ok(manifest.repository.files.length < 150, 'repository inventory must remain deliberately narrow');
+  assert.ok(manifest.repository.files.length < 160, 'repository inventory must remain deliberately narrow');
   for (const required of [
     '.github/workflows/ci.yml',
     '.github/workflows/codeql.yml',

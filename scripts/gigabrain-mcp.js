@@ -96,8 +96,11 @@ if (!['stdio', 'http'].includes(transportKind)) {
 }
 
 let activeServer = null;
+let shuttingDown = false;
 
 const shutdown = async (exitCode = 0) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
   try {
     if (typeof activeServer?.close === 'function') {
       await activeServer.close();
@@ -117,6 +120,25 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   void shutdown(0);
 });
+
+if (transportKind === 'stdio') {
+  process.stdin.once('end', () => {
+    void shutdown(0);
+  });
+  process.stdin.once('close', () => {
+    void shutdown(0);
+  });
+  const parentPid = process.ppid;
+  const parentWatch = setInterval(() => {
+    try {
+      process.kill(parentPid, 0);
+    } catch {
+      clearInterval(parentWatch);
+      void shutdown(0);
+    }
+  }, 2000);
+  parentWatch.unref();
+}
 
 const main = async () => {
   if (transportKind === 'stdio') {
@@ -152,6 +174,10 @@ const main = async () => {
 };
 
 main().catch((error) => {
+  if (transportKind === 'stdio' && (shuttingDown || process.stdin.readableEnded)) {
+    void shutdown(0);
+    return;
+  }
   console.error(error instanceof Error ? error.stack || error.message : String(error));
   process.exit(1);
 });

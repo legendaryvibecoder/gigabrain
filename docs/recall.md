@@ -1,6 +1,6 @@
 # How Recall Works
 
-Before each prompt, Gigabrain automatically retrieves relevant context through its recall pipeline.
+Gigabrain recalls context on demand through MCP, HTTP, or CLI surfaces. Automatic per-prompt injection is disabled by default.
 
 ## Recall pipeline
 
@@ -14,9 +14,9 @@ Before each prompt, Gigabrain automatically retrieves relevant context through i
 8. **Temporal safety** — older memories that say `today` / `heute` / `currently` are marked with their recorded date instead of being treated as if they refer to the current day
 9. **World-model synthesis** — where possible, prefers entity/timeline syntheses over raw snippet piles
 10. Applies class budgets (core / situational / decisions) and token limits
-11. Injects the results as a system message placed before the last user message in the conversation, without exposing internal provenance like file paths or memory ids
+11. Returns structured results and, when requested by an opt-in plugin deployment, a compact system-context block without local file paths or memory ids
 
-The agent doesn't need to do anything special for recall — it happens automatically via the gateway plugin hooks.
+Agents should call recall only when the task depends on prior decisions, continuity, or an explicit user preference. Set `recall.autoInjectEnabled` to `true` only for a deployment that deliberately accepts always-on recall.
 
 If you also use OpenClaw's separate `memory_search` / `memory_get` tools, note that their visible `Source:` behavior is controlled by OpenClaw's own `memory.citations` setting, not by Gigabrain.
 

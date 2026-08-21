@@ -57,20 +57,28 @@ OpenClaw mode keeps config under `plugins.entries.gigabrain.config` in `openclaw
 ```json
 {
   "recall": {
+    "autoInjectEnabled": false,
     "topK": 8,
-    "minScore": 0.45,
     "maxTokens": 1200,
-    "mode": "hybrid"
+    "mode": "hybrid",
+    "relevanceFloor": {
+      "minMatchedTokens": 2,
+      "denseCosine": 0.65
+    }
   }
 }
 ```
 
+- `autoInjectEnabled` — default `false`; agents recall on demand unless an operator deliberately enables always-on prompt injection
 - `topK` — maximum memories injected per prompt
 - `mode` — `personal_core` (identity-heavy), `project_context` (task-heavy), or `hybrid`
 - `classBudgets` — budget split between core/situational/decisions (must sum to 1.0)
 - `semanticRerankEnabled` — **default `true` (U14)**: recall fuses the lexical FTS5 ranking with a dense bge-m3 cosine ranking (weighted Borda-count rank aggregation) over embeddings cached in `memory_embeddings`; capture's embedding-kNN neighbor selection reads the same flag. Degrades silently to lexical-only when Ollama is unreachable or no embeddings are cached — no crash, no log spam. Set to `false` for strictly lexical recall.
 - `crossEncoderRerankEnabled` — default `false`: seam for a cross-encoder rerank over the fused candidate set; currently an identity passthrough until a measured experiment wires a model in.
 - `ollamaUrl` / `embeddingModel` / `embeddingTimeoutMs` — dense-leg embedding endpoint (loopback-only, port 11434 enforced), model (`bge-m3`), and per-call timeout
+- `relevanceFloor.minMatchedTokens` — default `2` for queries with at least four informative tokens; short queries require one token
+- `relevanceFloor.denseCosine` — default `0.65`; a sufficiently strong dense match may pass without the lexical minimum
+- Recall never performs native sync, projection rebuild, or maintenance. Run those write paths explicitly.
 
 ## Orchestrator and world model
 
@@ -99,7 +107,7 @@ OpenClaw mode keeps config under `plugins.entries.gigabrain.config` in `openclaw
     "enabled": true,
     "briefing": {
       "enabled": true,
-      "includeSessionPrelude": true
+      "includeSessionPrelude": false
     }
   }
 }
@@ -107,7 +115,7 @@ OpenClaw mode keeps config under `plugins.entries.gigabrain.config` in `openclaw
 
 - The orchestrator chooses a profile-first recall path and only allows deep lookup for source/date/wording verification or true low-confidence-no-brief cases
 - The world model projects atomic memories into internal entities, beliefs, episodes, contradictions, and syntheses without replacing the underlying registry
-- Syntheses generate reusable briefs for recall, current state, what changed, and session-start context
+- Syntheses generate reusable briefs for explicit recall and current-state views. Set `includeSessionPrelude` to `true` only when always-on session context is an intentional deployment choice.
 
 ### `worldModel.enabled`
 
