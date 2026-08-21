@@ -59,21 +59,38 @@ const run = async () => {
       on: (event, handler) => handlers.set(event, handler),
     });
     const db = openDb(ws.dbPath);
-    seedMemoryCurrent(db, [{
-      memory_id: 'plugin-observational-recall',
-      type: 'DECISION',
-      scope: 'cpto',
-      content: 'The cpto agent owns roadmap planning and release sequencing.',
-      normalized: 'the cpto agent owns roadmap planning and release sequencing',
-    }]);
+    seedMemoryCurrent(db, [
+      {
+        memory_id: 'plugin-observational-recall',
+        type: 'DECISION',
+        scope: 'project:alpha',
+        content: 'Project alpha owns roadmap planning and release sequencing.',
+        normalized: 'project alpha owns roadmap planning and release sequencing',
+      },
+      {
+        memory_id: 'plugin-shared-shadow',
+        type: 'CONTEXT',
+        scope: 'shared',
+        content: 'Shared shadow also says roadmap planning and release sequencing.',
+        normalized: 'shared shadow also says roadmap planning and release sequencing',
+      },
+      {
+        memory_id: 'plugin-private-profile-shadow',
+        type: 'USER_FACT',
+        scope: 'profile:user',
+        content: 'Private profile shadow also says roadmap planning and release sequencing.',
+        normalized: 'private profile shadow also says roadmap planning and release sequencing',
+      },
+    ]);
     const before = mutationCounts(db);
     db.close();
 
     const recall = await handlers.get('before_agent_start')(
       { messages: [{ role: 'user', content: 'Who owns roadmap planning?' }] },
-      { agentId: 'cpto', sessionKey: 'plugin-observational-session', workspaceDir: ws.workspace },
+      { agentId: 'project:alpha', sessionKey: 'plugin-observational-session', workspaceDir: ws.workspace },
     );
     assert.match(String(recall?.appendSystemContext || ''), /roadmap planning and release sequencing/);
+    assert.doesNotMatch(String(recall?.appendSystemContext || ''), /Shared shadow|Private profile shadow/);
 
     const afterDb = openDb(ws.dbPath);
     const after = mutationCounts(afterDb);

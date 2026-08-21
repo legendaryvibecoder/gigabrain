@@ -522,7 +522,11 @@ const gigabrainPlugin = {
             config,
             query,
             scope,
-            scopeVisibility: { allowMaintenance: false },
+            scopeVisibility: {
+              includeProfile: false,
+              includeShared: !String(scope || '').startsWith('project:'),
+              allowMaintenance: false,
+            },
           });
           const recallElapsedMs = Math.round(performance.now() - recallStartMs);
           const recallChars = String(orchestrated?.injection || '').length;

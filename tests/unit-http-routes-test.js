@@ -118,13 +118,29 @@ const run = async () => {
   try {
     const configObject = makeConfigObject(ws.workspace);
     const db = openDb(ws.dbPath);
-    seedMemoryCurrent(db, [{
-      memory_id: 'http-observational-recall',
-      type: 'DECISION',
-      scope: 'shared',
-      content: 'The copper lighthouse release policy is active.',
-      normalized: 'the copper lighthouse release policy is active',
-    }]);
+    seedMemoryCurrent(db, [
+      {
+        memory_id: 'http-shared-recall',
+        type: 'DECISION',
+        scope: 'shared',
+        content: 'Shared copper lighthouse release policy is active.',
+        normalized: 'shared copper lighthouse release policy is active',
+      },
+      {
+        memory_id: 'http-project-recall',
+        type: 'DECISION',
+        scope: 'project:alpha',
+        content: 'Project copper lighthouse release policy is active.',
+        normalized: 'project copper lighthouse release policy is active',
+      },
+      {
+        memory_id: 'http-private-profile-shadow',
+        type: 'USER_FACT',
+        scope: 'profile:user',
+        content: 'Private profile copper lighthouse release policy is active.',
+        normalized: 'private profile copper lighthouse release policy is active',
+      },
+    ]);
     db.close();
     const handler = createMemoryHttpHandler({
       dbPath: ws.dbPath,
@@ -148,6 +164,31 @@ const run = async () => {
       assert.equal(response.ok, true, 'HTTP recall should remain available through the read-only path');
       const payload = await response.json();
       assert.match(String(payload.results?.[0]?.content || ''), /copper lighthouse/);
+      assert.deepEqual(
+        [...new Set((payload.results || []).map((row) => row.scope))],
+        ['shared'],
+        'missing HTTP scope must default to shared-only recall',
+      );
+      const projectResponse = await fetch(`${baseUrl}/gb/recall`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-gb-token': 'test-http-token',
+        },
+        body: JSON.stringify({
+          query: 'copper lighthouse release policy',
+          scope: 'project:alpha',
+          topK: 10,
+        }),
+      });
+      assert.equal(projectResponse.ok, true, 'explicit project HTTP recall should return 200');
+      const projectPayload = await projectResponse.json();
+      assert.match(String(projectPayload.results?.[0]?.content || ''), /Project copper lighthouse/);
+      assert.deepEqual(
+        [...new Set((projectPayload.results || []).map((row) => row.scope))],
+        ['project:alpha'],
+        'explicit project HTTP recall must exclude shared and profile rows',
+      );
     } finally {
       await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
     }
