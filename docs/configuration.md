@@ -79,6 +79,7 @@ OpenClaw mode keeps config under `plugins.entries.gigabrain.config` in `openclaw
 - `relevanceFloor.minMatchedTokens` — default `2` for queries with at least four informative tokens; short queries require one token
 - `relevanceFloor.denseCosine` — default `0.65`; a sufficiently strong dense match may pass without the lexical minimum
 - Recall never performs native sync, projection rebuild, or maintenance. Run those write paths explicitly.
+- Local HTTP recall defaults an omitted scope to `shared`. An explicit `project:*` scope is exact and excludes shared and profile rows; an explicit `profile:*` scope is the intentional personal-memory path.
 
 ## Orchestrator and world model
 

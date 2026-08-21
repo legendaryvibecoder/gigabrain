@@ -98,6 +98,27 @@ const run = async () => {
     assert.deepEqual(afterRecall, beforeRecall, 'recall must not mutate sync, event, entity, or projection tables');
     assert.match(contents(scoped), /copper lighthouse/);
     assert.doesNotMatch(contents(scoped), /violet submarine|amber kestrel|topaz snow leopard/);
+    const maintenanceProbeDb = new DatabaseSync(dbPath);
+    try {
+      maintenanceProbeDb.exec('PRAGMA foreign_keys = OFF; DELETE FROM memory_entities;');
+    } finally {
+      maintenanceProbeDb.close();
+    }
+    const beforeReceiptedRecall = mutationCounts(dbPath);
+    const receiptedRecall = await runRecall({
+      configPath,
+      target: 'project',
+      query: 'target merge fix live worktree release',
+      topK: 8,
+      recordReceipt: true,
+    });
+    const afterReceiptedRecall = mutationCounts(dbPath);
+    assert.ok(receiptedRecall.receipt_id, 'explicit receipt recording should return a receipt id');
+    assert.deepEqual(
+      afterReceiptedRecall,
+      beforeReceiptedRecall,
+      'receipt recording must not trigger sync, event, entity, or projection maintenance',
+    );
     const shortQuery = await runRecall({
       configPath,
       target: 'project',

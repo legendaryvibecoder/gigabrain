@@ -23,6 +23,7 @@ All notable changes to Gigabrain are documented in this file.
 
 ### Security
 - Technical project recall no longer admits unrelated profile/private rows by default.
+- Plugin and HTTP recall exclude profile rows; explicit `project:*` scopes also exclude shared rows, and omitted HTTP scope defaults to shared-only recall.
 - Generated agent policy requires provenance checks before consequential reliance and prohibits profile memory in public artifacts.
 
 ## [0.10.1] — 2026-08-17
